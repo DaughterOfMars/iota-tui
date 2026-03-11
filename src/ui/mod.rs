@@ -1,0 +1,40 @@
+mod coins;
+mod objects;
+mod packages;
+mod address_book;
+mod keys;
+mod tx_builder;
+mod common;
+
+use ratatui::Frame;
+use crate::app::{App, Screen};
+
+pub fn draw(frame: &mut Frame, app: &mut App) {
+    let area = frame.area();
+
+    let layout = ratatui::layout::Layout::vertical([
+        ratatui::layout::Constraint::Length(1),  // tab bar
+        ratatui::layout::Constraint::Length(1),  // separator
+        ratatui::layout::Constraint::Min(10),    // content
+        ratatui::layout::Constraint::Length(1),  // status bar
+    ]).split(area);
+
+    common::draw_tabs(frame, app, layout[0]);
+    common::draw_separator(frame, layout[1]);
+
+    match app.screen {
+        Screen::Coins => coins::draw(frame, app, layout[2]),
+        Screen::Objects => objects::draw(frame, app, layout[2]),
+        Screen::Packages => packages::draw(frame, app, layout[2]),
+        Screen::AddressBook => address_book::draw(frame, app, layout[2]),
+        Screen::Keys => keys::draw(frame, app, layout[2]),
+        Screen::TxBuilder => tx_builder::draw(frame, app, layout[2]),
+    }
+
+    common::draw_status_bar(frame, app, layout[3]);
+
+    // Draw popup overlay last
+    if app.popup.is_some() {
+        common::draw_popup(frame, app);
+    }
+}

@@ -1,0 +1,11 @@
+[package]
+name = "iota-wallet-tui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ratatui = "0.29"
+crossterm = { version = "0.28", features = ["event-stream"] }
+color-eyre = "0.6"
+unicode-width = "0.2"
+rand = "0.8"
