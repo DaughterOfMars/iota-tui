@@ -6,13 +6,13 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, Paragraph, Row, Table},
 };
 
-use crate::app::{App, InputMode, TxBuilderStep};
 use super::common;
+use crate::app::{App, InputMode, TxBuilderStep};
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let layout = Layout::vertical([
         Constraint::Length(3), // step indicator
-        Constraint::Min(10),  // step content
+        Constraint::Min(10),   // step content
     ])
     .split(area);
 
@@ -116,9 +116,10 @@ fn draw_recipients(frame: &mut Frame, app: &App, area: Rect) {
     if app.tx_recipients.is_empty() {
         let text = vec![
             Line::from(""),
-            Line::from(vec![
-                Span::styled("  No recipients added yet.", common::dim_style()),
-            ]),
+            Line::from(vec![Span::styled(
+                "  No recipients added yet.",
+                common::dim_style(),
+            )]),
             Line::from(""),
             Line::from(vec![
                 Span::styled("  Press ", common::dim_style()),
@@ -194,20 +195,22 @@ fn draw_gas(frame: &mut Frame, app: &App, area: Rect) {
     let text = vec![
         Line::from(""),
         Line::from(vec![
-            Span::styled("  Gas Budget (MIST): ", Style::default().fg(Color::White).bold()),
+            Span::styled(
+                "  Gas Budget (MIST): ",
+                Style::default().fg(Color::White).bold(),
+            ),
             Span::styled(&display, budget_style),
         ]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled(
-                format!("  Approx: {} IOTA", parse_gas_iota(&app.tx_gas_budget)),
-                common::dim_style(),
-            ),
-        ]),
+        Line::from(vec![Span::styled(
+            format!("  Approx: {} IOTA", parse_gas_iota(&app.tx_gas_budget)),
+            common::dim_style(),
+        )]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled(format!("  {}", edit_hint), common::dim_style()),
-        ]),
+        Line::from(vec![Span::styled(
+            format!("  {}", edit_hint),
+            common::dim_style(),
+        )]),
     ];
 
     frame.render_widget(Paragraph::new(text).block(block), area);
@@ -223,7 +226,13 @@ fn draw_review(frame: &mut Frame, app: &App, area: Rect) {
     let sender = app
         .keys
         .get(app.tx_sender)
-        .map(|k| format!("{} ({})", common::truncate_address(&k.address, 30), k.alias.as_str()))
+        .map(|k| {
+            format!(
+                "{} ({})",
+                common::truncate_address(&k.address, 30),
+                k.alias.as_str()
+            )
+        })
         .unwrap_or_else(|| "None".into());
 
     let mut lines = vec![
@@ -234,21 +243,24 @@ fn draw_review(frame: &mut Frame, app: &App, area: Rect) {
         ]),
         Line::from(vec![
             Span::styled("  Gas Budget: ", Style::default().fg(Color::White).bold()),
-            Span::raw(format!("{} MIST ({} IOTA)", app.tx_gas_budget, parse_gas_iota(&app.tx_gas_budget))),
+            Span::raw(format!(
+                "{} MIST ({} IOTA)",
+                app.tx_gas_budget,
+                parse_gas_iota(&app.tx_gas_budget)
+            )),
         ]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled(
-                format!("  Recipients ({}):", app.tx_recipients.len()),
-                Style::default().fg(Color::White).bold(),
-            ),
-        ]),
+        Line::from(vec![Span::styled(
+            format!("  Recipients ({}):", app.tx_recipients.len()),
+            Style::default().fg(Color::White).bold(),
+        )]),
     ];
 
     if app.tx_recipients.is_empty() {
-        lines.push(Line::from(vec![
-            Span::styled("    (none)", Style::default().fg(Color::Red)),
-        ]));
+        lines.push(Line::from(vec![Span::styled(
+            "    (none)",
+            Style::default().fg(Color::Red),
+        )]));
     } else {
         for (i, r) in app.tx_recipients.iter().enumerate() {
             lines.push(Line::from(vec![
@@ -260,9 +272,10 @@ fn draw_review(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     lines.push(Line::from(""));
-    lines.push(Line::from(vec![
-        Span::styled("  Press Enter to sign and submit", Style::default().fg(Color::Green).bold()),
-    ]));
+    lines.push(Line::from(vec![Span::styled(
+        "  Press Enter to sign and submit",
+        Style::default().fg(Color::Green).bold(),
+    )]));
 
     frame.render_widget(Paragraph::new(lines).block(block), area);
 }

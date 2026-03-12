@@ -6,15 +6,11 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Row, Table},
 };
 
-use crate::app::App;
 use super::common;
+use crate::app::App;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
-    let layout = Layout::vertical([
-        Constraint::Min(6),
-        Constraint::Length(7),
-    ])
-    .split(area);
+    let layout = Layout::vertical([Constraint::Min(6), Constraint::Length(7)]).split(area);
 
     draw_key_table(frame, app, layout[0]);
     draw_detail(frame, app, layout[1]);
@@ -30,9 +26,10 @@ fn draw_key_table(frame: &mut Frame, app: &App, area: Rect) {
 
         let text = vec![
             Line::from(""),
-            Line::from(vec![
-                Span::styled("  No keys configured yet.", common::dim_style()),
-            ]),
+            Line::from(vec![Span::styled(
+                "  No keys configured yet.",
+                common::dim_style(),
+            )]),
             Line::from(""),
             Line::from(vec![
                 Span::styled("  Press ", common::dim_style()),
@@ -86,15 +83,13 @@ fn draw_key_table(frame: &mut Frame, app: &App, area: Rect) {
         Constraint::Min(24),
     ];
 
-    let table = Table::new(rows, widths)
-        .header(header)
-        .block(
-            Block::default()
-                .title(format!(" Keys ({}) ", app.keys.len()))
-                .title_style(common::header_style())
-                .borders(Borders::ALL)
-                .border_style(common::dim_style()),
-        );
+    let table = Table::new(rows, widths).header(header).block(
+        Block::default()
+            .title(format!(" Keys ({}) ", app.keys.len()))
+            .title_style(common::header_style())
+            .borders(Borders::ALL)
+            .border_style(common::dim_style()),
+    );
 
     frame.render_widget(table, area);
 }
@@ -109,11 +104,19 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
     let content = if let Some(key) = app.keys.get(app.keys_selected) {
         let addr_width = area.width.saturating_sub(14) as usize;
         let active_str = if key.is_active { "Yes (active)" } else { "No" };
-        let active_color = if key.is_active { Color::Green } else { Color::White };
+        let active_color = if key.is_active {
+            Color::Green
+        } else {
+            Color::White
+        };
 
         let private_line = if app.keys_show_private {
             let hex_display = if key.private_key_hex.len() > addr_width {
-                format!("{}...{}", &key.private_key_hex[..16], &key.private_key_hex[key.private_key_hex.len().saturating_sub(8)..])
+                format!(
+                    "{}...{}",
+                    &key.private_key_hex[..16],
+                    &key.private_key_hex[key.private_key_hex.len().saturating_sub(8)..]
+                )
             } else {
                 key.private_key_hex.clone()
             };
@@ -124,7 +127,10 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
         } else {
             Line::from(vec![
                 Span::styled("  Private: ", Style::default().fg(Color::White).bold()),
-                Span::styled("********** (press 'p' to reveal)", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    "********** (press 'p' to reveal)",
+                    Style::default().fg(Color::DarkGray),
+                ),
             ])
         };
 

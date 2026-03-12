@@ -6,15 +6,11 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Row, Table},
 };
 
-use crate::app::App;
 use super::common;
+use crate::app::App;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
-    let layout = Layout::vertical([
-        Constraint::Min(6),
-        Constraint::Length(6),
-    ])
-    .split(area);
+    let layout = Layout::vertical([Constraint::Min(6), Constraint::Length(6)]).split(area);
 
     draw_address_table(frame, app, layout[0]);
     draw_detail(frame, app, layout[1]);
@@ -57,15 +53,13 @@ fn draw_address_table(frame: &mut Frame, app: &App, area: Rect) {
         Constraint::Length(28),
     ];
 
-    let table = Table::new(rows, widths)
-        .header(header)
-        .block(
-            Block::default()
-                .title(format!(" Address Book ({}) ", app.address_book.len()))
-                .title_style(common::header_style())
-                .borders(Borders::ALL)
-                .border_style(common::dim_style()),
-        );
+    let table = Table::new(rows, widths).header(header).block(
+        Block::default()
+            .title(format!(" Address Book ({}) ", app.address_book.len()))
+            .title_style(common::header_style())
+            .borders(Borders::ALL)
+            .border_style(common::dim_style()),
+    );
 
     frame.render_widget(table, area);
 }

@@ -1,23 +1,24 @@
+mod address_book;
 mod coins;
+mod common;
+mod keys;
 mod objects;
 mod packages;
-mod address_book;
-mod keys;
 mod tx_builder;
-mod common;
 
-use ratatui::Frame;
 use crate::app::{App, Screen};
+use ratatui::Frame;
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
 
     let layout = ratatui::layout::Layout::vertical([
-        ratatui::layout::Constraint::Length(1),  // tab bar
-        ratatui::layout::Constraint::Length(1),  // separator
-        ratatui::layout::Constraint::Min(10),    // content
-        ratatui::layout::Constraint::Length(1),  // status bar
-    ]).split(area);
+        ratatui::layout::Constraint::Length(1), // tab bar
+        ratatui::layout::Constraint::Length(1), // separator
+        ratatui::layout::Constraint::Min(10),   // content
+        ratatui::layout::Constraint::Length(1), // status bar
+    ])
+    .split(area);
 
     common::draw_tabs(frame, app, layout[0]);
     common::draw_separator(frame, layout[1]);

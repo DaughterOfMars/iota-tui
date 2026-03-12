@@ -6,15 +6,11 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Row, Table},
 };
 
-use crate::app::App;
 use super::common;
+use crate::app::App;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
-    let layout = Layout::vertical([
-        Constraint::Min(8),
-        Constraint::Length(7),
-    ])
-    .split(area);
+    let layout = Layout::vertical([Constraint::Min(8), Constraint::Length(7)]).split(area);
 
     draw_object_table(frame, app, layout[0]);
     draw_detail(frame, app, layout[1]);
@@ -79,23 +75,24 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
     ];
 
     let title = if app.objects.len() > visible_rows {
-        format!(" Objects ({}) [{}-{}/{}] ",
-            app.objects.len(), app.objects_offset + 1,
+        format!(
+            " Objects ({}) [{}-{}/{}] ",
+            app.objects.len(),
+            app.objects_offset + 1,
             (app.objects_offset + visible_rows).min(app.objects.len()),
-            app.objects.len())
+            app.objects.len()
+        )
     } else {
         format!(" Objects ({}) ", app.objects.len())
     };
 
-    let table = Table::new(rows, widths)
-        .header(header)
-        .block(
-            Block::default()
-                .title(title)
-                .title_style(common::header_style())
-                .borders(Borders::ALL)
-                .border_style(common::dim_style()),
-        );
+    let table = Table::new(rows, widths).header(header).block(
+        Block::default()
+            .title(title)
+            .title_style(common::header_style())
+            .borders(Borders::ALL)
+            .border_style(common::dim_style()),
+    );
 
     frame.render_widget(table, area);
 }

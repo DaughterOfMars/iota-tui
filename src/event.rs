@@ -1,4 +1,6 @@
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 
 use crate::app::{App, InputMode, Popup, Screen, TxBuilderStep, TxRecipient, save_address_book};
 use crate::wallet::WalletCmd;
@@ -43,12 +45,30 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             app.set_status("Refreshing...");
             return;
         }
-        KeyCode::Char('1') => { app.navigate(Screen::Coins); return; }
-        KeyCode::Char('2') => { app.navigate(Screen::Objects); return; }
-        KeyCode::Char('3') => { app.navigate(Screen::Packages); return; }
-        KeyCode::Char('4') => { app.navigate(Screen::AddressBook); return; }
-        KeyCode::Char('5') => { app.navigate(Screen::Keys); return; }
-        KeyCode::Char('6') => { app.navigate(Screen::TxBuilder); return; }
+        KeyCode::Char('1') => {
+            app.navigate(Screen::Coins);
+            return;
+        }
+        KeyCode::Char('2') => {
+            app.navigate(Screen::Objects);
+            return;
+        }
+        KeyCode::Char('3') => {
+            app.navigate(Screen::Packages);
+            return;
+        }
+        KeyCode::Char('4') => {
+            app.navigate(Screen::AddressBook);
+            return;
+        }
+        KeyCode::Char('5') => {
+            app.navigate(Screen::Keys);
+            return;
+        }
+        KeyCode::Char('6') => {
+            app.navigate(Screen::TxBuilder);
+            return;
+        }
         KeyCode::Tab => {
             let idx = app.screen.index();
             let next = (idx + 1) % Screen::ALL.len();
@@ -57,7 +77,11 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         }
         KeyCode::BackTab => {
             let idx = app.screen.index();
-            let next = if idx == 0 { Screen::ALL.len() - 1 } else { idx - 1 };
+            let next = if idx == 0 {
+                Screen::ALL.len() - 1
+            } else {
+                idx - 1
+            };
             app.navigate(Screen::ALL[next]);
             return;
         }
@@ -76,84 +100,83 @@ fn handle_key(app: &mut App, key: KeyEvent) {
 
 fn handle_popup_key(app: &mut App, key: KeyEvent) {
     match app.popup {
-        Some(Popup::Help | Popup::Confirm) => {
-            match key.code {
-                KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => app.popup = None,
-                _ => {}
+        Some(Popup::Help | Popup::Confirm) => match key.code {
+            KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => app.popup = None,
+            _ => {}
+        },
+        Some(Popup::AddAddress | Popup::EditAddress) => match key.code {
+            KeyCode::Esc => {
+                app.popup = None;
+                app.input_mode = InputMode::Normal;
+                app.input_clear();
             }
-        }
-        Some(Popup::AddAddress | Popup::EditAddress) => {
-            match key.code {
-                KeyCode::Esc => {
-                    app.popup = None;
-                    app.input_mode = InputMode::Normal;
-                    app.input_clear();
-                }
-                KeyCode::Tab => {
-                    let val = app.input_buffer.clone();
-                    app.address_edit_buffers[app.address_edit_field] = val;
-                    app.address_edit_field = (app.address_edit_field + 1) % 3;
-                    let next_val = app.address_edit_buffers[app.address_edit_field].clone();
-                    app.start_input(&next_val);
-                }
-                KeyCode::Enter => {
-                    app.address_edit_buffers[app.address_edit_field] = app.input_buffer.clone();
-                    let [label, address, notes] = app.address_edit_buffers.clone();
-                    if !label.is_empty() && !address.is_empty() {
-                        if app.popup == Some(Popup::AddAddress) {
-                            app.address_book.push(crate::app::AddressEntry {
-                                label, address, notes,
-                            });
-                            app.set_status("Address added");
-                        } else if let Some(entry) = app.address_book.get_mut(app.address_selected) {
-                            entry.label = label;
-                            entry.address = address;
-                            entry.notes = notes;
-                            app.set_status("Address updated");
-                        }
-                        save_address_book(&app.address_book);
+            KeyCode::Tab => {
+                let val = app.input_buffer.clone();
+                app.address_edit_buffers[app.address_edit_field] = val;
+                app.address_edit_field = (app.address_edit_field + 1) % 3;
+                let next_val = app.address_edit_buffers[app.address_edit_field].clone();
+                app.start_input(&next_val);
+            }
+            KeyCode::Enter => {
+                app.address_edit_buffers[app.address_edit_field] = app.input_buffer.clone();
+                let [label, address, notes] = app.address_edit_buffers.clone();
+                if !label.is_empty() && !address.is_empty() {
+                    if app.popup == Some(Popup::AddAddress) {
+                        app.address_book.push(crate::app::AddressEntry {
+                            label,
+                            address,
+                            notes,
+                        });
+                        app.set_status("Address added");
+                    } else if let Some(entry) = app.address_book.get_mut(app.address_selected) {
+                        entry.label = label;
+                        entry.address = address;
+                        entry.notes = notes;
+                        app.set_status("Address updated");
                     }
-                    app.popup = None;
-                    app.input_mode = InputMode::Normal;
-                    app.input_clear();
+                    save_address_book(&app.address_book);
                 }
-                _ => handle_input_key(app, key),
+                app.popup = None;
+                app.input_mode = InputMode::Normal;
+                app.input_clear();
             }
-        }
-        Some(Popup::AddRecipient) => {
-            match key.code {
-                KeyCode::Esc => {
-                    app.popup = None;
-                    app.input_mode = InputMode::Normal;
-                    app.input_clear();
-                }
-                KeyCode::Tab => {
-                    let val = app.input_buffer.clone();
-                    app.tx_edit_buffers[app.tx_edit_field] = val;
-                    app.tx_edit_field = (app.tx_edit_field + 1) % 2;
-                    let next_val = app.tx_edit_buffers[app.tx_edit_field].clone();
-                    app.start_input(&next_val);
-                }
-                KeyCode::Enter => {
-                    app.tx_edit_buffers[app.tx_edit_field] = app.input_buffer.clone();
-                    let [address, amount] = app.tx_edit_buffers.clone();
-                    if !address.is_empty() && !amount.is_empty() {
-                        app.tx_recipients.push(TxRecipient { address, amount });
-                        app.set_status("Recipient added");
-                    }
-                    app.popup = None;
-                    app.input_mode = InputMode::Normal;
-                    app.input_clear();
-                }
-                _ => handle_input_key(app, key),
+            _ => handle_input_key(app, key),
+        },
+        Some(Popup::AddRecipient) => match key.code {
+            KeyCode::Esc => {
+                app.popup = None;
+                app.input_mode = InputMode::Normal;
+                app.input_clear();
             }
-        }
+            KeyCode::Tab => {
+                let val = app.input_buffer.clone();
+                app.tx_edit_buffers[app.tx_edit_field] = val;
+                app.tx_edit_field = (app.tx_edit_field + 1) % 2;
+                let next_val = app.tx_edit_buffers[app.tx_edit_field].clone();
+                app.start_input(&next_val);
+            }
+            KeyCode::Enter => {
+                app.tx_edit_buffers[app.tx_edit_field] = app.input_buffer.clone();
+                let [address, amount] = app.tx_edit_buffers.clone();
+                if !address.is_empty() && !amount.is_empty() {
+                    app.tx_recipients.push(TxRecipient { address, amount });
+                    app.set_status("Recipient added");
+                }
+                app.popup = None;
+                app.input_mode = InputMode::Normal;
+                app.input_clear();
+            }
+            _ => handle_input_key(app, key),
+        },
         Some(Popup::GenerateKey) => {
             let scheme = match key.code {
                 KeyCode::Char('1') | KeyCode::Char('e') => Some("ed25519"),
                 KeyCode::Char('2') | KeyCode::Char('s') => Some("secp256k1"),
                 KeyCode::Char('3') | KeyCode::Char('r') => Some("secp256r1"),
-                KeyCode::Esc => { app.popup = None; None }
+                KeyCode::Esc => {
+                    app.popup = None;
+                    None
+                }
                 _ => None,
             };
             if let Some(scheme) = scheme {
@@ -166,29 +189,27 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
                 app.popup = None;
             }
         }
-        Some(Popup::ImportKey) => {
-            match key.code {
-                KeyCode::Esc => {
-                    app.popup = None;
-                    app.input_mode = InputMode::Normal;
-                    app.input_clear();
-                }
-                KeyCode::Enter => {
-                    let val = app.stop_input();
-                    if !val.is_empty() {
-                        let alias = format!("imported-{}", app.keys.len());
-                        app.send_cmd(WalletCmd::ImportKey {
-                            scheme: "ed25519".to_string(),
-                            private_key_hex: val,
-                            alias,
-                        });
-                        app.set_status("Importing key...");
-                    }
-                    app.popup = None;
-                }
-                _ => handle_input_key(app, key),
+        Some(Popup::ImportKey) => match key.code {
+            KeyCode::Esc => {
+                app.popup = None;
+                app.input_mode = InputMode::Normal;
+                app.input_clear();
             }
-        }
+            KeyCode::Enter => {
+                let val = app.stop_input();
+                if !val.is_empty() {
+                    let alias = format!("imported-{}", app.keys.len());
+                    app.send_cmd(WalletCmd::ImportKey {
+                        scheme: "ed25519".to_string(),
+                        private_key_hex: val,
+                        alias,
+                    });
+                    app.set_status("Importing key...");
+                }
+                app.popup = None;
+            }
+            _ => handle_input_key(app, key),
+        },
         None => {}
     }
 }
@@ -210,14 +231,22 @@ fn handle_coins_key(app: &mut App, key: KeyEvent) {
     let len = app.coins.len();
     match key.code {
         KeyCode::Up | KeyCode::Char('k') => {
-            if app.coins_selected > 0 { app.coins_selected -= 1; }
+            if app.coins_selected > 0 {
+                app.coins_selected -= 1;
+            }
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            if app.coins_selected + 1 < len { app.coins_selected += 1; }
+            if app.coins_selected + 1 < len {
+                app.coins_selected += 1;
+            }
         }
-        KeyCode::Home | KeyCode::Char('g') => { app.coins_selected = 0; }
+        KeyCode::Home | KeyCode::Char('g') => {
+            app.coins_selected = 0;
+        }
         KeyCode::End | KeyCode::Char('G') => {
-            if len > 0 { app.coins_selected = len - 1; }
+            if len > 0 {
+                app.coins_selected = len - 1;
+            }
         }
         KeyCode::PageUp => {
             app.coins_selected = app.coins_selected.saturating_sub(10);
@@ -249,14 +278,22 @@ fn handle_objects_key(app: &mut App, key: KeyEvent) {
     let len = app.objects.len();
     match key.code {
         KeyCode::Up | KeyCode::Char('k') => {
-            if app.objects_selected > 0 { app.objects_selected -= 1; }
+            if app.objects_selected > 0 {
+                app.objects_selected -= 1;
+            }
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            if app.objects_selected + 1 < len { app.objects_selected += 1; }
+            if app.objects_selected + 1 < len {
+                app.objects_selected += 1;
+            }
         }
-        KeyCode::Home | KeyCode::Char('g') => { app.objects_selected = 0; }
+        KeyCode::Home | KeyCode::Char('g') => {
+            app.objects_selected = 0;
+        }
         KeyCode::End | KeyCode::Char('G') => {
-            if len > 0 { app.objects_selected = len - 1; }
+            if len > 0 {
+                app.objects_selected = len - 1;
+            }
         }
         KeyCode::PageUp => {
             app.objects_selected = app.objects_selected.saturating_sub(10);
@@ -280,14 +317,22 @@ fn handle_address_key(app: &mut App, key: KeyEvent) {
     let len = app.address_book.len();
     match key.code {
         KeyCode::Up | KeyCode::Char('k') => {
-            if app.address_selected > 0 { app.address_selected -= 1; }
+            if app.address_selected > 0 {
+                app.address_selected -= 1;
+            }
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            if app.address_selected + 1 < len { app.address_selected += 1; }
+            if app.address_selected + 1 < len {
+                app.address_selected += 1;
+            }
         }
-        KeyCode::Home => { app.address_selected = 0; }
+        KeyCode::Home => {
+            app.address_selected = 0;
+        }
         KeyCode::End => {
-            if len > 0 { app.address_selected = len - 1; }
+            if len > 0 {
+                app.address_selected = len - 1;
+            }
         }
         KeyCode::Char('a') => {
             app.address_edit_field = 0;
@@ -325,14 +370,22 @@ fn handle_keys_key(app: &mut App, key: KeyEvent) {
     let len = app.keys.len();
     match key.code {
         KeyCode::Up | KeyCode::Char('k') => {
-            if app.keys_selected > 0 { app.keys_selected -= 1; }
+            if app.keys_selected > 0 {
+                app.keys_selected -= 1;
+            }
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            if app.keys_selected + 1 < len { app.keys_selected += 1; }
+            if app.keys_selected + 1 < len {
+                app.keys_selected += 1;
+            }
         }
-        KeyCode::Home => { app.keys_selected = 0; }
+        KeyCode::Home => {
+            app.keys_selected = 0;
+        }
         KeyCode::End => {
-            if len > 0 { app.keys_selected = len - 1; }
+            if len > 0 {
+                app.keys_selected = len - 1;
+            }
         }
         KeyCode::Enter => {
             // Set active key and refresh
@@ -376,60 +429,66 @@ fn handle_keys_key(app: &mut App, key: KeyEvent) {
 
 fn handle_tx_key(app: &mut App, key: KeyEvent) {
     match app.tx_step {
-        TxBuilderStep::SelectSender => {
-            match key.code {
-                KeyCode::Up | KeyCode::Char('k') => {
-                    if app.tx_sender > 0 { app.tx_sender -= 1; }
+        TxBuilderStep::SelectSender => match key.code {
+            KeyCode::Up | KeyCode::Char('k') => {
+                if app.tx_sender > 0 {
+                    app.tx_sender -= 1;
                 }
-                KeyCode::Down | KeyCode::Char('j') => {
-                    if app.tx_sender + 1 < app.keys.len() { app.tx_sender += 1; }
-                }
-                KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
-                    app.tx_step = TxBuilderStep::AddRecipients;
-                }
-                _ => {}
             }
-        }
-        TxBuilderStep::AddRecipients => {
-            match key.code {
-                KeyCode::Left | KeyCode::Char('h') => {
-                    app.tx_step = TxBuilderStep::SelectSender;
+            KeyCode::Down | KeyCode::Char('j') => {
+                if app.tx_sender + 1 < app.keys.len() {
+                    app.tx_sender += 1;
                 }
-                KeyCode::Right | KeyCode::Char('l') => {
-                    app.tx_step = TxBuilderStep::SetGas;
+            }
+            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
+                app.tx_step = TxBuilderStep::AddRecipients;
+            }
+            _ => {}
+        },
+        TxBuilderStep::AddRecipients => match key.code {
+            KeyCode::Left | KeyCode::Char('h') => {
+                app.tx_step = TxBuilderStep::SelectSender;
+            }
+            KeyCode::Right | KeyCode::Char('l') => {
+                app.tx_step = TxBuilderStep::SetGas;
+            }
+            KeyCode::Char('a') => {
+                app.tx_edit_field = 0;
+                app.tx_edit_buffers = [String::new(), String::new()];
+                app.popup = Some(Popup::AddRecipient);
+                app.start_input("");
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                if app.tx_recipient_selected > 0 {
+                    app.tx_recipient_selected -= 1;
                 }
-                KeyCode::Char('a') => {
-                    app.tx_edit_field = 0;
-                    app.tx_edit_buffers = [String::new(), String::new()];
-                    app.popup = Some(Popup::AddRecipient);
-                    app.start_input("");
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                if app.tx_recipient_selected + 1 < app.tx_recipients.len() {
+                    app.tx_recipient_selected += 1;
                 }
-                KeyCode::Up | KeyCode::Char('k') => {
-                    if app.tx_recipient_selected > 0 { app.tx_recipient_selected -= 1; }
-                }
-                KeyCode::Down | KeyCode::Char('j') => {
-                    if app.tx_recipient_selected + 1 < app.tx_recipients.len() {
-                        app.tx_recipient_selected += 1;
+            }
+            KeyCode::Char('d') | KeyCode::Delete => {
+                if !app.tx_recipients.is_empty() {
+                    app.tx_recipients.remove(app.tx_recipient_selected);
+                    if app.tx_recipient_selected >= app.tx_recipients.len()
+                        && app.tx_recipient_selected > 0
+                    {
+                        app.tx_recipient_selected -= 1;
                     }
                 }
-                KeyCode::Char('d') | KeyCode::Delete => {
-                    if !app.tx_recipients.is_empty() {
-                        app.tx_recipients.remove(app.tx_recipient_selected);
-                        if app.tx_recipient_selected >= app.tx_recipients.len()
-                            && app.tx_recipient_selected > 0
-                        {
-                            app.tx_recipient_selected -= 1;
-                        }
-                    }
-                }
-                _ => {}
             }
-        }
+            _ => {}
+        },
         TxBuilderStep::SetGas => {
             if app.input_mode == InputMode::Editing {
                 match key.code {
-                    KeyCode::Enter => { app.tx_gas_budget = app.stop_input(); }
-                    KeyCode::Esc => { app.stop_input(); }
+                    KeyCode::Enter => {
+                        app.tx_gas_budget = app.stop_input();
+                    }
+                    KeyCode::Esc => {
+                        app.stop_input();
+                    }
                     _ => handle_input_key(app, key),
                 }
             } else {
@@ -447,17 +506,15 @@ fn handle_tx_key(app: &mut App, key: KeyEvent) {
                 }
             }
         }
-        TxBuilderStep::Review => {
-            match key.code {
-                KeyCode::Left | KeyCode::Char('h') => {
-                    app.tx_step = TxBuilderStep::SetGas;
-                }
-                KeyCode::Enter => {
-                    submit_transaction(app);
-                }
-                _ => {}
+        TxBuilderStep::Review => match key.code {
+            KeyCode::Left | KeyCode::Char('h') => {
+                app.tx_step = TxBuilderStep::SetGas;
             }
-        }
+            KeyCode::Enter => {
+                submit_transaction(app);
+            }
+            _ => {}
+        },
     }
 }
 
@@ -525,17 +582,25 @@ fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                 let list_index = (row - content_start) as usize;
                 match app.screen {
                     Screen::Coins => {
-                        if list_index < app.coins.len() { app.coins_selected = list_index; }
+                        if list_index < app.coins.len() {
+                            app.coins_selected = list_index;
+                        }
                     }
                     Screen::Objects => {
-                        if list_index < app.objects.len() { app.objects_selected = list_index; }
+                        if list_index < app.objects.len() {
+                            app.objects_selected = list_index;
+                        }
                     }
                     Screen::Packages => {}
                     Screen::AddressBook => {
-                        if list_index < app.address_book.len() { app.address_selected = list_index; }
+                        if list_index < app.address_book.len() {
+                            app.address_selected = list_index;
+                        }
                     }
                     Screen::Keys => {
-                        if list_index < app.keys.len() { app.keys_selected = list_index; }
+                        if list_index < app.keys.len() {
+                            app.keys_selected = list_index;
+                        }
                     }
                     Screen::TxBuilder => {
                         if row == 3 {
@@ -548,24 +613,52 @@ fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                 }
             }
         }
-        MouseEventKind::ScrollUp => {
-            match app.screen {
-                Screen::Coins => { if app.coins_selected > 0 { app.coins_selected -= 1; } }
-                Screen::Objects => { if app.objects_selected > 0 { app.objects_selected -= 1; } }
-                Screen::AddressBook => { if app.address_selected > 0 { app.address_selected -= 1; } }
-                Screen::Keys => { if app.keys_selected > 0 { app.keys_selected -= 1; } }
-                _ => {}
+        MouseEventKind::ScrollUp => match app.screen {
+            Screen::Coins => {
+                if app.coins_selected > 0 {
+                    app.coins_selected -= 1;
+                }
             }
-        }
-        MouseEventKind::ScrollDown => {
-            match app.screen {
-                Screen::Coins => { if app.coins_selected + 1 < app.coins.len() { app.coins_selected += 1; } }
-                Screen::Objects => { if app.objects_selected + 1 < app.objects.len() { app.objects_selected += 1; } }
-                Screen::AddressBook => { if app.address_selected + 1 < app.address_book.len() { app.address_selected += 1; } }
-                Screen::Keys => { if app.keys_selected + 1 < app.keys.len() { app.keys_selected += 1; } }
-                _ => {}
+            Screen::Objects => {
+                if app.objects_selected > 0 {
+                    app.objects_selected -= 1;
+                }
             }
-        }
+            Screen::AddressBook => {
+                if app.address_selected > 0 {
+                    app.address_selected -= 1;
+                }
+            }
+            Screen::Keys => {
+                if app.keys_selected > 0 {
+                    app.keys_selected -= 1;
+                }
+            }
+            _ => {}
+        },
+        MouseEventKind::ScrollDown => match app.screen {
+            Screen::Coins => {
+                if app.coins_selected + 1 < app.coins.len() {
+                    app.coins_selected += 1;
+                }
+            }
+            Screen::Objects => {
+                if app.objects_selected + 1 < app.objects.len() {
+                    app.objects_selected += 1;
+                }
+            }
+            Screen::AddressBook => {
+                if app.address_selected + 1 < app.address_book.len() {
+                    app.address_selected += 1;
+                }
+            }
+            Screen::Keys => {
+                if app.keys_selected + 1 < app.keys.len() {
+                    app.keys_selected += 1;
+                }
+            }
+            _ => {}
+        },
         _ => {}
     }
 }

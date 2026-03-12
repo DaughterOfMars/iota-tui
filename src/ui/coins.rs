@@ -6,13 +6,13 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Row, Table},
 };
 
-use crate::app::App;
 use super::common;
+use crate::app::App;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let layout = Layout::vertical([
         Constraint::Length(3), // balance summary
-        Constraint::Min(5),   // coin table
+        Constraint::Min(5),    // coin table
         Constraint::Length(5), // selected coin detail
     ])
     .split(area);
@@ -34,18 +34,12 @@ fn draw_summary(frame: &mut Frame, app: &App, area: Rect) {
 
     let text = Line::from(vec![
         Span::styled("  Total IOTA: ", Style::default().fg(Color::White)),
-        Span::styled(
-            &balance_display,
-            Style::default().fg(Color::Green).bold(),
-        ),
+        Span::styled(&balance_display, Style::default().fg(Color::Green).bold()),
         Span::styled(
             format!("    {} coin objects", app.coins.len()),
             common::dim_style(),
         ),
-        Span::styled(
-            format!("    [{}]", network),
-            common::accent_style(),
-        ),
+        Span::styled(format!("    [{}]", network), common::accent_style()),
         Span::styled("    f:faucet  r:refresh", common::dim_style()),
     ]);
 
@@ -112,23 +106,24 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
     ];
 
     let title = if app.coins.len() > visible_rows {
-        format!(" Coins ({}) [{}-{}/{}] ",
-            app.coins.len(), app.coins_offset + 1,
+        format!(
+            " Coins ({}) [{}-{}/{}] ",
+            app.coins.len(),
+            app.coins_offset + 1,
             (app.coins_offset + visible_rows).min(app.coins.len()),
-            app.coins.len())
+            app.coins.len()
+        )
     } else {
         format!(" Coins ({}) ", app.coins.len())
     };
 
-    let table = Table::new(rows, widths)
-        .header(header)
-        .block(
-            Block::default()
-                .title(title)
-                .title_style(common::header_style())
-                .borders(Borders::ALL)
-                .border_style(common::dim_style()),
-        );
+    let table = Table::new(rows, widths).header(header).block(
+        Block::default()
+            .title(title)
+            .title_style(common::header_style())
+            .borders(Borders::ALL)
+            .border_style(common::dim_style()),
+    );
 
     frame.render_widget(table, area);
 }
@@ -155,7 +150,10 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
             ]),
             Line::from(vec![
                 Span::styled("  Object:  ", Style::default().fg(Color::White).bold()),
-                Span::styled(common::truncate_address(&coin.object_id, id_width), common::dim_style()),
+                Span::styled(
+                    common::truncate_address(&coin.object_id, id_width),
+                    common::dim_style(),
+                ),
             ]),
         ]
     } else {

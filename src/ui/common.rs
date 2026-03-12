@@ -45,8 +45,7 @@ pub fn draw_tabs(frame: &mut Frame, app: &mut App, area: Rect) {
 }
 
 pub fn draw_separator(frame: &mut Frame, area: Rect) {
-    let sep = Paragraph::new("─".repeat(area.width as usize))
-        .style(Style::default().fg(DIM));
+    let sep = Paragraph::new("─".repeat(area.width as usize)).style(Style::default().fg(DIM));
     frame.render_widget(sep, area);
 }
 
@@ -58,16 +57,19 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
 
     let left = match &app.status_message {
         Some((msg, _)) => Span::styled(msg.as_str(), Style::default().fg(HIGHLIGHT)),
-        None => Span::styled(
-            screen_hint(app.screen),
-            Style::default().fg(DIM),
-        ),
+        None => Span::styled(screen_hint(app.screen), Style::default().fg(DIM)),
     };
 
     let mode_indicator = if app.input_mode == InputMode::Editing {
-        Span::styled(" EDIT ", Style::default().fg(Color::Black).bg(Color::Green).bold())
+        Span::styled(
+            " EDIT ",
+            Style::default().fg(Color::Black).bg(Color::Green).bold(),
+        )
     } else {
-        Span::styled(" NORMAL ", Style::default().fg(Color::Black).bg(Color::Blue).bold())
+        Span::styled(
+            " NORMAL ",
+            Style::default().fg(Color::Black).bg(Color::Blue).bold(),
+        )
     };
 
     // Network indicator
@@ -91,7 +93,8 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     let right_text = format!("  {} ", active_addr);
     let right = Span::styled(&right_text, Style::default().fg(ACCENT));
 
-    let fixed_right = mode_indicator.width() as u16 + net_indicator.width() as u16 + right_text.len() as u16;
+    let fixed_right =
+        mode_indicator.width() as u16 + net_indicator.width() as u16 + right_text.len() as u16;
     let left_width = area.width.saturating_sub(fixed_right);
 
     let cols = Layout::horizontal([
@@ -142,13 +145,15 @@ pub fn draw_popup(frame: &mut Frame, app: &App) {
 
 fn draw_help_popup(frame: &mut Frame, area: Rect) {
     let text = vec![
-        Line::from(vec![
-            Span::styled("IOTA Wallet TUI", Style::default().fg(ACCENT).bold()),
-        ]),
+        Line::from(vec![Span::styled(
+            "IOTA Wallet TUI",
+            Style::default().fg(ACCENT).bold(),
+        )]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("Navigation", Style::default().bold().underlined()),
-        ]),
+        Line::from(vec![Span::styled(
+            "Navigation",
+            Style::default().bold().underlined(),
+        )]),
         Line::from("  1-6        Switch screens"),
         Line::from("  Tab/S-Tab  Cycle screens"),
         Line::from("  j/k        Move up/down"),
@@ -156,9 +161,10 @@ fn draw_help_popup(frame: &mut Frame, area: Rect) {
         Line::from("  Enter      Select / Confirm"),
         Line::from("  Esc        Cancel / Close popup"),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("Actions", Style::default().bold().underlined()),
-        ]),
+        Line::from(vec![Span::styled(
+            "Actions",
+            Style::default().bold().underlined(),
+        )]),
         Line::from("  a          Add entry"),
         Line::from("  e          Edit entry"),
         Line::from("  d/Del      Delete entry"),
@@ -168,9 +174,10 @@ fn draw_help_popup(frame: &mut Frame, area: Rect) {
         Line::from("  r          Refresh data from network"),
         Line::from("  f          Request faucet (testnet/devnet)"),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("General", Style::default().bold().underlined()),
-        ]),
+        Line::from(vec![Span::styled(
+            "General",
+            Style::default().bold().underlined(),
+        )]),
         Line::from("  ?          Show this help"),
         Line::from("  q/Ctrl-c   Quit"),
         Line::from(""),
@@ -179,9 +186,10 @@ fn draw_help_popup(frame: &mut Frame, area: Rect) {
             Span::raw("Click tabs, list items. Scroll to navigate."),
         ]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("Press Esc to close", Style::default().fg(DIM)),
-        ]),
+        Line::from(vec![Span::styled(
+            "Press Esc to close",
+            Style::default().fg(DIM),
+        )]),
     ];
 
     let block = Block::default()
@@ -200,15 +208,17 @@ fn draw_confirm_popup(frame: &mut Frame, area: Rect) {
 
     let text = vec![
         Line::from(""),
-        Line::from(vec![
-            Span::styled("Transaction submitted!", Style::default().fg(Color::Green).bold()),
-        ]),
+        Line::from(vec![Span::styled(
+            "Transaction submitted!",
+            Style::default().fg(Color::Green).bold(),
+        )]),
         Line::from(""),
         Line::from("Check the status bar for the transaction digest."),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("Press Enter to close", Style::default().fg(DIM)),
-        ]),
+        Line::from(vec![Span::styled(
+            "Press Enter to close",
+            Style::default().fg(DIM),
+        )]),
     ];
 
     let block = Block::default()
@@ -217,7 +227,12 @@ fn draw_confirm_popup(frame: &mut Frame, area: Rect) {
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Green));
 
-    frame.render_widget(Paragraph::new(text).block(block).alignment(Alignment::Center), popup);
+    frame.render_widget(
+        Paragraph::new(text)
+            .block(block)
+            .alignment(Alignment::Center),
+        popup,
+    );
 }
 
 fn draw_address_form(frame: &mut Frame, app: &App, area: Rect, title: &str) {
@@ -238,12 +253,15 @@ fn draw_address_form(frame: &mut Frame, app: &App, area: Rect, title: &str) {
             Style::default().fg(Color::White)
         };
 
-        lines.push(Line::from(vec![
-            Span::styled(format!("  {}: ", field), label_style),
-        ]));
+        lines.push(Line::from(vec![Span::styled(
+            format!("  {}: ", field),
+            label_style,
+        )]));
 
         let input_style = if is_active {
-            Style::default().fg(Color::White).add_modifier(Modifier::UNDERLINED)
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::UNDERLINED)
         } else {
             Style::default().fg(DIM)
         };
@@ -256,15 +274,17 @@ fn draw_address_form(frame: &mut Frame, app: &App, area: Rect, title: &str) {
             value.clone()
         };
 
-        lines.push(Line::from(vec![
-            Span::styled(format!("  {}", display), input_style),
-        ]));
+        lines.push(Line::from(vec![Span::styled(
+            format!("  {}", display),
+            input_style,
+        )]));
         lines.push(Line::from(""));
     }
 
-    lines.push(Line::from(vec![
-        Span::styled("  Tab: next field  Enter: save  Esc: cancel", Style::default().fg(DIM)),
-    ]));
+    lines.push(Line::from(vec![Span::styled(
+        "  Tab: next field  Enter: save  Esc: cancel",
+        Style::default().fg(DIM),
+    )]));
 
     let block = Block::default()
         .title(format!(" {} ", title))
@@ -281,9 +301,10 @@ fn draw_generate_key_popup(frame: &mut Frame, area: Rect) {
 
     let text = vec![
         Line::from(""),
-        Line::from(vec![
-            Span::styled("Select key scheme:", Style::default().bold()),
-        ]),
+        Line::from(vec![Span::styled(
+            "Select key scheme:",
+            Style::default().bold(),
+        )]),
         Line::from(""),
         Line::from(vec![
             Span::styled("  [1/e] ", Style::default().fg(ACCENT).bold()),
@@ -298,9 +319,10 @@ fn draw_generate_key_popup(frame: &mut Frame, area: Rect) {
             Span::raw("Secp256r1"),
         ]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("  Esc to cancel", Style::default().fg(DIM)),
-        ]),
+        Line::from(vec![Span::styled(
+            "  Esc to cancel",
+            Style::default().fg(DIM),
+        )]),
     ];
 
     let block = Block::default()
@@ -318,20 +340,22 @@ fn draw_import_key_popup(frame: &mut Frame, app: &App, area: Rect) {
 
     let text = vec![
         Line::from(""),
-        Line::from(vec![
-            Span::styled("  Paste private key (base64 or hex):", Style::default().bold()),
-        ]),
+        Line::from(vec![Span::styled(
+            "  Paste private key (base64 or hex):",
+            Style::default().bold(),
+        )]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled(
-                format!("  {}|", &app.input_buffer),
-                Style::default().fg(Color::White).add_modifier(Modifier::UNDERLINED),
-            ),
-        ]),
+        Line::from(vec![Span::styled(
+            format!("  {}|", &app.input_buffer),
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::UNDERLINED),
+        )]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("  Enter: import  Esc: cancel", Style::default().fg(DIM)),
-        ]),
+        Line::from(vec![Span::styled(
+            "  Enter: import  Esc: cancel",
+            Style::default().fg(DIM),
+        )]),
     ];
 
     let block = Block::default()
@@ -361,12 +385,15 @@ fn draw_add_recipient_popup(frame: &mut Frame, app: &App, area: Rect) {
             Style::default().fg(Color::White)
         };
 
-        lines.push(Line::from(vec![
-            Span::styled(format!("  {}: ", field), label_style),
-        ]));
+        lines.push(Line::from(vec![Span::styled(
+            format!("  {}: ", field),
+            label_style,
+        )]));
 
         let input_style = if is_active {
-            Style::default().fg(Color::White).add_modifier(Modifier::UNDERLINED)
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::UNDERLINED)
         } else {
             Style::default().fg(DIM)
         };
@@ -379,15 +406,17 @@ fn draw_add_recipient_popup(frame: &mut Frame, app: &App, area: Rect) {
             value.clone()
         };
 
-        lines.push(Line::from(vec![
-            Span::styled(format!("  {}", display), input_style),
-        ]));
+        lines.push(Line::from(vec![Span::styled(
+            format!("  {}", display),
+            input_style,
+        )]));
         lines.push(Line::from(""));
     }
 
-    lines.push(Line::from(vec![
-        Span::styled("  Tab: next field  Enter: add  Esc: cancel", Style::default().fg(DIM)),
-    ]));
+    lines.push(Line::from(vec![Span::styled(
+        "  Tab: next field  Enter: add  Esc: cancel",
+        Style::default().fg(DIM),
+    )]));
 
     let block = Block::default()
         .title(" Add Recipient ")

@@ -5,8 +5,8 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
 };
 
-use crate::app::App;
 use super::common;
+use crate::app::App;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
@@ -19,22 +19,27 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let package_objects: Vec<_> = app
         .objects
         .iter()
-        .filter(|o| o.type_name.contains("package") || o.type_name == "Package" || o.type_name.is_empty())
+        .filter(|o| {
+            o.type_name.contains("package") || o.type_name == "Package" || o.type_name.is_empty()
+        })
         .collect();
 
     if package_objects.is_empty() {
         let text = vec![
             Line::from(""),
-            Line::from(vec![
-                Span::styled("  No published packages found for this address.", common::dim_style()),
-            ]),
+            Line::from(vec![Span::styled(
+                "  No published packages found for this address.",
+                common::dim_style(),
+            )]),
             Line::from(""),
-            Line::from(vec![
-                Span::styled("  Package objects will appear here once you publish Move packages.", common::dim_style()),
-            ]),
-            Line::from(vec![
-                Span::styled("  Alternatively, browse all objects in the Objects tab.", common::dim_style()),
-            ]),
+            Line::from(vec![Span::styled(
+                "  Package objects will appear here once you publish Move packages.",
+                common::dim_style(),
+            )]),
+            Line::from(vec![Span::styled(
+                "  Alternatively, browse all objects in the Objects tab.",
+                common::dim_style(),
+            )]),
         ];
         frame.render_widget(Paragraph::new(text).block(block), area);
     } else {
