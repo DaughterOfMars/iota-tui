@@ -439,6 +439,15 @@ impl WalletBackend {
                         .collect();
                     builder.merge_coins(primary_id, source_ids?);
                 }
+                crate::app::PtbCommand::Stake { amount, validator } => {
+                    let nanos = parse_iota_amount(&amount)?;
+                    let validator_addr = Address::from_hex(&validator)?;
+                    builder.stake(nanos, validator_addr);
+                }
+                crate::app::PtbCommand::Unstake { staked_iota_id } => {
+                    let obj_id: iota_sdk::types::ObjectId = staked_iota_id.parse()?;
+                    builder.unstake(obj_id);
+                }
             }
         }
 

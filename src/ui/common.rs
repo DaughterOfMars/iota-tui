@@ -160,7 +160,7 @@ pub fn draw_popup(frame: &mut Frame, app: &App) {
             draw_import_key_popup(frame, app, popup_area);
         }
         Some(Popup::AddCommand) => {
-            let popup_area = centered_rect_min(50, 45, 40, 14, area);
+            let popup_area = centered_rect_min(50, 50, 40, 16, area);
             frame.render_widget(Clear, popup_area);
             draw_add_command_popup(frame, popup_area);
         }
@@ -494,6 +494,14 @@ fn draw_add_command_popup(frame: &mut Frame, area: Rect) {
             Span::styled("  [5/r] ", Style::default().fg(ACCENT).bold()),
             Span::raw("Merge Coins"),
         ]),
+        Line::from(vec![
+            Span::styled("  [6/k] ", Style::default().fg(ACCENT).bold()),
+            Span::raw("Stake"),
+        ]),
+        Line::from(vec![
+            Span::styled("  [7/u] ", Style::default().fg(ACCENT).bold()),
+            Span::raw("Unstake"),
+        ]),
         Line::from(""),
         Line::from(vec![Span::styled(
             "  Esc to cancel",
@@ -517,11 +525,15 @@ fn draw_add_command_form(frame: &mut Frame, app: &App, area: Rect) {
     };
 
     let fields: &[&str] = match ct {
-        AddCommandType::TransferIota => &["Recipient", "Amount (IOTA)"],
-        AddCommandType::TransferObjects => &["Recipient", "Object IDs (comma-sep)"],
+        AddCommandType::TransferIota => &["Recipient (address or alias)", "Amount (IOTA)"],
+        AddCommandType::TransferObjects => {
+            &["Recipient (address or alias)", "Object IDs (comma-sep)"]
+        }
         AddCommandType::MoveCall => &["Package", "Module", "Function", "Type Args", "Arguments"],
         AddCommandType::SplitCoins => &["Coin Object ID", "Amounts (comma-sep)"],
         AddCommandType::MergeCoins => &["Primary Coin ID", "Source Coin IDs (comma-sep)"],
+        AddCommandType::Stake => &["Amount (IOTA)", "Validator (address or alias)"],
+        AddCommandType::Unstake => &["Staked IOTA Object ID"],
     };
 
     let mut lines = vec![Line::from("")];

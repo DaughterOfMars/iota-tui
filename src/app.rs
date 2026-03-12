@@ -128,6 +128,13 @@ pub enum PtbCommand {
         primary: String,
         sources: Vec<String>,
     },
+    Stake {
+        amount: String,
+        validator: String,
+    },
+    Unstake {
+        staked_iota_id: String,
+    },
 }
 
 impl PtbCommand {
@@ -138,6 +145,8 @@ impl PtbCommand {
             PtbCommand::MoveCall { .. } => "MoveCall",
             PtbCommand::SplitCoins { .. } => "SplitCoins",
             PtbCommand::MergeCoins { .. } => "MergeCoins",
+            PtbCommand::Stake { .. } => "Stake",
+            PtbCommand::Unstake { .. } => "Unstake",
         }
     }
 
@@ -170,6 +179,12 @@ impl PtbCommand {
             PtbCommand::MergeCoins { primary, sources } => {
                 format!("{} + {} coins", truncate_id(primary, 12), sources.len())
             }
+            PtbCommand::Stake { amount, validator } => {
+                format!("{} IOTA -> {}", amount, truncate_id(validator, 16))
+            }
+            PtbCommand::Unstake { staked_iota_id } => {
+                format!("{}", truncate_id(staked_iota_id, 20))
+            }
         }
     }
 }
@@ -190,6 +205,8 @@ pub enum AddCommandType {
     MoveCall,
     SplitCoins,
     MergeCoins,
+    Stake,
+    Unstake,
 }
 
 impl AddCommandType {
@@ -200,6 +217,8 @@ impl AddCommandType {
             AddCommandType::MoveCall => "Move Call",
             AddCommandType::SplitCoins => "Split Coins",
             AddCommandType::MergeCoins => "Merge Coins",
+            AddCommandType::Stake => "Stake",
+            AddCommandType::Unstake => "Unstake",
         }
     }
 }
@@ -475,6 +494,57 @@ impl App {
 
     pub fn active_key(&self) -> Option<&KeyDisplay> {
         self.keys.iter().find(|k| k.is_active)
+    }
+
+    /// Number of key-derived entries shown at the top of the address book.
+    pub fn key_entry_count(&self) -> usize {
+        self.keys.len()
+    }
+
+    /// Returns combined address book: keys first (read-only), then user entries.
+    pub fn combined_address_book(&self) -> Vec<AddressEntry> {
+        let mut combined: Vec<AddressEntry> = self
+            .keys
+            .iter()
+            .map(|k| AddressEntry {
+                label: format!("{} (key)", k.alias),
+                address: k.address.clone(),
+                notes: k.scheme.clone(),
+            })
+            .collect();
+        combined.extend(self.address_book.iter().cloned());
+        combined
+    }
+
+    /// Convert a combined address book index to a user address book index.
+    /// Returns None if the index points to a key entry (read-only).
+    pub fn user_address_index(&self, combined_idx: usize) -> Option<usize> {
+        let key_count = self.key_entry_count();
+        if combined_idx >= key_count {
+            Some(combined_idx - key_count)
+        } else {
+            None
+        }
+    }
+
+    /// Resolve an alias or label to an address.
+    /// Checks key aliases first, then address book labels. Case-insensitive.
+    /// Returns the original string if no match is found.
+    pub fn resolve_address(&self, input: &str) -> String {
+        let input_lower = input.to_lowercase();
+        // Check key aliases
+        for key in &self.keys {
+            if key.alias.to_lowercase() == input_lower {
+                return key.address.clone();
+            }
+        }
+        // Check address book labels
+        for entry in &self.address_book {
+            if entry.label.to_lowercase() == input_lower {
+                return entry.address.clone();
+            }
+        }
+        input.to_string()
     }
 
     /// Adjust a scroll offset so that `selected` is visible within `visible_rows`.

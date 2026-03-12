@@ -133,11 +133,13 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
                             notes,
                         });
                         app.set_status("Address added");
-                    } else if let Some(entry) = app.address_book.get_mut(app.address_selected) {
-                        entry.label = label;
-                        entry.address = address;
-                        entry.notes = notes;
-                        app.set_status("Address updated");
+                    } else if let Some(user_idx) = app.user_address_index(app.address_selected) {
+                        if let Some(entry) = app.address_book.get_mut(user_idx) {
+                            entry.label = label;
+                            entry.address = address;
+                            entry.notes = notes;
+                            app.set_status("Address updated");
+                        }
                     }
                     save_address_book(&app.address_book);
                 }
@@ -155,6 +157,8 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
                 KeyCode::Char('3') | KeyCode::Char('m') => Some(AddCommandType::MoveCall),
                 KeyCode::Char('4') | KeyCode::Char('s') => Some(AddCommandType::SplitCoins),
                 KeyCode::Char('5') | KeyCode::Char('r') => Some(AddCommandType::MergeCoins),
+                KeyCode::Char('6') | KeyCode::Char('k') => Some(AddCommandType::Stake),
+                KeyCode::Char('7') | KeyCode::Char('u') => Some(AddCommandType::Unstake),
                 KeyCode::Esc => {
                     app.popup = None;
                     None
@@ -168,6 +172,8 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
                     AddCommandType::MoveCall => 5, // package, module, function, type_args, args
                     AddCommandType::SplitCoins => 2, // coin, amounts (comma-sep)
                     AddCommandType::MergeCoins => 2, // primary, sources (comma-sep)
+                    AddCommandType::Stake => 2,    // amount, validator address
+                    AddCommandType::Unstake => 1,  // staked iota object id
                 };
                 app.tx_adding_cmd = Some(ct);
                 app.tx_edit_field = 0;
@@ -291,13 +297,14 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
     }
 }
 
-/// Parse the form buffers into a PtbCommand based on the selected command type
+/// Parse the form buffers into a PtbCommand based on the selected command type.
+/// Address fields are resolved through aliases (key aliases + address book labels).
 fn build_command_from_form(app: &App) -> Option<PtbCommand> {
     let ct = app.tx_adding_cmd?;
     let bufs = &app.tx_edit_buffers;
     match ct {
         AddCommandType::TransferIota => {
-            let recipient = bufs.first()?.clone();
+            let recipient = app.resolve_address(bufs.first()?);
             let amount = bufs.get(1)?.clone();
             if recipient.is_empty() || amount.is_empty() {
                 return None;
@@ -305,7 +312,7 @@ fn build_command_from_form(app: &App) -> Option<PtbCommand> {
             Some(PtbCommand::TransferIota { recipient, amount })
         }
         AddCommandType::TransferObjects => {
-            let recipient = bufs.first()?.clone();
+            let recipient = app.resolve_address(bufs.first()?);
             let ids_str = bufs.get(1)?.clone();
             if recipient.is_empty() || ids_str.is_empty() {
                 return None;
@@ -370,6 +377,21 @@ fn build_command_from_form(app: &App) -> Option<PtbCommand> {
                 .map(|s| s.trim().to_string())
                 .collect();
             Some(PtbCommand::MergeCoins { primary, sources })
+        }
+        AddCommandType::Stake => {
+            let amount = bufs.first()?.clone();
+            let validator = app.resolve_address(bufs.get(1)?);
+            if amount.is_empty() || validator.is_empty() {
+                return None;
+            }
+            Some(PtbCommand::Stake { amount, validator })
+        }
+        AddCommandType::Unstake => {
+            let staked_iota_id = bufs.first()?.clone();
+            if staked_iota_id.is_empty() {
+                return None;
+            }
+            Some(PtbCommand::Unstake { staked_iota_id })
         }
     }
 }
@@ -474,7 +496,7 @@ fn handle_objects_key(app: &mut App, key: KeyEvent) {
 }
 
 fn handle_address_key(app: &mut App, key: KeyEvent) {
-    let len = app.address_book.len();
+    let combined_len = app.key_entry_count() + app.address_book.len();
     match key.code {
         KeyCode::Up | KeyCode::Char('k') => {
             if app.address_selected > 0 {
@@ -482,7 +504,7 @@ fn handle_address_key(app: &mut App, key: KeyEvent) {
             }
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            if app.address_selected + 1 < len {
+            if app.address_selected + 1 < combined_len {
                 app.address_selected += 1;
             }
         }
@@ -490,8 +512,8 @@ fn handle_address_key(app: &mut App, key: KeyEvent) {
             app.address_selected = 0;
         }
         KeyCode::End => {
-            if len > 0 {
-                app.address_selected = len - 1;
+            if combined_len > 0 {
+                app.address_selected = combined_len - 1;
             }
         }
         KeyCode::Char('a') => {
@@ -501,24 +523,35 @@ fn handle_address_key(app: &mut App, key: KeyEvent) {
             app.start_input("");
         }
         KeyCode::Char('e') => {
-            if let Some(entry) = app.address_book.get(app.address_selected) {
-                let label = entry.label.clone();
-                let address = entry.address.clone();
-                let notes = entry.notes.clone();
-                app.address_edit_field = 0;
-                app.address_edit_buffers = [label.clone(), address, notes];
-                app.popup = Some(Popup::EditAddress);
-                app.start_input(&label);
+            // Only allow editing user entries, not key entries
+            if let Some(user_idx) = app.user_address_index(app.address_selected) {
+                if let Some(entry) = app.address_book.get(user_idx) {
+                    let label = entry.label.clone();
+                    let address = entry.address.clone();
+                    let notes = entry.notes.clone();
+                    app.address_edit_field = 0;
+                    app.address_edit_buffers = [label.clone(), address, notes];
+                    app.popup = Some(Popup::EditAddress);
+                    app.start_input(&label);
+                }
+            } else {
+                app.set_status("Key entries are read-only");
             }
         }
         KeyCode::Char('d') | KeyCode::Delete => {
-            if !app.address_book.is_empty() {
-                app.address_book.remove(app.address_selected);
-                if app.address_selected >= app.address_book.len() && app.address_selected > 0 {
-                    app.address_selected -= 1;
+            if let Some(user_idx) = app.user_address_index(app.address_selected) {
+                if user_idx < app.address_book.len() {
+                    app.address_book.remove(user_idx);
+                    if app.address_selected >= combined_len.saturating_sub(1)
+                        && app.address_selected > 0
+                    {
+                        app.address_selected -= 1;
+                    }
+                    save_address_book(&app.address_book);
+                    app.set_status("Address removed");
                 }
-                save_address_book(&app.address_book);
-                app.set_status("Address removed");
+            } else {
+                app.set_status("Key entries cannot be deleted here");
             }
         }
         _ => {}
@@ -710,7 +743,8 @@ fn scroll_selection(app: &mut App, delta: i32) {
             App::scroll_into_view(app.objects_selected, &mut app.objects_offset, 20);
         }
         Screen::AddressBook => {
-            app.address_selected = apply_delta(app.address_selected, delta, app.address_book.len());
+            let combined_len = app.key_entry_count() + app.address_book.len();
+            app.address_selected = apply_delta(app.address_selected, delta, combined_len);
             App::scroll_into_view(app.address_selected, &mut app.address_offset, 20);
         }
         Screen::Keys => {
@@ -786,7 +820,8 @@ fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                     Screen::Packages => {}
                     Screen::AddressBook => {
                         let idx = app.address_offset + visual_index;
-                        if idx < app.address_book.len() {
+                        let combined_len = app.key_entry_count() + app.address_book.len();
+                        if idx < combined_len {
                             app.address_selected = idx;
                         }
                     }
