@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use base64ct::Encoding;
 use iota_sdk::crypto::{
     ToFromBytes, ed25519::Ed25519PrivateKey, secp256k1::Secp256k1PrivateKey,
     secp256r1::Secp256r1PrivateKey, simple::SimpleKeypair,
@@ -317,19 +318,17 @@ impl WalletBackend {
     fn handle_import_key(
         &mut self,
         scheme: &str,
-        hex_key: &str,
+        key_input: &str,
         alias: &str,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let raw = hex::decode(hex_key.strip_prefix("0x").unwrap_or(hex_key))
-            .map_err(|e| format!("Invalid hex: {}", e))?;
-
-        let (keypair, address_str) = import_keypair_from_raw(scheme, &raw)?;
+        let (keypair, detected_scheme) = decode_private_key(scheme, key_input)?;
+        let address_str = keypair_address(&keypair);
         let stored_bytes = keypair.to_bytes();
         let key_hex = hex::encode(&stored_bytes);
 
         let stored = StoredKey {
             alias: alias.to_string(),
-            scheme: scheme.to_string(),
+            scheme: detected_scheme.clone(),
             private_key_bytes: stored_bytes,
             address: address_str.clone(),
             is_active: self.keys.is_empty(),
@@ -342,7 +341,7 @@ impl WalletBackend {
         let event = WalletEvent::KeyImported {
             alias: alias.to_string(),
             address: address_str,
-            scheme: scheme.to_string(),
+            scheme: detected_scheme,
             private_key_hex: key_hex,
         };
         let _ = self.event_tx.try_send(event);
@@ -576,4 +575,79 @@ fn extract_symbol(coin_type: &str) -> String {
         .next()
         .unwrap_or(coin_type)
         .to_string()
+}
+
+/// Auto-detect encoding format and decode a private key.
+/// Supports: bech32 (iotaprivkey1...), base64 (flagged bytes), hex (raw or 0x-prefixed).
+/// Returns (keypair, scheme_name).
+fn decode_private_key(
+    fallback_scheme: &str,
+    input: &str,
+) -> Result<(SimpleKeypair, String), Box<dyn std::error::Error + Send + Sync>> {
+    use iota_sdk::crypto::{ToFromBech32, ToFromFlaggedBytes};
+
+    let input = input.trim();
+
+    // 1. Bech32: starts with "iotaprivkey1"
+    if input.starts_with("iotaprivkey1") {
+        let kp =
+            SimpleKeypair::from_bech32(input).map_err(|e| format!("Invalid bech32 key: {}", e))?;
+        let scheme = scheme_name_from_keypair(&kp);
+        return Ok((kp, scheme));
+    }
+
+    // 2. Hex: starts with "0x" or is all hex chars
+    let stripped = input.strip_prefix("0x").unwrap_or(input);
+    if !stripped.is_empty() && stripped.chars().all(|c| c.is_ascii_hexdigit()) {
+        let raw = hex::decode(stripped).map_err(|e| format!("Invalid hex: {}", e))?;
+
+        // If 33 bytes, treat as flagged (flag + 32-byte key)
+        if raw.len() == 33 {
+            let kp = SimpleKeypair::from_flagged_bytes(&raw)
+                .map_err(|e| format!("Invalid flagged key: {}", e))?;
+            let scheme = scheme_name_from_keypair(&kp);
+            return Ok((kp, scheme));
+        }
+
+        // Otherwise treat as raw key bytes using the fallback scheme
+        let (kp, _addr) = import_keypair_from_raw(fallback_scheme, &raw)?;
+        return Ok((kp, fallback_scheme.to_string()));
+    }
+
+    // 3. Base64: try decoding as base64 (flagged bytes format)
+    if let Ok(decoded) = base64ct::Base64::decode_vec(input) {
+        if decoded.len() == 33 {
+            let kp = SimpleKeypair::from_flagged_bytes(&decoded)
+                .map_err(|e| format!("Invalid base64 key: {}", e))?;
+            let scheme = scheme_name_from_keypair(&kp);
+            return Ok((kp, scheme));
+        }
+        // Raw 32-byte key in base64
+        if decoded.len() == 32 {
+            let (kp, _addr) = import_keypair_from_raw(fallback_scheme, &decoded)?;
+            return Ok((kp, fallback_scheme.to_string()));
+        }
+    }
+
+    Err("Could not decode key. Supported formats: bech32 (iotaprivkey1...), hex, base64".into())
+}
+
+fn scheme_name_from_keypair(kp: &SimpleKeypair) -> String {
+    use iota_sdk::types::SignatureScheme;
+    match kp.scheme() {
+        SignatureScheme::Ed25519 => "ed25519".into(),
+        SignatureScheme::Secp256k1 => "secp256k1".into(),
+        SignatureScheme::Secp256r1 => "secp256r1".into(),
+        other => format!("{:?}", other),
+    }
+}
+
+fn keypair_address(kp: &SimpleKeypair) -> String {
+    use iota_sdk::types::MultisigMemberPublicKey;
+    match kp.public_key() {
+        MultisigMemberPublicKey::Ed25519(pk) => pk.derive_address().to_string(),
+        MultisigMemberPublicKey::Secp256k1(pk) => pk.derive_address().to_string(),
+        MultisigMemberPublicKey::Secp256r1(pk) => pk.derive_address().to_string(),
+        _ => "unknown".to_string(),
+    }
 }

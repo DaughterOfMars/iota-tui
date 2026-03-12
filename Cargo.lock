@@ -1691,6 +1691,7 @@ dependencies = [
 name = "iota-wallet-tui"
 version = "0.1.0"
 dependencies = [
+ "base64ct",
  "color-eyre",
  "crossterm",
  "dirs",

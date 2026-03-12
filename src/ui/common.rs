@@ -155,7 +155,7 @@ pub fn draw_popup(frame: &mut Frame, app: &App) {
             draw_generate_key_popup(frame, popup_area);
         }
         Some(Popup::ImportKey) => {
-            let popup_area = centered_rect_min(60, 30, 48, 9, area);
+            let popup_area = centered_rect_min(60, 30, 48, 10, area);
             frame.render_widget(Clear, popup_area);
             draw_import_key_popup(frame, app, popup_area);
         }
@@ -373,8 +373,12 @@ fn draw_import_key_popup(frame: &mut Frame, app: &App, area: Rect) {
     let text = vec![
         Line::from(""),
         Line::from(vec![Span::styled(
-            "  Paste private key (hex):",
+            "  Paste private key:",
             Style::default().bold(),
+        )]),
+        Line::from(vec![Span::styled(
+            "  (hex, base64, or bech32 iotaprivkey1...)",
+            Style::default().fg(DIM),
         )]),
         Line::from(""),
         Line::from(vec![Span::styled(
