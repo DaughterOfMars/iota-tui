@@ -84,13 +84,16 @@ pub enum WalletCmd {
         private_key_hex: String,
         alias: String,
     },
-    SendIota {
+    ExecutePtb {
         sender_idx: usize,
-        recipient: Address,
-        amount: u64,
+        commands: Vec<crate::app::PtbCommand>,
         gas_budget: u64,
     },
     DeleteKey(usize),
+    RenameKey {
+        idx: usize,
+        new_alias: String,
+    },
     RequestFaucet(Address),
 }
 
@@ -166,16 +169,16 @@ impl WalletBackend {
                     private_key_hex,
                     alias,
                 } => self.handle_import_key(&scheme, &private_key_hex, &alias),
-                WalletCmd::SendIota {
+                WalletCmd::ExecutePtb {
                     sender_idx,
-                    recipient,
-                    amount,
+                    commands,
                     gas_budget,
                 } => {
-                    self.handle_send_iota(sender_idx, recipient, amount, gas_budget)
+                    self.handle_execute_ptb(sender_idx, commands, gas_budget)
                         .await
                 }
                 WalletCmd::DeleteKey(idx) => self.handle_delete_key(idx),
+                WalletCmd::RenameKey { idx, new_alias } => self.handle_rename_key(idx, &new_alias),
                 WalletCmd::RequestFaucet(addr) => self.handle_faucet(addr).await,
             };
 
@@ -346,6 +349,18 @@ impl WalletBackend {
         Ok(())
     }
 
+    fn handle_rename_key(
+        &mut self,
+        idx: usize,
+        new_alias: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        if let Some(key) = self.keys.get_mut(idx) {
+            key.alias = new_alias.to_string();
+            self.save_keys();
+        }
+        Ok(())
+    }
+
     fn handle_delete_key(
         &mut self,
         idx: usize,
@@ -358,11 +373,10 @@ impl WalletBackend {
         Ok(())
     }
 
-    async fn handle_send_iota(
+    async fn handle_execute_ptb(
         &self,
         sender_idx: usize,
-        recipient: Address,
-        amount: u64,
+        commands: Vec<crate::app::PtbCommand>,
         gas_budget: u64,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let client = self.client.as_ref().ok_or("Not connected")?;
@@ -373,7 +387,63 @@ impl WalletBackend {
         let sender_addr = Address::from_hex(&self.keys[sender_idx].address)?;
 
         let mut builder = TransactionBuilder::new(sender_addr).with_client(client);
-        builder.send_iota(recipient, amount).gas_budget(gas_budget);
+
+        for cmd in &commands {
+            match cmd {
+                crate::app::PtbCommand::TransferIota { recipient, amount } => {
+                    let addr = Address::from_hex(recipient)?;
+                    let nanos = parse_iota_amount(amount)?;
+                    builder.send_iota(addr, nanos);
+                }
+                crate::app::PtbCommand::TransferObjects {
+                    recipient,
+                    object_ids,
+                } => {
+                    let addr = Address::from_hex(recipient)?;
+                    let ids: Result<Vec<iota_sdk::types::ObjectId>, _> = object_ids
+                        .iter()
+                        .map(|id| id.parse::<iota_sdk::types::ObjectId>())
+                        .collect();
+                    builder.transfer_objects(addr, ids?);
+                }
+                crate::app::PtbCommand::MoveCall {
+                    package,
+                    module,
+                    function,
+                    type_args,
+                    args,
+                } => {
+                    let pkg_addr = Address::from_hex(package)?;
+                    let call = builder.move_call(pkg_addr, module.as_str(), function.as_str());
+                    if !type_args.is_empty() {
+                        let tags: Vec<iota_sdk::types::TypeTag> = type_args
+                            .iter()
+                            .map(|s| s.parse::<iota_sdk::types::TypeTag>())
+                            .collect::<Result<Vec<_>, _>>()?;
+                        call.type_tags(tags);
+                    }
+                    // TODO: argument parsing for move calls is complex;
+                    // for now we pass no extra args (works for 0-arg functions)
+                    let _ = args;
+                }
+                crate::app::PtbCommand::SplitCoins { coin, amounts } => {
+                    let coin_id: iota_sdk::types::ObjectId = coin.parse()?;
+                    let parsed: Result<Vec<u64>, _> =
+                        amounts.iter().map(|a| parse_iota_amount(a)).collect();
+                    builder.split_coins(coin_id, parsed?);
+                }
+                crate::app::PtbCommand::MergeCoins { primary, sources } => {
+                    let primary_id: iota_sdk::types::ObjectId = primary.parse()?;
+                    let source_ids: Result<Vec<iota_sdk::types::ObjectId>, _> = sources
+                        .iter()
+                        .map(|id| id.parse::<iota_sdk::types::ObjectId>())
+                        .collect();
+                    builder.merge_coins(primary_id, source_ids?);
+                }
+            }
+        }
+
+        builder.gas_budget(gas_budget);
         let effects = builder.execute(keypair, None).await?;
 
         let digest = effects.as_v1().transaction_digest.to_string();
@@ -486,6 +556,18 @@ fn import_keypair_from_raw(
         }
         _ => Err(format!("Unknown scheme: {}", scheme).into()),
     }
+}
+
+fn parse_iota_amount(s: &str) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+    // Try as decimal IOTA first (e.g. "1.5" -> 1_500_000_000 nanos)
+    if let Ok(f) = s.parse::<f64>() {
+        return Ok((f * 1_000_000_000.0) as u64);
+    }
+    // Try as raw integer nanos
+    if let Ok(n) = s.parse::<u64>() {
+        return Ok(n);
+    }
+    Err(format!("Invalid amount: {}", s).into())
 }
 
 fn extract_symbol(coin_type: &str) -> String {

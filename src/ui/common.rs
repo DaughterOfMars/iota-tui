@@ -120,25 +120,65 @@ fn screen_hint(screen: Screen) -> &'static str {
         Screen::Objects => " j/k:navigate  Enter:details  r:refresh  ?:help",
         Screen::Packages => " r:refresh  ?:help",
         Screen::AddressBook => " j/k:navigate  a:add  e:edit  d:delete  ?:help",
-        Screen::Keys => " j/k:navigate  Enter:set active  g:generate  i:import  ?:help",
+        Screen::Keys => " j/k:navigate  Enter:active  g:gen  i:import  e:rename  n:network  ?:help",
         Screen::TxBuilder => " h/l:step  j/k:navigate  a:add  Enter:confirm  ?:help",
     }
 }
 
 pub fn draw_popup(frame: &mut Frame, app: &App) {
     let area = frame.area();
-    let popup_area = centered_rect(60, 60, area);
-
-    frame.render_widget(Clear, popup_area);
 
     match app.popup {
-        Some(Popup::Help) => draw_help_popup(frame, popup_area),
-        Some(Popup::Confirm) => draw_confirm_popup(frame, popup_area),
-        Some(Popup::AddAddress) => draw_address_form(frame, app, popup_area, "Add Address"),
-        Some(Popup::EditAddress) => draw_address_form(frame, app, popup_area, "Edit Address"),
-        Some(Popup::GenerateKey) => draw_generate_key_popup(frame, popup_area),
-        Some(Popup::ImportKey) => draw_import_key_popup(frame, app, popup_area),
-        Some(Popup::AddRecipient) => draw_add_recipient_popup(frame, app, popup_area),
+        Some(Popup::Help) => {
+            let popup_area = centered_rect_min(70, 80, 50, 24, area);
+            frame.render_widget(Clear, popup_area);
+            draw_help_popup(frame, popup_area);
+        }
+        Some(Popup::Confirm) => {
+            let popup_area = centered_rect_min(50, 30, 40, 8, area);
+            frame.render_widget(Clear, popup_area);
+            draw_confirm_popup(frame, popup_area);
+        }
+        Some(Popup::AddAddress) => {
+            let popup_area = centered_rect_min(60, 60, 48, 14, area);
+            frame.render_widget(Clear, popup_area);
+            draw_address_form(frame, app, popup_area, "Add Address");
+        }
+        Some(Popup::EditAddress) => {
+            let popup_area = centered_rect_min(60, 60, 48, 14, area);
+            frame.render_widget(Clear, popup_area);
+            draw_address_form(frame, app, popup_area, "Edit Address");
+        }
+        Some(Popup::GenerateKey) => {
+            let popup_area = centered_rect_min(50, 40, 36, 11, area);
+            frame.render_widget(Clear, popup_area);
+            draw_generate_key_popup(frame, popup_area);
+        }
+        Some(Popup::ImportKey) => {
+            let popup_area = centered_rect_min(60, 30, 48, 9, area);
+            frame.render_widget(Clear, popup_area);
+            draw_import_key_popup(frame, app, popup_area);
+        }
+        Some(Popup::AddCommand) => {
+            let popup_area = centered_rect_min(50, 45, 40, 14, area);
+            frame.render_widget(Clear, popup_area);
+            draw_add_command_popup(frame, popup_area);
+        }
+        Some(Popup::AddCommandForm) => {
+            let popup_area = centered_rect_min(65, 60, 52, 14, area);
+            frame.render_widget(Clear, popup_area);
+            draw_add_command_form(frame, app, popup_area);
+        }
+        Some(Popup::RenameKey) => {
+            let popup_area = centered_rect_min(50, 30, 40, 8, area);
+            frame.render_widget(Clear, popup_area);
+            draw_rename_key_popup(frame, app, popup_area);
+        }
+        Some(Popup::SwitchNetwork) => {
+            let popup_area = centered_rect_min(50, 40, 36, 12, area);
+            frame.render_widget(Clear, popup_area);
+            draw_switch_network_popup(frame, popup_area);
+        }
         None => {}
     }
 }
@@ -171,6 +211,7 @@ fn draw_help_popup(frame: &mut Frame, area: Rect) {
         Line::from("  g          Generate key"),
         Line::from("  i          Import key"),
         Line::from("  p          Toggle private key visibility"),
+        Line::from("  n          Switch network"),
         Line::from("  r          Refresh data from network"),
         Line::from("  f          Request faucet (testnet/devnet)"),
         Line::from(""),
@@ -203,9 +244,6 @@ fn draw_help_popup(frame: &mut Frame, area: Rect) {
 }
 
 fn draw_confirm_popup(frame: &mut Frame, area: Rect) {
-    let popup = centered_rect(50, 30, area);
-    frame.render_widget(Clear, popup);
-
     let text = vec![
         Line::from(""),
         Line::from(vec![Span::styled(
@@ -213,7 +251,7 @@ fn draw_confirm_popup(frame: &mut Frame, area: Rect) {
             Style::default().fg(Color::Green).bold(),
         )]),
         Line::from(""),
-        Line::from("Check the status bar for the transaction digest."),
+        Line::from("Check the status bar for the digest."),
         Line::from(""),
         Line::from(vec![Span::styled(
             "Press Enter to close",
@@ -231,7 +269,7 @@ fn draw_confirm_popup(frame: &mut Frame, area: Rect) {
         Paragraph::new(text)
             .block(block)
             .alignment(Alignment::Center),
-        popup,
+        area,
     );
 }
 
@@ -296,9 +334,6 @@ fn draw_address_form(frame: &mut Frame, app: &App, area: Rect, title: &str) {
 }
 
 fn draw_generate_key_popup(frame: &mut Frame, area: Rect) {
-    let popup = centered_rect(50, 40, area);
-    frame.render_widget(Clear, popup);
-
     let text = vec![
         Line::from(""),
         Line::from(vec![Span::styled(
@@ -331,17 +366,14 @@ fn draw_generate_key_popup(frame: &mut Frame, area: Rect) {
         .borders(Borders::ALL)
         .border_style(Style::default().fg(ACCENT));
 
-    frame.render_widget(Paragraph::new(text).block(block), popup);
+    frame.render_widget(Paragraph::new(text).block(block), area);
 }
 
 fn draw_import_key_popup(frame: &mut Frame, app: &App, area: Rect) {
-    let popup = centered_rect(60, 30, area);
-    frame.render_widget(Clear, popup);
-
     let text = vec![
         Line::from(""),
         Line::from(vec![Span::styled(
-            "  Paste private key (base64 or hex):",
+            "  Paste private key (hex):",
             Style::default().bold(),
         )]),
         Line::from(""),
@@ -364,19 +396,137 @@ fn draw_import_key_popup(frame: &mut Frame, app: &App, area: Rect) {
         .borders(Borders::ALL)
         .border_style(Style::default().fg(ACCENT));
 
-    frame.render_widget(Paragraph::new(text).block(block), popup);
+    frame.render_widget(Paragraph::new(text).block(block), area);
 }
 
-fn draw_add_recipient_popup(frame: &mut Frame, app: &App, area: Rect) {
-    let fields = ["Address", "Amount (IOTA)"];
-    let mut lines = vec![Line::from("")];
+fn draw_rename_key_popup(frame: &mut Frame, app: &App, area: Rect) {
+    let text = vec![
+        Line::from(""),
+        Line::from(vec![Span::styled("  New alias:", Style::default().bold())]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            format!("  {}|", &app.input_buffer),
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::UNDERLINED),
+        )]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Enter: save  Esc: cancel",
+            Style::default().fg(DIM),
+        )]),
+    ];
 
+    let block = Block::default()
+        .title(" Rename Key ")
+        .title_style(Style::default().fg(ACCENT).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ACCENT));
+
+    frame.render_widget(Paragraph::new(text).block(block), area);
+}
+
+fn draw_switch_network_popup(frame: &mut Frame, area: Rect) {
+    let text = vec![
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "Select network:",
+            Style::default().bold(),
+        )]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  [1/m] ", Style::default().fg(ACCENT).bold()),
+            Span::raw("Mainnet"),
+        ]),
+        Line::from(vec![
+            Span::styled("  [2/t] ", Style::default().fg(ACCENT).bold()),
+            Span::raw("Testnet"),
+        ]),
+        Line::from(vec![
+            Span::styled("  [3/d] ", Style::default().fg(ACCENT).bold()),
+            Span::raw("Devnet"),
+        ]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Esc to cancel",
+            Style::default().fg(DIM),
+        )]),
+    ];
+
+    let block = Block::default()
+        .title(" Switch Network ")
+        .title_style(Style::default().fg(ACCENT).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ACCENT));
+
+    frame.render_widget(Paragraph::new(text).block(block), area);
+}
+
+fn draw_add_command_popup(frame: &mut Frame, area: Rect) {
+    let text = vec![
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "Select command type:",
+            Style::default().bold(),
+        )]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  [1/t] ", Style::default().fg(ACCENT).bold()),
+            Span::raw("Transfer IOTA"),
+        ]),
+        Line::from(vec![
+            Span::styled("  [2/o] ", Style::default().fg(ACCENT).bold()),
+            Span::raw("Transfer Objects"),
+        ]),
+        Line::from(vec![
+            Span::styled("  [3/m] ", Style::default().fg(ACCENT).bold()),
+            Span::raw("Move Call"),
+        ]),
+        Line::from(vec![
+            Span::styled("  [4/s] ", Style::default().fg(ACCENT).bold()),
+            Span::raw("Split Coins"),
+        ]),
+        Line::from(vec![
+            Span::styled("  [5/r] ", Style::default().fg(ACCENT).bold()),
+            Span::raw("Merge Coins"),
+        ]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Esc to cancel",
+            Style::default().fg(DIM),
+        )]),
+    ];
+
+    let block = Block::default()
+        .title(" Add Command ")
+        .title_style(Style::default().fg(ACCENT).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ACCENT));
+
+    frame.render_widget(Paragraph::new(text).block(block), area);
+}
+
+fn draw_add_command_form(frame: &mut Frame, app: &App, area: Rect) {
+    use crate::app::AddCommandType;
+    let Some(ct) = app.tx_adding_cmd else {
+        return;
+    };
+
+    let fields: &[&str] = match ct {
+        AddCommandType::TransferIota => &["Recipient", "Amount (IOTA)"],
+        AddCommandType::TransferObjects => &["Recipient", "Object IDs (comma-sep)"],
+        AddCommandType::MoveCall => &["Package", "Module", "Function", "Type Args", "Arguments"],
+        AddCommandType::SplitCoins => &["Coin Object ID", "Amounts (comma-sep)"],
+        AddCommandType::MergeCoins => &["Primary Coin ID", "Source Coin IDs (comma-sep)"],
+    };
+
+    let mut lines = vec![Line::from("")];
     for (i, field) in fields.iter().enumerate() {
         let is_active = i == app.tx_edit_field;
         let value = if is_active {
             &app.input_buffer
         } else {
-            &app.tx_edit_buffers[i]
+            app.tx_edit_buffers.get(i).map(|s| s.as_str()).unwrap_or("")
         };
 
         let label_style = if is_active {
@@ -403,7 +553,7 @@ fn draw_add_recipient_popup(frame: &mut Frame, app: &App, area: Rect) {
         } else if is_active {
             format!("{}|", value)
         } else {
-            value.clone()
+            value.to_string()
         };
 
         lines.push(Line::from(vec![Span::styled(
@@ -419,28 +569,31 @@ fn draw_add_recipient_popup(frame: &mut Frame, app: &App, area: Rect) {
     )]));
 
     let block = Block::default()
-        .title(" Add Recipient ")
+        .title(format!(" {} ", ct.label()))
         .title_style(Style::default().fg(ACCENT).bold())
         .borders(Borders::ALL)
         .border_style(Style::default().fg(ACCENT));
 
-    frame.render_widget(Paragraph::new(lines).block(block), area);
+    frame.render_widget(
+        Paragraph::new(lines)
+            .block(block)
+            .wrap(Wrap { trim: false }),
+        area,
+    );
 }
 
-pub fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
-    let popup_layout = Layout::vertical([
-        Constraint::Percentage((100 - percent_y) / 2),
-        Constraint::Percentage(percent_y),
-        Constraint::Percentage((100 - percent_y) / 2),
-    ])
-    .split(area);
-
-    Layout::horizontal([
-        Constraint::Percentage((100 - percent_x) / 2),
-        Constraint::Percentage(percent_x),
-        Constraint::Percentage((100 - percent_x) / 2),
-    ])
-    .split(popup_layout[1])[1]
+pub fn centered_rect_min(
+    percent_x: u16,
+    percent_y: u16,
+    min_w: u16,
+    min_h: u16,
+    area: Rect,
+) -> Rect {
+    let w = (area.width * percent_x / 100).max(min_w).min(area.width);
+    let h = (area.height * percent_y / 100).max(min_h).min(area.height);
+    let x = area.x + (area.width.saturating_sub(w)) / 2;
+    let y = area.y + (area.height.saturating_sub(h)) / 2;
+    Rect::new(x, y, w, h)
 }
 
 pub fn truncate_type(type_str: &str, max_width: usize) -> String {

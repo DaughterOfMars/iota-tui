@@ -20,7 +20,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
 
     match app.tx_step {
         TxBuilderStep::SelectSender => draw_select_sender(frame, app, layout[1]),
-        TxBuilderStep::AddRecipients => draw_recipients(frame, app, layout[1]),
+        TxBuilderStep::EditCommands => draw_commands(frame, app, layout[1]),
         TxBuilderStep::SetGas => draw_gas(frame, app, layout[1]),
         TxBuilderStep::Review => draw_review(frame, app, layout[1]),
     }
@@ -75,6 +75,18 @@ fn draw_select_sender(frame: &mut Frame, app: &App, area: Rect) {
         .borders(Borders::ALL)
         .border_style(common::dim_style());
 
+    if app.keys.is_empty() {
+        let text = vec![
+            Line::from(""),
+            Line::from(vec![Span::styled(
+                "  No keys available. Go to Keys (5) and generate one first.",
+                common::dim_style(),
+            )]),
+        ];
+        frame.render_widget(Paragraph::new(text).block(block), area);
+        return;
+    }
+
     let items: Vec<ListItem> = app
         .keys
         .iter()
@@ -106,43 +118,49 @@ fn draw_select_sender(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(list, area);
 }
 
-fn draw_recipients(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_commands(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
-        .title(" Recipients (a: add, d: delete) ")
+        .title(format!(
+            " Commands ({}) - a:add  d:delete ",
+            app.tx_commands.len()
+        ))
         .title_style(common::header_style())
         .borders(Borders::ALL)
         .border_style(common::dim_style());
 
-    if app.tx_recipients.is_empty() {
+    if app.tx_commands.is_empty() {
         let text = vec![
             Line::from(""),
             Line::from(vec![Span::styled(
-                "  No recipients added yet.",
+                "  No commands added yet.",
                 common::dim_style(),
             )]),
             Line::from(""),
             Line::from(vec![
                 Span::styled("  Press ", common::dim_style()),
                 Span::styled("'a'", common::accent_style()),
-                Span::styled(" to add a recipient.", common::dim_style()),
+                Span::styled(
+                    " to add a command (Transfer, MoveCall, Split, Merge).",
+                    common::dim_style(),
+                ),
             ]),
         ];
         frame.render_widget(Paragraph::new(text).block(block), area);
         return;
     }
 
-    let header = Row::new(vec!["#", "Address", "Amount (IOTA)"])
+    let header = Row::new(vec!["#", "Command", "Details"])
         .style(common::header_style())
         .bottom_margin(1);
 
-    let addr_width = area.width.saturating_sub(30) as usize;
+    let detail_width = area.width.saturating_sub(30) as usize;
 
     let rows: Vec<Row> = app
-        .tx_recipients
+        .tx_commands
         .iter()
         .enumerate()
-        .map(|(i, r)| {
-            let style = if i == app.tx_recipient_selected {
+        .map(|(i, cmd)| {
+            let style = if i == app.tx_cmd_selected {
                 common::selected_style()
             } else {
                 Style::default()
@@ -150,8 +168,8 @@ fn draw_recipients(frame: &mut Frame, app: &App, area: Rect) {
 
             Row::new(vec![
                 format!("{}", i + 1),
-                common::truncate_address(&r.address, addr_width.max(20)),
-                r.amount.clone(),
+                cmd.label().to_string(),
+                common::truncate_type(&cmd.summary(), detail_width.max(20)),
             ])
             .style(style)
         })
@@ -159,8 +177,8 @@ fn draw_recipients(frame: &mut Frame, app: &App, area: Rect) {
 
     let widths = [
         Constraint::Length(4),
-        Constraint::Min(24),
-        Constraint::Length(16),
+        Constraint::Length(18),
+        Constraint::Min(20),
     ];
 
     let table = Table::new(rows, widths).header(header).block(block);
@@ -251,31 +269,41 @@ fn draw_review(frame: &mut Frame, app: &App, area: Rect) {
         ]),
         Line::from(""),
         Line::from(vec![Span::styled(
-            format!("  Recipients ({}):", app.tx_recipients.len()),
+            format!("  Commands ({}):", app.tx_commands.len()),
             Style::default().fg(Color::White).bold(),
         )]),
     ];
 
-    if app.tx_recipients.is_empty() {
+    if app.tx_commands.is_empty() {
         lines.push(Line::from(vec![Span::styled(
-            "    (none)",
+            "    (none - go back and add commands)",
             Style::default().fg(Color::Red),
         )]));
     } else {
-        for (i, r) in app.tx_recipients.iter().enumerate() {
+        for (i, cmd) in app.tx_commands.iter().enumerate() {
             lines.push(Line::from(vec![
                 Span::styled(format!("    {}. ", i + 1), common::dim_style()),
-                Span::raw(common::truncate_address(&r.address, 30)),
-                Span::styled(format!("  {} IOTA", r.amount), common::accent_style()),
+                Span::styled(
+                    format!("{}: ", cmd.label()),
+                    Style::default().fg(Color::White).bold(),
+                ),
+                Span::styled(cmd.summary(), common::accent_style()),
             ]));
         }
     }
 
     lines.push(Line::from(""));
-    lines.push(Line::from(vec![Span::styled(
-        "  Press Enter to sign and submit",
-        Style::default().fg(Color::Green).bold(),
-    )]));
+    if app.tx_commands.is_empty() {
+        lines.push(Line::from(vec![Span::styled(
+            "  Cannot submit: no commands",
+            Style::default().fg(Color::Red),
+        )]));
+    } else {
+        lines.push(Line::from(vec![Span::styled(
+            "  Press Enter to sign and submit",
+            Style::default().fg(Color::Green).bold(),
+        )]));
+    }
 
     frame.render_widget(Paragraph::new(lines).block(block), area);
 }

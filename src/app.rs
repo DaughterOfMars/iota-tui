@@ -79,7 +79,7 @@ pub struct KeyDisplay {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TxBuilderStep {
     SelectSender,
-    AddRecipients,
+    EditCommands,
     SetGas,
     Review,
 }
@@ -87,7 +87,7 @@ pub enum TxBuilderStep {
 impl TxBuilderStep {
     pub const ALL: [TxBuilderStep; 4] = [
         TxBuilderStep::SelectSender,
-        TxBuilderStep::AddRecipients,
+        TxBuilderStep::EditCommands,
         TxBuilderStep::SetGas,
         TxBuilderStep::Review,
     ];
@@ -95,17 +95,113 @@ impl TxBuilderStep {
     pub fn title(self) -> &'static str {
         match self {
             TxBuilderStep::SelectSender => "Sender",
-            TxBuilderStep::AddRecipients => "Recipients",
+            TxBuilderStep::EditCommands => "Commands",
             TxBuilderStep::SetGas => "Gas",
             TxBuilderStep::Review => "Review",
         }
     }
 }
 
+/// A visual PTB command in the transaction builder
 #[derive(Debug, Clone)]
-pub struct TxRecipient {
-    pub address: String,
-    pub amount: String,
+pub enum PtbCommand {
+    TransferIota {
+        recipient: String,
+        amount: String,
+    },
+    TransferObjects {
+        recipient: String,
+        object_ids: Vec<String>,
+    },
+    MoveCall {
+        package: String,
+        module: String,
+        function: String,
+        type_args: Vec<String>,
+        args: Vec<String>,
+    },
+    SplitCoins {
+        coin: String,
+        amounts: Vec<String>,
+    },
+    MergeCoins {
+        primary: String,
+        sources: Vec<String>,
+    },
+}
+
+impl PtbCommand {
+    pub fn label(&self) -> &'static str {
+        match self {
+            PtbCommand::TransferIota { .. } => "TransferIota",
+            PtbCommand::TransferObjects { .. } => "TransferObjects",
+            PtbCommand::MoveCall { .. } => "MoveCall",
+            PtbCommand::SplitCoins { .. } => "SplitCoins",
+            PtbCommand::MergeCoins { .. } => "MergeCoins",
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        match self {
+            PtbCommand::TransferIota { recipient, amount } => {
+                format!("{} IOTA -> {}", amount, truncate_id(recipient, 16))
+            }
+            PtbCommand::TransferObjects {
+                recipient,
+                object_ids,
+            } => {
+                format!(
+                    "{} objs -> {}",
+                    object_ids.len(),
+                    truncate_id(recipient, 16)
+                )
+            }
+            PtbCommand::MoveCall {
+                package,
+                module,
+                function,
+                ..
+            } => {
+                format!("{}::{}::{}", truncate_id(package, 8), module, function)
+            }
+            PtbCommand::SplitCoins { coin, amounts } => {
+                format!("{} into {} parts", truncate_id(coin, 12), amounts.len())
+            }
+            PtbCommand::MergeCoins { primary, sources } => {
+                format!("{} + {} coins", truncate_id(primary, 12), sources.len())
+            }
+        }
+    }
+}
+
+fn truncate_id(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        s.to_string()
+    } else {
+        format!("{}..{}", &s[..max / 2], &s[s.len() - max / 2..])
+    }
+}
+
+/// Which command type is being added in the popup
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AddCommandType {
+    TransferIota,
+    TransferObjects,
+    MoveCall,
+    SplitCoins,
+    MergeCoins,
+}
+
+impl AddCommandType {
+    pub fn label(self) -> &'static str {
+        match self {
+            AddCommandType::TransferIota => "Transfer IOTA",
+            AddCommandType::TransferObjects => "Transfer Objects",
+            AddCommandType::MoveCall => "Move Call",
+            AddCommandType::SplitCoins => "Split Coins",
+            AddCommandType::MergeCoins => "Merge Coins",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -122,7 +218,10 @@ pub enum Popup {
     EditAddress,
     GenerateKey,
     ImportKey,
-    AddRecipient,
+    AddCommand,
+    AddCommandForm,
+    RenameKey,
+    SwitchNetwork,
 }
 
 // ── App State ──────────────────────────────────────────────────────
@@ -167,11 +266,12 @@ pub struct App {
 
     pub tx_step: TxBuilderStep,
     pub tx_sender: usize,
-    pub tx_recipients: Vec<TxRecipient>,
-    pub tx_recipient_selected: usize,
+    pub tx_commands: Vec<PtbCommand>,
+    pub tx_cmd_selected: usize,
     pub tx_gas_budget: String,
     pub tx_edit_field: usize,
-    pub tx_edit_buffers: [String; 2],
+    pub tx_edit_buffers: Vec<String>,
+    pub tx_adding_cmd: Option<AddCommandType>,
 
     // Layout state for mouse hit-testing
     pub tab_areas: Vec<ratatui::layout::Rect>,
@@ -230,11 +330,12 @@ impl App {
 
             tx_step: TxBuilderStep::SelectSender,
             tx_sender: 0,
-            tx_recipients: vec![],
-            tx_recipient_selected: 0,
+            tx_commands: vec![],
+            tx_cmd_selected: 0,
             tx_gas_budget: "10000000".into(),
             tx_edit_field: 0,
-            tx_edit_buffers: [String::new(), String::new()],
+            tx_edit_buffers: vec![],
+            tx_adding_cmd: None,
 
             tab_areas: vec![],
         }
