@@ -70,25 +70,44 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         Span::styled(" NORMAL ", Style::default().fg(Color::Black).bg(Color::Blue).bold())
     };
 
-    let right = Span::styled(
-        format!("  {} ", active_addr),
-        Style::default().fg(ACCENT),
-    );
+    // Network indicator
+    let net_indicator = if app.loading {
+        Span::styled(
+            format!(" {} ... ", app.network_name),
+            Style::default().fg(Color::Black).bg(Color::Yellow).bold(),
+        )
+    } else if app.connected {
+        Span::styled(
+            format!(" {} ", app.network_name),
+            Style::default().fg(Color::Black).bg(Color::Green).bold(),
+        )
+    } else {
+        Span::styled(
+            " offline ",
+            Style::default().fg(Color::Black).bg(Color::Red).bold(),
+        )
+    };
 
-    let left_width = area.width.saturating_sub(right.width() as u16 + mode_indicator.width() as u16);
+    let right_text = format!("  {} ", active_addr);
+    let right = Span::styled(&right_text, Style::default().fg(ACCENT));
+
+    let fixed_right = mode_indicator.width() as u16 + net_indicator.width() as u16 + right_text.len() as u16;
+    let left_width = area.width.saturating_sub(fixed_right);
 
     let cols = Layout::horizontal([
         Constraint::Length(mode_indicator.width() as u16),
         Constraint::Length(left_width),
+        Constraint::Length(net_indicator.width() as u16),
         Constraint::Min(0),
     ])
     .split(area);
 
     frame.render_widget(Paragraph::new(Line::from(vec![mode_indicator])), cols[0]);
     frame.render_widget(Paragraph::new(Line::from(vec![left])), cols[1]);
+    frame.render_widget(Paragraph::new(Line::from(vec![net_indicator])), cols[2]);
     frame.render_widget(
         Paragraph::new(Line::from(vec![right])).alignment(Alignment::Right),
-        cols[2],
+        cols[3],
     );
 }
 

@@ -21,6 +21,8 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_address_table(frame: &mut Frame, app: &App, area: Rect) {
+    let visible_rows = area.height.saturating_sub(4) as usize;
+
     let header = Row::new(vec!["Label", "Address", "Notes"])
         .style(common::header_style())
         .bottom_margin(1);
@@ -31,6 +33,8 @@ fn draw_address_table(frame: &mut Frame, app: &App, area: Rect) {
         .address_book
         .iter()
         .enumerate()
+        .skip(app.address_offset)
+        .take(visible_rows)
         .map(|(i, entry)| {
             let style = if i == app.address_selected {
                 common::selected_style()

@@ -1,20 +1,14 @@
 use std::path::PathBuf;
 
-use iota_sdk::graphql_client::{
-    faucet::FaucetClient,
-    Client,
-    PaginationFilter,
-    query_types::ObjectFilter,
-};
-use iota_sdk::types::{Address, ObjectType};
 use iota_sdk::crypto::{
-    ed25519::Ed25519PrivateKey,
-    secp256k1::Secp256k1PrivateKey,
-    secp256r1::Secp256r1PrivateKey,
-    simple::SimpleKeypair,
-    ToFromBytes,
+    ToFromBytes, ed25519::Ed25519PrivateKey, secp256k1::Secp256k1PrivateKey,
+    secp256r1::Secp256r1PrivateKey, simple::SimpleKeypair,
+};
+use iota_sdk::graphql_client::{
+    Client, PaginationFilter, faucet::FaucetClient, query_types::ObjectFilter,
 };
 use iota_sdk::transaction_builder::TransactionBuilder;
+use iota_sdk::types::{Address, ObjectType};
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -81,9 +75,22 @@ pub enum WalletCmd {
     RefreshBalances(Address),
     RefreshCoins(Address),
     RefreshObjects(Address),
-    GenerateKey { scheme: String, alias: String },
-    ImportKey { scheme: String, private_key_hex: String, alias: String },
-    SendIota { sender_idx: usize, recipient: Address, amount: u64, gas_budget: u64 },
+    GenerateKey {
+        scheme: String,
+        alias: String,
+    },
+    ImportKey {
+        scheme: String,
+        private_key_hex: String,
+        alias: String,
+    },
+    SendIota {
+        sender_idx: usize,
+        recipient: Address,
+        amount: u64,
+        gas_budget: u64,
+    },
+    DeleteKey(usize),
     RequestFaucet(Address),
 }
 
@@ -93,9 +100,21 @@ pub enum WalletEvent {
     Balances(Vec<BalanceInfo>),
     Coins(Vec<CoinInfo>),
     Objects(Vec<ObjectInfo>),
-    KeyGenerated { alias: String, address: String, scheme: String },
-    KeyImported { alias: String, address: String, scheme: String },
-    TxSubmitted { digest: String },
+    KeyGenerated {
+        alias: String,
+        address: String,
+        scheme: String,
+        private_key_hex: String,
+    },
+    KeyImported {
+        alias: String,
+        address: String,
+        scheme: String,
+        private_key_hex: String,
+    },
+    TxSubmitted {
+        digest: String,
+    },
     FaucetRequested(String),
     Error(String),
 }
@@ -113,10 +132,7 @@ pub struct WalletBackend {
 }
 
 impl WalletBackend {
-    pub fn new(
-        cmd_rx: mpsc::Receiver<WalletCmd>,
-        event_tx: mpsc::Sender<WalletEvent>,
-    ) -> Self {
+    pub fn new(cmd_rx: mpsc::Receiver<WalletCmd>, event_tx: mpsc::Sender<WalletEvent>) -> Self {
         let keystore_path = dirs::data_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join("iota-wallet-tui")
@@ -142,13 +158,24 @@ impl WalletBackend {
                 WalletCmd::RefreshBalances(addr) => self.handle_balances(addr).await,
                 WalletCmd::RefreshCoins(addr) => self.handle_coins(addr).await,
                 WalletCmd::RefreshObjects(addr) => self.handle_objects(addr).await,
-                WalletCmd::GenerateKey { scheme, alias } => self.handle_generate_key(&scheme, &alias),
-                WalletCmd::ImportKey { scheme, private_key_hex, alias } => {
-                    self.handle_import_key(&scheme, &private_key_hex, &alias)
+                WalletCmd::GenerateKey { scheme, alias } => {
+                    self.handle_generate_key(&scheme, &alias)
                 }
-                WalletCmd::SendIota { sender_idx, recipient, amount, gas_budget } => {
-                    self.handle_send_iota(sender_idx, recipient, amount, gas_budget).await
+                WalletCmd::ImportKey {
+                    scheme,
+                    private_key_hex,
+                    alias,
+                } => self.handle_import_key(&scheme, &private_key_hex, &alias),
+                WalletCmd::SendIota {
+                    sender_idx,
+                    recipient,
+                    amount,
+                    gas_budget,
+                } => {
+                    self.handle_send_iota(sender_idx, recipient, amount, gas_budget)
+                        .await
                 }
+                WalletCmd::DeleteKey(idx) => self.handle_delete_key(idx),
                 WalletCmd::RequestFaucet(addr) => self.handle_faucet(addr).await,
             };
 
@@ -158,7 +185,10 @@ impl WalletBackend {
         }
     }
 
-    async fn handle_connect(&mut self, network: Network) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn handle_connect(
+        &mut self,
+        network: Network,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let (client, faucet) = match &network {
             Network::Mainnet => (Client::new_mainnet(), None),
             Network::Testnet => (Client::new_testnet(), Some(FaucetClient::new_testnet())),
@@ -173,7 +203,10 @@ impl WalletBackend {
         Ok(())
     }
 
-    async fn handle_balances(&self, addr: Address) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn handle_balances(
+        &self,
+        addr: Address,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let client = self.client.as_ref().ok_or("Not connected")?;
 
         let iota_balance = client.balance(addr, None::<String>).await?;
@@ -186,10 +219,15 @@ impl WalletBackend {
         Ok(())
     }
 
-    async fn handle_coins(&self, addr: Address) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn handle_coins(
+        &self,
+        addr: Address,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let client = self.client.as_ref().ok_or("Not connected")?;
 
-        let page = client.coins(addr, None, PaginationFilter::default()).await?;
+        let page = client
+            .coins(addr, None, PaginationFilter::default())
+            .await?;
         let coins: Vec<CoinInfo> = page
             .data()
             .iter()
@@ -205,7 +243,10 @@ impl WalletBackend {
         Ok(())
     }
 
-    async fn handle_objects(&self, addr: Address) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn handle_objects(
+        &self,
+        addr: Address,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let client = self.client.as_ref().ok_or("Not connected")?;
 
         let filter = ObjectFilter {
@@ -239,9 +280,14 @@ impl WalletBackend {
         Ok(())
     }
 
-    fn handle_generate_key(&mut self, scheme: &str, alias: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    fn handle_generate_key(
+        &mut self,
+        scheme: &str,
+        alias: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let (keypair, address_str) = generate_keypair(scheme)?;
         let bytes = keypair.to_bytes();
+        let key_hex = hex::encode(&bytes);
 
         let stored = StoredKey {
             alias: alias.to_string(),
@@ -259,17 +305,24 @@ impl WalletBackend {
             alias: alias.to_string(),
             address: address_str,
             scheme: scheme.to_string(),
+            private_key_hex: key_hex,
         };
         let _ = self.event_tx.try_send(event);
         Ok(())
     }
 
-    fn handle_import_key(&mut self, scheme: &str, hex_key: &str, alias: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    fn handle_import_key(
+        &mut self,
+        scheme: &str,
+        hex_key: &str,
+        alias: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let raw = hex::decode(hex_key.strip_prefix("0x").unwrap_or(hex_key))
             .map_err(|e| format!("Invalid hex: {}", e))?;
 
         let (keypair, address_str) = import_keypair_from_raw(scheme, &raw)?;
         let stored_bytes = keypair.to_bytes();
+        let key_hex = hex::encode(&stored_bytes);
 
         let stored = StoredKey {
             alias: alias.to_string(),
@@ -287,8 +340,21 @@ impl WalletBackend {
             alias: alias.to_string(),
             address: address_str,
             scheme: scheme.to_string(),
+            private_key_hex: key_hex,
         };
         let _ = self.event_tx.try_send(event);
+        Ok(())
+    }
+
+    fn handle_delete_key(
+        &mut self,
+        idx: usize,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        if idx < self.keys.len() {
+            self.keys.remove(idx);
+            self.keypairs.remove(idx);
+            self.save_keys();
+        }
         Ok(())
     }
 
@@ -300,11 +366,13 @@ impl WalletBackend {
         gas_budget: u64,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let client = self.client.as_ref().ok_or("Not connected")?;
-        let keypair = self.keypairs.get(sender_idx).ok_or("Invalid sender key index")?;
+        let keypair = self
+            .keypairs
+            .get(sender_idx)
+            .ok_or("Invalid sender key index")?;
         let sender_addr = Address::from_hex(&self.keys[sender_idx].address)?;
 
-        let mut builder = TransactionBuilder::new(sender_addr)
-            .with_client(client);
+        let mut builder = TransactionBuilder::new(sender_addr).with_client(client);
         builder.send_iota(recipient, amount).gas_budget(gas_budget);
         let effects = builder.execute(keypair, None).await?;
 
@@ -315,14 +383,22 @@ impl WalletBackend {
         Ok(())
     }
 
-    async fn handle_faucet(&self, addr: Address) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let faucet = self.faucet.as_ref().ok_or("Faucet not available on this network")?;
+    async fn handle_faucet(
+        &self,
+        addr: Address,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let faucet = self
+            .faucet
+            .as_ref()
+            .ok_or("Faucet not available on this network")?;
         let receipt = faucet.request_and_wait(addr).await?;
         let msg = match receipt {
             Some(_r) => "Faucet: received coins".to_string(),
             None => "Faucet request sent (no receipt)".into(),
         };
-        self.event_tx.send(WalletEvent::FaucetRequested(msg)).await?;
+        self.event_tx
+            .send(WalletEvent::FaucetRequested(msg))
+            .await?;
         Ok(())
     }
 
@@ -355,7 +431,9 @@ impl WalletBackend {
 
 // ── Helpers ────────────────────────────────────────────────────────
 
-fn generate_keypair(scheme: &str) -> Result<(SimpleKeypair, String), Box<dyn std::error::Error + Send + Sync>> {
+fn generate_keypair(
+    scheme: &str,
+) -> Result<(SimpleKeypair, String), Box<dyn std::error::Error + Send + Sync>> {
     let mut rng = rand::rngs::OsRng;
     match scheme {
         "ed25519" => {
@@ -380,7 +458,10 @@ fn generate_keypair(scheme: &str) -> Result<(SimpleKeypair, String), Box<dyn std
     }
 }
 
-fn import_keypair_from_raw(scheme: &str, raw_bytes: &[u8]) -> Result<(SimpleKeypair, String), Box<dyn std::error::Error + Send + Sync>> {
+fn import_keypair_from_raw(
+    scheme: &str,
+    raw_bytes: &[u8],
+) -> Result<(SimpleKeypair, String), Box<dyn std::error::Error + Send + Sync>> {
     match scheme {
         "ed25519" => {
             let sk = Ed25519PrivateKey::from_bytes(raw_bytes)

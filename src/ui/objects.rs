@@ -40,6 +40,8 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
+    let visible_rows = area.height.saturating_sub(4) as usize;
+
     let header = Row::new(vec!["Object ID", "Type", "Version", "Digest"])
         .style(common::header_style())
         .bottom_margin(1);
@@ -50,6 +52,8 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
         .objects
         .iter()
         .enumerate()
+        .skip(app.objects_offset)
+        .take(visible_rows)
         .map(|(i, obj)| {
             let style = if i == app.objects_selected {
                 common::selected_style()
@@ -74,11 +78,20 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
         Constraint::Length(18),
     ];
 
+    let title = if app.objects.len() > visible_rows {
+        format!(" Objects ({}) [{}-{}/{}] ",
+            app.objects.len(), app.objects_offset + 1,
+            (app.objects_offset + visible_rows).min(app.objects.len()),
+            app.objects.len())
+    } else {
+        format!(" Objects ({}) ", app.objects.len())
+    };
+
     let table = Table::new(rows, widths)
         .header(header)
         .block(
             Block::default()
-                .title(format!(" Objects ({}) ", app.objects.len()))
+                .title(title)
                 .title_style(common::header_style())
                 .borders(Borders::ALL)
                 .border_style(common::dim_style()),

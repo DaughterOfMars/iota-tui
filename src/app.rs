@@ -73,6 +73,7 @@ pub struct KeyDisplay {
     pub address: String,
     pub scheme: String,
     pub is_active: bool,
+    pub private_key_hex: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -146,18 +147,22 @@ pub struct App {
     // Per-screen data
     pub coins: Vec<CoinDisplay>,
     pub coins_selected: usize,
+    pub coins_offset: usize,
     pub total_balance_iota: u128,
 
     pub objects: Vec<ObjectDisplay>,
     pub objects_selected: usize,
+    pub objects_offset: usize,
 
     pub address_book: Vec<AddressEntry>,
     pub address_selected: usize,
+    pub address_offset: usize,
     pub address_edit_field: usize,
     pub address_edit_buffers: [String; 3],
 
     pub keys: Vec<KeyDisplay>,
     pub keys_selected: usize,
+    pub keys_offset: usize,
     pub keys_show_private: bool,
 
     pub tx_step: TxBuilderStep,
@@ -181,6 +186,7 @@ impl App {
                 address: k.address.clone(),
                 scheme: k.scheme.clone(),
                 is_active: k.is_active,
+                private_key_hex: hex::encode(&k.private_key_bytes),
             })
             .collect();
 
@@ -204,18 +210,22 @@ impl App {
 
             coins: vec![],
             coins_selected: 0,
+            coins_offset: 0,
             total_balance_iota: 0,
 
             objects: vec![],
             objects_selected: 0,
+            objects_offset: 0,
 
             address_book,
             address_selected: 0,
+            address_offset: 0,
             address_edit_field: 0,
             address_edit_buffers: [String::new(), String::new(), String::new()],
 
             keys,
             keys_selected: 0,
+            keys_offset: 0,
             keys_show_private: false,
 
             tx_step: TxBuilderStep::SelectSender,
@@ -285,11 +295,13 @@ impl App {
                 alias,
                 address,
                 scheme,
+                private_key_hex,
             }
             | WalletEvent::KeyImported {
                 alias,
                 address,
                 scheme,
+                private_key_hex,
             } => {
                 let is_first = self.keys.is_empty();
                 self.keys.push(KeyDisplay {
@@ -297,6 +309,7 @@ impl App {
                     address,
                     scheme,
                     is_active: is_first,
+                    private_key_hex,
                 });
                 self.set_status(format!("Key '{}' ready", alias));
                 // If this is the first key, refresh data
@@ -330,9 +343,10 @@ impl App {
     }
 
     /// Request a data refresh for the active key's address
-    pub fn request_refresh(&self) {
-        if let Some(key) = self.active_key() {
+    pub fn request_refresh(&mut self) {
+        if let Some(key) = self.active_key().cloned() {
             if let Some(addr) = parse_address(&key.address) {
+                self.loading = true;
                 self.send_cmd(WalletCmd::RefreshCoins(addr));
                 self.send_cmd(WalletCmd::RefreshObjects(addr));
                 self.send_cmd(WalletCmd::RefreshBalances(addr));
@@ -360,6 +374,18 @@ impl App {
 
     pub fn active_key(&self) -> Option<&KeyDisplay> {
         self.keys.iter().find(|k| k.is_active)
+    }
+
+    /// Adjust a scroll offset so that `selected` is visible within `visible_rows`.
+    pub fn scroll_into_view(selected: usize, offset: &mut usize, visible_rows: usize) {
+        if visible_rows == 0 {
+            return;
+        }
+        if selected < *offset {
+            *offset = selected;
+        } else if selected >= *offset + visible_rows {
+            *offset = selected - visible_rows + 1;
+        }
     }
 
     pub fn input_insert(&mut self, ch: char) {

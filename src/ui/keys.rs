@@ -21,6 +21,33 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_key_table(frame: &mut Frame, app: &App, area: Rect) {
+    if app.keys.is_empty() {
+        let block = Block::default()
+            .title(" Keys (0) ")
+            .title_style(common::header_style())
+            .borders(Borders::ALL)
+            .border_style(common::dim_style());
+
+        let text = vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  No keys configured yet.", common::dim_style()),
+            ]),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  Press ", common::dim_style()),
+                Span::styled("'g'", common::accent_style()),
+                Span::styled(" to generate a new keypair, or ", common::dim_style()),
+                Span::styled("'i'", common::accent_style()),
+                Span::styled(" to import one.", common::dim_style()),
+            ]),
+        ];
+        frame.render_widget(Paragraph::new(text).block(block), area);
+        return;
+    }
+
+    let visible_rows = area.height.saturating_sub(4) as usize;
+
     let header = Row::new(vec!["", "Alias", "Scheme", "Address"])
         .style(common::header_style())
         .bottom_margin(1);
@@ -31,6 +58,8 @@ fn draw_key_table(frame: &mut Frame, app: &App, area: Rect) {
         .keys
         .iter()
         .enumerate()
+        .skip(app.keys_offset)
+        .take(visible_rows)
         .map(|(i, key)| {
             let style = if i == app.keys_selected {
                 common::selected_style()
@@ -82,10 +111,21 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
         let active_str = if key.is_active { "Yes (active)" } else { "No" };
         let active_color = if key.is_active { Color::Green } else { Color::White };
 
-        let private_display = if app.keys_show_private {
-            "iotaprivkey1q...mock_private_key_data...redacted"
+        let private_line = if app.keys_show_private {
+            let hex_display = if key.private_key_hex.len() > addr_width {
+                format!("{}...{}", &key.private_key_hex[..16], &key.private_key_hex[key.private_key_hex.len().saturating_sub(8)..])
+            } else {
+                key.private_key_hex.clone()
+            };
+            Line::from(vec![
+                Span::styled("  Private: ", Style::default().fg(Color::White).bold()),
+                Span::styled(hex_display, Style::default().fg(Color::Red)),
+            ])
         } else {
-            "********** (press 'p' to reveal)"
+            Line::from(vec![
+                Span::styled("  Private: ", Style::default().fg(Color::White).bold()),
+                Span::styled("********** (press 'p' to reveal)", Style::default().fg(Color::DarkGray)),
+            ])
         };
 
         vec![
@@ -103,10 +143,7 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
                 Span::styled("  Address: ", Style::default().fg(Color::White).bold()),
                 Span::raw(common::truncate_address(&key.address, addr_width)),
             ]),
-            Line::from(vec![
-                Span::styled("  Private: ", Style::default().fg(Color::White).bold()),
-                Span::styled(private_display, Style::default().fg(Color::Red)),
-            ]),
+            private_line,
         ]
     } else {
         vec![Line::from("  No key selected")]

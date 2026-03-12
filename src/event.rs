@@ -207,16 +207,23 @@ fn handle_input_key(app: &mut App, key: KeyEvent) {
 }
 
 fn handle_coins_key(app: &mut App, key: KeyEvent) {
+    let len = app.coins.len();
     match key.code {
         KeyCode::Up | KeyCode::Char('k') => {
-            if app.coins_selected > 0 {
-                app.coins_selected -= 1;
-            }
+            if app.coins_selected > 0 { app.coins_selected -= 1; }
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            if app.coins_selected + 1 < app.coins.len() {
-                app.coins_selected += 1;
-            }
+            if app.coins_selected + 1 < len { app.coins_selected += 1; }
+        }
+        KeyCode::Home | KeyCode::Char('g') => { app.coins_selected = 0; }
+        KeyCode::End | KeyCode::Char('G') => {
+            if len > 0 { app.coins_selected = len - 1; }
+        }
+        KeyCode::PageUp => {
+            app.coins_selected = app.coins_selected.saturating_sub(10);
+        }
+        KeyCode::PageDown => {
+            app.coins_selected = (app.coins_selected + 10).min(len.saturating_sub(1));
         }
         KeyCode::Enter => {
             if let Some(coin) = app.coins.get(app.coins_selected) {
@@ -226,7 +233,6 @@ fn handle_coins_key(app: &mut App, key: KeyEvent) {
             }
         }
         KeyCode::Char('f') => {
-            // Request faucet
             if let Some(key) = app.active_key() {
                 if let Ok(addr) = iota_sdk::types::Address::from_hex(&key.address) {
                     app.send_cmd(WalletCmd::RequestFaucet(addr));
@@ -236,19 +242,27 @@ fn handle_coins_key(app: &mut App, key: KeyEvent) {
         }
         _ => {}
     }
+    App::scroll_into_view(app.coins_selected, &mut app.coins_offset, 20);
 }
 
 fn handle_objects_key(app: &mut App, key: KeyEvent) {
+    let len = app.objects.len();
     match key.code {
         KeyCode::Up | KeyCode::Char('k') => {
-            if app.objects_selected > 0 {
-                app.objects_selected -= 1;
-            }
+            if app.objects_selected > 0 { app.objects_selected -= 1; }
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            if app.objects_selected + 1 < app.objects.len() {
-                app.objects_selected += 1;
-            }
+            if app.objects_selected + 1 < len { app.objects_selected += 1; }
+        }
+        KeyCode::Home | KeyCode::Char('g') => { app.objects_selected = 0; }
+        KeyCode::End | KeyCode::Char('G') => {
+            if len > 0 { app.objects_selected = len - 1; }
+        }
+        KeyCode::PageUp => {
+            app.objects_selected = app.objects_selected.saturating_sub(10);
+        }
+        KeyCode::PageDown => {
+            app.objects_selected = (app.objects_selected + 10).min(len.saturating_sub(1));
         }
         KeyCode::Enter => {
             if let Some(obj) = app.objects.get(app.objects_selected) {
@@ -259,19 +273,21 @@ fn handle_objects_key(app: &mut App, key: KeyEvent) {
         }
         _ => {}
     }
+    App::scroll_into_view(app.objects_selected, &mut app.objects_offset, 20);
 }
 
 fn handle_address_key(app: &mut App, key: KeyEvent) {
+    let len = app.address_book.len();
     match key.code {
         KeyCode::Up | KeyCode::Char('k') => {
-            if app.address_selected > 0 {
-                app.address_selected -= 1;
-            }
+            if app.address_selected > 0 { app.address_selected -= 1; }
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            if app.address_selected + 1 < app.address_book.len() {
-                app.address_selected += 1;
-            }
+            if app.address_selected + 1 < len { app.address_selected += 1; }
+        }
+        KeyCode::Home => { app.address_selected = 0; }
+        KeyCode::End => {
+            if len > 0 { app.address_selected = len - 1; }
         }
         KeyCode::Char('a') => {
             app.address_edit_field = 0;
@@ -302,19 +318,21 @@ fn handle_address_key(app: &mut App, key: KeyEvent) {
         }
         _ => {}
     }
+    App::scroll_into_view(app.address_selected, &mut app.address_offset, 20);
 }
 
 fn handle_keys_key(app: &mut App, key: KeyEvent) {
+    let len = app.keys.len();
     match key.code {
         KeyCode::Up | KeyCode::Char('k') => {
-            if app.keys_selected > 0 {
-                app.keys_selected -= 1;
-            }
+            if app.keys_selected > 0 { app.keys_selected -= 1; }
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            if app.keys_selected + 1 < app.keys.len() {
-                app.keys_selected += 1;
-            }
+            if app.keys_selected + 1 < len { app.keys_selected += 1; }
+        }
+        KeyCode::Home => { app.keys_selected = 0; }
+        KeyCode::End => {
+            if len > 0 { app.keys_selected = len - 1; }
         }
         KeyCode::Enter => {
             // Set active key and refresh
@@ -336,20 +354,24 @@ fn handle_keys_key(app: &mut App, key: KeyEvent) {
         }
         KeyCode::Char('d') | KeyCode::Delete => {
             if app.keys.len() > 1 {
-                let removed = app.keys.remove(app.keys_selected);
+                let idx = app.keys_selected;
+                let removed = app.keys.remove(idx);
+                app.send_cmd(WalletCmd::DeleteKey(idx));
                 if removed.is_active && !app.keys.is_empty() {
                     app.keys[0].is_active = true;
+                    app.request_refresh();
                 }
                 if app.keys_selected >= app.keys.len() && app.keys_selected > 0 {
                     app.keys_selected -= 1;
                 }
                 app.set_status("Key removed");
-            } else {
+            } else if !app.keys.is_empty() {
                 app.set_status("Cannot remove last key");
             }
         }
         _ => {}
     }
+    App::scroll_into_view(app.keys_selected, &mut app.keys_offset, 20);
 }
 
 fn handle_tx_key(app: &mut App, key: KeyEvent) {

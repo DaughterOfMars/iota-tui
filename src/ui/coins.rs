@@ -72,6 +72,9 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
+    // borders (2) + header (1) + header margin (1) = 4 rows overhead
+    let visible_rows = area.height.saturating_sub(4) as usize;
+
     let header = Row::new(vec!["Symbol", "Type", "Balance", "Object ID"])
         .style(common::header_style())
         .bottom_margin(1);
@@ -80,6 +83,8 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
         .coins
         .iter()
         .enumerate()
+        .skip(app.coins_offset)
+        .take(visible_rows)
         .map(|(i, coin)| {
             let style = if i == app.coins_selected {
                 common::selected_style()
@@ -106,11 +111,20 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
         Constraint::Length(26),
     ];
 
+    let title = if app.coins.len() > visible_rows {
+        format!(" Coins ({}) [{}-{}/{}] ",
+            app.coins.len(), app.coins_offset + 1,
+            (app.coins_offset + visible_rows).min(app.coins.len()),
+            app.coins.len())
+    } else {
+        format!(" Coins ({}) ", app.coins.len())
+    };
+
     let table = Table::new(rows, widths)
         .header(header)
         .block(
             Block::default()
-                .title(format!(" Coins ({}) ", app.coins.len()))
+                .title(title)
                 .title_style(common::header_style())
                 .borders(Borders::ALL)
                 .border_style(common::dim_style()),
