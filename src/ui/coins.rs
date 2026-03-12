@@ -11,7 +11,7 @@ use super::common;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let layout = Layout::vertical([
-        Constraint::Length(3), // portfolio summary
+        Constraint::Length(3), // balance summary
         Constraint::Min(5),   // coin table
         Constraint::Length(5), // selected coin detail
     ])
@@ -23,30 +23,56 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_summary(frame: &mut Frame, app: &App, area: Rect) {
-    let total = app.total_usd_value();
     let block = Block::default()
         .title(" Portfolio ")
         .title_style(common::header_style())
         .borders(Borders::ALL)
         .border_style(common::dim_style());
 
+    let balance_display = format_nanos(app.total_balance_iota);
+    let network = &app.network_name;
+
     let text = Line::from(vec![
-        Span::styled("  Total Value: ", Style::default().fg(Color::White)),
+        Span::styled("  Total IOTA: ", Style::default().fg(Color::White)),
         Span::styled(
-            format!("${:.2}", total),
+            &balance_display,
             Style::default().fg(Color::Green).bold(),
         ),
         Span::styled(
-            format!("    {} coins", app.coins.len()),
+            format!("    {} coin objects", app.coins.len()),
             common::dim_style(),
         ),
+        Span::styled(
+            format!("    [{}]", network),
+            common::accent_style(),
+        ),
+        Span::styled("    f:faucet  r:refresh", common::dim_style()),
     ]);
 
     frame.render_widget(Paragraph::new(text).block(block), area);
 }
 
 fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
-    let header = Row::new(vec!["Coin", "Symbol", "Balance", "USD Value", "24h"])
+    if app.coins.is_empty() {
+        let block = Block::default()
+            .title(" Coins ")
+            .title_style(common::header_style())
+            .borders(Borders::ALL)
+            .border_style(common::dim_style());
+
+        let msg = if app.keys.is_empty() {
+            "  No keys configured. Press 5 to go to Keys, then 'g' to generate one."
+        } else if !app.connected {
+            "  Connecting..."
+        } else {
+            "  No coins found. Press 'f' to request from faucet (testnet/devnet)."
+        };
+
+        frame.render_widget(Paragraph::new(msg).block(block), area);
+        return;
+    }
+
+    let header = Row::new(vec!["Symbol", "Type", "Balance", "Object ID"])
         .style(common::header_style())
         .bottom_margin(1);
 
@@ -55,42 +81,36 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
         .iter()
         .enumerate()
         .map(|(i, coin)| {
-            let change_str = if coin.change_24h >= 0.0 {
-                format!("+{:.2}%", coin.change_24h)
-            } else {
-                format!("{:.2}%", coin.change_24h)
-            };
-
             let style = if i == app.coins_selected {
                 common::selected_style()
             } else {
                 Style::default()
             };
 
+            let id_display = common::truncate_address(&coin.object_id, 24);
+
             Row::new(vec![
-                coin.name.clone(),
                 coin.symbol.clone(),
-                format!("{:.4}", coin.balance),
-                format!("${:.2}", coin.usd_value),
-                change_str,
+                common::truncate_type(&coin.coin_type, 30),
+                coin.balance_display.clone(),
+                id_display,
             ])
             .style(style)
         })
         .collect();
 
     let widths = [
-        Constraint::Percentage(25),
-        Constraint::Percentage(15),
-        Constraint::Percentage(20),
-        Constraint::Percentage(20),
-        Constraint::Percentage(20),
+        Constraint::Length(10),
+        Constraint::Min(20),
+        Constraint::Length(20),
+        Constraint::Length(26),
     ];
 
     let table = Table::new(rows, widths)
         .header(header)
         .block(
             Block::default()
-                .title(" Coins ")
+                .title(format!(" Coins ({}) ", app.coins.len()))
                 .title_style(common::header_style())
                 .borders(Borders::ALL)
                 .border_style(common::dim_style()),
@@ -107,23 +127,21 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
         .border_style(common::dim_style());
 
     let content = if let Some(coin) = app.coins.get(app.coins_selected) {
-        let addr_display = common::truncate_address(&coin.object_id, area.width.saturating_sub(16) as usize);
+        let id_width = area.width.saturating_sub(16) as usize;
         vec![
             Line::from(vec![
-                Span::styled("  Name: ", Style::default().fg(Color::White).bold()),
-                Span::raw(&coin.name),
-                Span::styled("  |  Symbol: ", Style::default().fg(Color::White).bold()),
+                Span::styled("  Symbol:  ", Style::default().fg(Color::White).bold()),
                 Span::styled(&coin.symbol, common::accent_style()),
+                Span::styled("  |  Balance: ", Style::default().fg(Color::White).bold()),
+                Span::styled(&coin.balance_display, Style::default().fg(Color::Green)),
             ]),
             Line::from(vec![
-                Span::styled("  Balance: ", Style::default().fg(Color::White).bold()),
-                Span::raw(format!("{:.4} {}", coin.balance, coin.symbol)),
-                Span::styled("  |  Value: ", Style::default().fg(Color::White).bold()),
-                Span::styled(format!("${:.2}", coin.usd_value), Style::default().fg(Color::Green)),
+                Span::styled("  Type:    ", Style::default().fg(Color::White).bold()),
+                Span::raw(&coin.coin_type),
             ]),
             Line::from(vec![
-                Span::styled("  Object: ", Style::default().fg(Color::White).bold()),
-                Span::styled(addr_display, common::dim_style()),
+                Span::styled("  Object:  ", Style::default().fg(Color::White).bold()),
+                Span::styled(common::truncate_address(&coin.object_id, id_width), common::dim_style()),
             ]),
         ]
     } else {
@@ -131,4 +149,16 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
     };
 
     frame.render_widget(Paragraph::new(content).block(block), area);
+}
+
+fn format_nanos(nanos: u128) -> String {
+    let whole = nanos / 1_000_000_000;
+    let frac = nanos % 1_000_000_000;
+    let frac_str = format!("{:09}", frac);
+    let trimmed = frac_str.trim_end_matches('0');
+    if trimmed.is_empty() {
+        format!("{} IOTA", whole)
+    } else {
+        format!("{}.{} IOTA", whole, trimmed)
+    }
 }

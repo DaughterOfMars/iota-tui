@@ -94,11 +94,11 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
 
 fn screen_hint(screen: Screen) -> &'static str {
     match screen {
-        Screen::Coins => " j/k:navigate  Enter:details  Tab:next screen  ?:help",
-        Screen::Objects => " j/k:navigate  Enter:details  Tab:next screen  ?:help",
-        Screen::Packages => " j/k:navigate  Enter:expand  Tab:next screen  ?:help",
+        Screen::Coins => " j/k:navigate  Enter:details  f:faucet  r:refresh  ?:help",
+        Screen::Objects => " j/k:navigate  Enter:details  r:refresh  ?:help",
+        Screen::Packages => " r:refresh  ?:help",
         Screen::AddressBook => " j/k:navigate  a:add  e:edit  d:delete  ?:help",
-        Screen::Keys => " j/k:navigate  Enter:set active  g:generate  i:import  p:toggle private  ?:help",
+        Screen::Keys => " j/k:navigate  Enter:set active  g:generate  i:import  ?:help",
         Screen::TxBuilder => " h/l:step  j/k:navigate  a:add  Enter:confirm  ?:help",
     }
 }
@@ -146,6 +146,8 @@ fn draw_help_popup(frame: &mut Frame, area: Rect) {
         Line::from("  g          Generate key"),
         Line::from("  i          Import key"),
         Line::from("  p          Toggle private key visibility"),
+        Line::from("  r          Refresh data from network"),
+        Line::from("  f          Request faucet (testnet/devnet)"),
         Line::from(""),
         Line::from(vec![
             Span::styled("General", Style::default().bold().underlined()),
@@ -183,7 +185,7 @@ fn draw_confirm_popup(frame: &mut Frame, area: Rect) {
             Span::styled("Transaction submitted!", Style::default().fg(Color::Green).bold()),
         ]),
         Line::from(""),
-        Line::from("(This is a mock - no real transaction was sent)"),
+        Line::from("Check the status bar for the transaction digest."),
         Line::from(""),
         Line::from(vec![
             Span::styled("Press Enter to close", Style::default().fg(DIM)),
@@ -391,6 +393,16 @@ pub fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
         Constraint::Percentage((100 - percent_x) / 2),
     ])
     .split(popup_layout[1])[1]
+}
+
+pub fn truncate_type(type_str: &str, max_width: usize) -> String {
+    if type_str.len() <= max_width {
+        return type_str.to_string();
+    }
+    if max_width < 6 {
+        return type_str[..max_width].to_string();
+    }
+    format!("{}...", &type_str[..max_width.saturating_sub(3)])
 }
 
 pub fn truncate_address(addr: &str, max_width: usize) -> String {

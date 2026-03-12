@@ -1,108 +1,57 @@
 use ratatui::{
     Frame,
-    layout::{Constraint, Layout, Rect},
-    style::{Color, Style, Stylize},
+    layout::Rect,
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    widgets::{Block, Borders, Paragraph},
 };
 
 use crate::app::App;
 use super::common;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
-    let layout = Layout::vertical([
-        Constraint::Min(8),
-        Constraint::Length(6),
-    ])
-    .split(area);
-
-    draw_package_list(frame, app, layout[0]);
-    draw_detail(frame, app, layout[1]);
-}
-
-fn draw_package_list(frame: &mut Frame, app: &App, area: Rect) {
-    let items: Vec<ListItem> = app
-        .packages
-        .iter()
-        .enumerate()
-        .flat_map(|(i, pkg)| {
-            let is_selected = i == app.packages_selected;
-            let is_expanded = app.packages_expanded == Some(i);
-
-            let indicator = if is_expanded { "[-]" } else { "[+]" };
-            let style = if is_selected {
-                common::selected_style()
-            } else {
-                Style::default()
-            };
-
-            let id_display = common::truncate_address(&pkg.package_id, 24);
-
-            let mut items = vec![ListItem::new(Line::from(vec![
-                Span::styled(format!(" {} ", indicator), common::accent_style()),
-                Span::styled(&pkg.name, Style::default().fg(Color::White).bold()),
-                Span::styled(format!("  v{}", pkg.version), common::dim_style()),
-                Span::styled(format!("  {}", id_display), common::dim_style()),
-            ]))
-            .style(style)];
-
-            if is_expanded {
-                for module in &pkg.modules {
-                    items.push(
-                        ListItem::new(Line::from(vec![
-                            Span::raw("     "),
-                            Span::styled("module ", common::dim_style()),
-                            Span::styled(module.as_str(), common::accent_style()),
-                        ]))
-                    );
-                }
-            }
-
-            items
-        })
-        .collect();
-
-    let list = List::new(items).block(
-        Block::default()
-            .title(format!(" Packages ({}) ", app.packages.len()))
-            .title_style(common::header_style())
-            .borders(Borders::ALL)
-            .border_style(common::dim_style()),
-    );
-
-    frame.render_widget(list, area);
-}
-
-fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
-        .title(" Package Details ")
+        .title(" Packages ")
         .title_style(common::header_style())
         .borders(Borders::ALL)
         .border_style(common::dim_style());
 
-    let content = if let Some(pkg) = app.packages.get(app.packages_selected) {
-        let id_width = area.width.saturating_sub(16) as usize;
-        vec![
-            Line::from(vec![
-                Span::styled("  Package:  ", Style::default().fg(Color::White).bold()),
-                Span::styled(&pkg.name, common::accent_style()),
-                Span::styled(format!("  (v{})", pkg.version), common::dim_style()),
-            ]),
-            Line::from(vec![
-                Span::styled("  ID:       ", Style::default().fg(Color::White).bold()),
-                Span::styled(
-                    common::truncate_address(&pkg.package_id, id_width),
-                    common::dim_style(),
-                ),
-            ]),
-            Line::from(vec![
-                Span::styled("  Modules:  ", Style::default().fg(Color::White).bold()),
-                Span::raw(pkg.modules.join(", ")),
-            ]),
-        ]
-    } else {
-        vec![Line::from("  No package selected")]
-    };
+    // Filter objects that look like packages
+    let package_objects: Vec<_> = app
+        .objects
+        .iter()
+        .filter(|o| o.type_name.contains("package") || o.type_name == "Package" || o.type_name.is_empty())
+        .collect();
 
-    frame.render_widget(Paragraph::new(content).block(block), area);
+    if package_objects.is_empty() {
+        let text = vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  No published packages found for this address.", common::dim_style()),
+            ]),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  Package objects will appear here once you publish Move packages.", common::dim_style()),
+            ]),
+            Line::from(vec![
+                Span::styled("  Alternatively, browse all objects in the Objects tab.", common::dim_style()),
+            ]),
+        ];
+        frame.render_widget(Paragraph::new(text).block(block), area);
+    } else {
+        let lines: Vec<Line> = package_objects
+            .iter()
+            .enumerate()
+            .map(|(i, obj)| {
+                Line::from(vec![
+                    Span::styled(format!("  {}. ", i + 1), common::dim_style()),
+                    Span::styled(
+                        common::truncate_address(&obj.object_id, 40),
+                        common::accent_style(),
+                    ),
+                    Span::styled(format!("  {}", obj.version), common::dim_style()),
+                ])
+            })
+            .collect();
+        frame.render_widget(Paragraph::new(lines).block(block), area);
+    }
 }

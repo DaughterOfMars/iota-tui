@@ -11,8 +11,8 @@ use super::common;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let layout = Layout::vertical([
-        Constraint::Min(8),   // object table
-        Constraint::Length(7), // selected object detail
+        Constraint::Min(8),
+        Constraint::Length(7),
     ])
     .split(area);
 
@@ -21,6 +21,25 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
+    if app.objects.is_empty() {
+        let block = Block::default()
+            .title(" Objects ")
+            .title_style(common::header_style())
+            .borders(Borders::ALL)
+            .border_style(common::dim_style());
+
+        let msg = if app.keys.is_empty() {
+            "  No keys configured."
+        } else if !app.connected {
+            "  Connecting..."
+        } else {
+            "  No objects found for this address."
+        };
+
+        frame.render_widget(Paragraph::new(msg).block(block), area);
+        return;
+    }
+
     let header = Row::new(vec!["Object ID", "Type", "Version", "Digest"])
         .style(common::header_style())
         .bottom_margin(1);
@@ -38,19 +57,11 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
                 Style::default()
             };
 
-            let id_display = common::truncate_address(&obj.object_id, 20);
-            let type_display = if obj.type_name.len() > max_type_width {
-                format!("{}...", &obj.type_name[..max_type_width.saturating_sub(3)])
-            } else {
-                obj.type_name.clone()
-            };
-            let digest_display = common::truncate_address(&obj.digest, 16);
-
             Row::new(vec![
-                id_display,
-                type_display,
-                format!("v{}", obj.version),
-                digest_display,
+                common::truncate_address(&obj.object_id, 20),
+                common::truncate_type(&obj.type_name, max_type_width),
+                obj.version.clone(),
+                common::truncate_address(&obj.digest, 16),
             ])
             .style(style)
         })
@@ -96,15 +107,11 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
             ]),
             Line::from(vec![
                 Span::styled("  Type:      ", Style::default().fg(Color::White).bold()),
-                Span::raw(if obj.type_name.len() > type_width {
-                    format!("{}...", &obj.type_name[..type_width.saturating_sub(3)])
-                } else {
-                    obj.type_name.clone()
-                }),
+                Span::raw(common::truncate_type(&obj.type_name, type_width)),
             ]),
             Line::from(vec![
                 Span::styled("  Version:   ", Style::default().fg(Color::White).bold()),
-                Span::raw(format!("v{}", obj.version)),
+                Span::raw(&obj.version),
             ]),
             Line::from(vec![
                 Span::styled("  Digest:    ", Style::default().fg(Color::White).bold()),

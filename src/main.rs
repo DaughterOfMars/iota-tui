@@ -1,16 +1,21 @@
 mod app;
 mod event;
 mod ui;
+mod wallet;
 
-use std::time::Duration;
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture},
+    event::{DisableMouseCapture, EnableMouseCapture, EventStream},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
+use futures::StreamExt;
 use ratatui::{Terminal, backend::CrosstermBackend};
+use tokio::sync::mpsc;
 
-fn main() -> color_eyre::Result<()> {
+use wallet::{Network, WalletBackend, WalletCmd};
+
+#[tokio::main]
+async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
 
     // Setup terminal
@@ -20,7 +25,7 @@ fn main() -> color_eyre::Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let result = run(&mut terminal);
+    let result = run(&mut terminal).await;
 
     // Restore terminal
     disable_raw_mode()?;
@@ -34,16 +39,44 @@ fn main() -> color_eyre::Result<()> {
     result
 }
 
-fn run(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> color_eyre::Result<()> {
-    let mut app = app::App::new();
+async fn run(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> color_eyre::Result<()> {
+    // Create channels
+    let (cmd_tx, cmd_rx) = mpsc::channel::<WalletCmd>(32);
+    let (event_tx, mut event_rx) = mpsc::channel::<wallet::WalletEvent>(32);
+
+    // Spawn wallet backend
+    let backend = WalletBackend::new(cmd_rx, event_tx);
+    let initial_keys = backend.stored_keys().to_vec();
+    tokio::spawn(backend.run());
+
+    let mut app = app::App::new(cmd_tx.clone(), initial_keys);
+
+    // Auto-connect to testnet
+    let _ = cmd_tx.send(WalletCmd::Connect(Network::Testnet)).await;
+
+    let mut event_stream = EventStream::new();
+    let mut tick_interval = tokio::time::interval(std::time::Duration::from_millis(100));
 
     loop {
         app.clear_expired_status();
 
         terminal.draw(|frame| ui::draw(frame, &mut app))?;
 
-        if let Some(ev) = event::poll_event(Duration::from_millis(100))? {
-            event::handle_event(&mut app, ev);
+        tokio::select! {
+            // Terminal events (keyboard/mouse)
+            maybe_event = event_stream.next() => {
+                if let Some(Ok(ev)) = maybe_event {
+                    event::handle_event(&mut app, ev);
+                }
+            }
+            // Wallet backend responses
+            maybe_wallet = event_rx.recv() => {
+                if let Some(wallet_event) = maybe_wallet {
+                    app.handle_wallet_event(wallet_event);
+                }
+            }
+            // Tick for periodic redraws
+            _ = tick_interval.tick() => {}
         }
 
         if !app.running {

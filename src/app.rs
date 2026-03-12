@@ -1,4 +1,6 @@
-use rand::prelude::*;
+use tokio::sync::mpsc;
+
+use crate::wallet::{StoredKey, WalletCmd, WalletEvent};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
@@ -36,30 +38,26 @@ impl Screen {
     }
 }
 
+// ── Display types (what the UI renders) ────────────────────────────
+
 #[derive(Debug, Clone)]
-pub struct Coin {
-    pub name: String,
+#[allow(dead_code)]
+pub struct CoinDisplay {
+    pub coin_type: String,
     pub symbol: String,
-    pub balance: f64,
-    pub usd_value: f64,
-    pub change_24h: f64,
+    pub balance: u128,
+    pub balance_display: String,
     pub object_id: String,
 }
 
 #[derive(Debug, Clone)]
-pub struct OwnedObject {
+#[allow(dead_code)]
+pub struct ObjectDisplay {
     pub object_id: String,
     pub type_name: String,
-    pub version: u64,
+    pub version: String,
     pub digest: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct Package {
-    pub package_id: String,
-    pub name: String,
-    pub version: u64,
-    pub modules: Vec<String>,
+    pub owner: String,
 }
 
 #[derive(Debug, Clone)]
@@ -70,7 +68,7 @@ pub struct AddressEntry {
 }
 
 #[derive(Debug, Clone)]
-pub struct KeyEntry {
+pub struct KeyDisplay {
     pub alias: String,
     pub address: String,
     pub scheme: String,
@@ -126,6 +124,8 @@ pub enum Popup {
     AddRecipient,
 }
 
+// ── App State ──────────────────────────────────────────────────────
+
 pub struct App {
     pub running: bool,
     pub screen: Screen,
@@ -135,24 +135,28 @@ pub struct App {
     pub popup: Option<Popup>,
     pub status_message: Option<(String, std::time::Instant)>,
 
-    // Per-screen state
-    pub coins: Vec<Coin>,
+    // Network state
+    pub connected: bool,
+    pub network_name: String,
+    pub loading: bool,
+
+    // Wallet command channel
+    pub cmd_tx: mpsc::Sender<WalletCmd>,
+
+    // Per-screen data
+    pub coins: Vec<CoinDisplay>,
     pub coins_selected: usize,
+    pub total_balance_iota: u128,
 
-    pub objects: Vec<OwnedObject>,
+    pub objects: Vec<ObjectDisplay>,
     pub objects_selected: usize,
-    pub _objects_scroll: usize,
-
-    pub packages: Vec<Package>,
-    pub packages_selected: usize,
-    pub packages_expanded: Option<usize>,
 
     pub address_book: Vec<AddressEntry>,
     pub address_selected: usize,
     pub address_edit_field: usize,
     pub address_edit_buffers: [String; 3],
 
-    pub keys: Vec<KeyEntry>,
+    pub keys: Vec<KeyDisplay>,
     pub keys_selected: usize,
     pub keys_show_private: bool,
 
@@ -168,167 +172,20 @@ pub struct App {
     pub tab_areas: Vec<ratatui::layout::Rect>,
 }
 
-pub fn random_hex_pub(len: usize) -> String {
-    random_hex(len)
-}
-
-fn random_hex(len: usize) -> String {
-    let mut rng = rand::thread_rng();
-    (0..len).map(|_| format!("{:x}", rng.gen_range(0..16u8))).collect()
-}
-
-fn mock_address() -> String {
-    format!("0x{}", random_hex(64))
-}
-
-fn mock_object_id() -> String {
-    format!("0x{}", random_hex(64))
-}
-
-fn mock_digest() -> String {
-    random_hex(44)
-}
-
 impl App {
-    pub fn new() -> Self {
-        let coins = vec![
-            Coin {
-                name: "IOTA".into(),
-                symbol: "IOTA".into(),
-                balance: 15_420.50,
-                usd_value: 4_312.94,
-                change_24h: 3.24,
-                object_id: mock_object_id(),
-            },
-            Coin {
-                name: "Deepbook Token".into(),
-                symbol: "DEEP".into(),
-                balance: 2_500.0,
-                usd_value: 125.00,
-                change_24h: -1.82,
-                object_id: mock_object_id(),
-            },
-            Coin {
-                name: "USD Coin".into(),
-                symbol: "USDC".into(),
-                balance: 1_000.0,
-                usd_value: 1_000.0,
-                change_24h: 0.01,
-                object_id: mock_object_id(),
-            },
-            Coin {
-                name: "Wrapped ETH".into(),
-                symbol: "wETH".into(),
-                balance: 0.85,
-                usd_value: 2_720.00,
-                change_24h: 1.45,
-                object_id: mock_object_id(),
-            },
-        ];
+    pub fn new(cmd_tx: mpsc::Sender<WalletCmd>, initial_keys: Vec<StoredKey>) -> Self {
+        let keys: Vec<KeyDisplay> = initial_keys
+            .iter()
+            .map(|k| KeyDisplay {
+                alias: k.alias.clone(),
+                address: k.address.clone(),
+                scheme: k.scheme.clone(),
+                is_active: k.is_active,
+            })
+            .collect();
 
-        let objects = vec![
-            OwnedObject {
-                object_id: mock_object_id(),
-                type_name: "0x2::coin::Coin<0x2::iota::IOTA>".into(),
-                version: 42,
-                digest: mock_digest(),
-            },
-            OwnedObject {
-                object_id: mock_object_id(),
-                type_name: "0x2::kiosk::Kiosk".into(),
-                version: 18,
-                digest: mock_digest(),
-            },
-            OwnedObject {
-                object_id: mock_object_id(),
-                type_name: "0xdee9::clob_v2::Pool<0x2::iota::IOTA, 0xusdc::usdc::USDC>".into(),
-                version: 103,
-                digest: mock_digest(),
-            },
-            OwnedObject {
-                object_id: mock_object_id(),
-                type_name: "0x2::display::Display<0xnft::collection::NFT>".into(),
-                version: 7,
-                digest: mock_digest(),
-            },
-            OwnedObject {
-                object_id: mock_object_id(),
-                type_name: "0x2::coin::Coin<0xdeep::deep::DEEP>".into(),
-                version: 55,
-                digest: mock_digest(),
-            },
-            OwnedObject {
-                object_id: mock_object_id(),
-                type_name: "0x2::token::Token<0xusdc::usdc::USDC>".into(),
-                version: 12,
-                digest: mock_digest(),
-            },
-        ];
-
-        let packages = vec![
-            Package {
-                package_id: mock_object_id(),
-                name: "my_defi_protocol".into(),
-                version: 3,
-                modules: vec!["pool".into(), "router".into(), "oracle".into()],
-            },
-            Package {
-                package_id: mock_object_id(),
-                name: "nft_collection".into(),
-                version: 1,
-                modules: vec!["collection".into(), "mint".into(), "metadata".into(), "royalty".into()],
-            },
-            Package {
-                package_id: mock_object_id(),
-                name: "governance".into(),
-                version: 2,
-                modules: vec!["proposal".into(), "voting".into(), "treasury".into()],
-            },
-        ];
-
-        let address_book = vec![
-            AddressEntry {
-                label: "My Main Wallet".into(),
-                address: mock_address(),
-                notes: "Primary trading account".into(),
-            },
-            AddressEntry {
-                label: "Cold Storage".into(),
-                address: mock_address(),
-                notes: "Long-term holdings".into(),
-            },
-            AddressEntry {
-                label: "Alice".into(),
-                address: mock_address(),
-                notes: "Friend's address".into(),
-            },
-            AddressEntry {
-                label: "DEX Router".into(),
-                address: mock_address(),
-                notes: "DeepBook router contract".into(),
-            },
-        ];
-
-        let keys = vec![
-            KeyEntry {
-                alias: "default".into(),
-                address: mock_address(),
-                scheme: "ed25519".into(),
-                is_active: true,
-            },
-            KeyEntry {
-                alias: "trading".into(),
-                address: mock_address(),
-                scheme: "secp256k1".into(),
-                is_active: false,
-            },
-            KeyEntry {
-                alias: "cold".into(),
-                address: mock_address(),
-                scheme: "ed25519".into(),
-                is_active: false,
-            },
-        ];
+        // Load saved address book
+        let address_book = load_address_book();
 
         App {
             running: true,
@@ -339,16 +196,18 @@ impl App {
             popup: None,
             status_message: None,
 
-            coins,
+            connected: false,
+            network_name: "disconnected".into(),
+            loading: false,
+
+            cmd_tx,
+
+            coins: vec![],
             coins_selected: 0,
+            total_balance_iota: 0,
 
-            objects,
+            objects: vec![],
             objects_selected: 0,
-            _objects_scroll: 0,
-
-            packages,
-            packages_selected: 0,
-            packages_expanded: None,
 
             address_book,
             address_selected: 0,
@@ -371,6 +230,116 @@ impl App {
         }
     }
 
+    /// Handle a response from the wallet backend
+    pub fn handle_wallet_event(&mut self, event: WalletEvent) {
+        self.loading = false;
+        match event {
+            WalletEvent::Connected(network) => {
+                self.connected = true;
+                self.network_name = network;
+                self.set_status("Connected");
+                // Auto-refresh if we have an active key
+                self.request_refresh();
+            }
+            WalletEvent::Balances(balances) => {
+                for b in &balances {
+                    if b.coin_type.contains("IOTA") {
+                        self.total_balance_iota = b.total_balance;
+                    }
+                }
+            }
+            WalletEvent::Coins(coins) => {
+                self.coins = coins
+                    .into_iter()
+                    .map(|c| CoinDisplay {
+                        balance_display: format_balance(c.balance, 9),
+                        coin_type: c.coin_type,
+                        symbol: c.symbol,
+                        balance: c.balance,
+                        object_id: c.object_id,
+                    })
+                    .collect();
+                if self.coins_selected >= self.coins.len() {
+                    self.coins_selected = self.coins.len().saturating_sub(1);
+                }
+            }
+            WalletEvent::Objects(objects) => {
+                self.objects = objects
+                    .into_iter()
+                    .map(|o| ObjectDisplay {
+                        object_id: o.object_id,
+                        type_name: o.type_name,
+                        version: o
+                            .version
+                            .map(|v| format!("v{}", v))
+                            .unwrap_or_else(|| "?".into()),
+                        digest: o.digest,
+                        owner: o.owner,
+                    })
+                    .collect();
+                if self.objects_selected >= self.objects.len() {
+                    self.objects_selected = self.objects.len().saturating_sub(1);
+                }
+            }
+            WalletEvent::KeyGenerated {
+                alias,
+                address,
+                scheme,
+            }
+            | WalletEvent::KeyImported {
+                alias,
+                address,
+                scheme,
+            } => {
+                let is_first = self.keys.is_empty();
+                self.keys.push(KeyDisplay {
+                    alias: alias.clone(),
+                    address,
+                    scheme,
+                    is_active: is_first,
+                });
+                self.set_status(format!("Key '{}' ready", alias));
+                // If this is the first key, refresh data
+                if is_first {
+                    self.request_refresh();
+                }
+            }
+            WalletEvent::TxSubmitted { digest } => {
+                self.set_status(format!(
+                    "Tx submitted: {}..{}",
+                    &digest[..8],
+                    &digest[digest.len().saturating_sub(6)..]
+                ));
+                self.popup = Some(Popup::Confirm);
+                // Refresh after transaction
+                self.request_refresh();
+            }
+            WalletEvent::FaucetRequested(msg) => {
+                self.set_status(msg);
+                self.request_refresh();
+            }
+            WalletEvent::Error(e) => {
+                self.set_status(format!("Error: {}", e));
+            }
+        }
+    }
+
+    /// Send a command to the wallet backend (non-blocking)
+    pub fn send_cmd(&self, cmd: WalletCmd) {
+        let _ = self.cmd_tx.try_send(cmd);
+    }
+
+    /// Request a data refresh for the active key's address
+    pub fn request_refresh(&self) {
+        if let Some(key) = self.active_key() {
+            if let Some(addr) = parse_address(&key.address) {
+                self.send_cmd(WalletCmd::RefreshCoins(addr));
+                self.send_cmd(WalletCmd::RefreshObjects(addr));
+                self.send_cmd(WalletCmd::RefreshBalances(addr));
+            }
+        }
+    }
+
     pub fn set_status(&mut self, msg: impl Into<String>) {
         self.status_message = Some((msg.into(), std::time::Instant::now()));
     }
@@ -389,12 +358,8 @@ impl App {
         self.popup = None;
     }
 
-    pub fn active_key(&self) -> Option<&KeyEntry> {
+    pub fn active_key(&self) -> Option<&KeyDisplay> {
         self.keys.iter().find(|k| k.is_active)
-    }
-
-    pub fn total_usd_value(&self) -> f64 {
-        self.coins.iter().map(|c| c.usd_value).sum()
     }
 
     pub fn input_insert(&mut self, ch: char) {
@@ -458,5 +423,86 @@ impl App {
         let val = self.input_buffer.clone();
         self.input_clear();
         val
+    }
+}
+
+// ── Persistence for address book ───────────────────────────────────
+
+fn address_book_path() -> std::path::PathBuf {
+    dirs::data_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("iota-wallet-tui")
+        .join("address_book.json")
+}
+
+fn load_address_book() -> Vec<AddressEntry> {
+    let path = address_book_path();
+    std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|data| serde_json::from_str(&data).ok())
+        .unwrap_or_default()
+}
+
+pub fn save_address_book(entries: &[AddressEntry]) {
+    let path = address_book_path();
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(data) = serde_json::to_string_pretty(entries) {
+        let _ = std::fs::write(&path, data);
+    }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────
+
+/// Format a raw balance (in smallest unit) as a human-readable string
+fn format_balance(raw: u128, decimals: u32) -> String {
+    let divisor = 10u128.pow(decimals);
+    let whole = raw / divisor;
+    let frac = raw % divisor;
+    if decimals == 0 {
+        return whole.to_string();
+    }
+    let frac_str = format!("{:0>width$}", frac, width = decimals as usize);
+    // Trim trailing zeros but keep at least 2 decimal places
+    let trimmed = frac_str.trim_end_matches('0');
+    let display_frac = if trimmed.len() < 2 {
+        &frac_str[..2]
+    } else {
+        trimmed
+    };
+    format!("{}.{}", whole, display_frac)
+}
+
+fn parse_address(hex: &str) -> Option<iota_sdk::types::Address> {
+    iota_sdk::types::Address::from_hex(hex).ok()
+}
+
+// Make AddressEntry serializable for persistence
+impl serde::Serialize for AddressEntry {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut s = serializer.serialize_struct("AddressEntry", 3)?;
+        s.serialize_field("label", &self.label)?;
+        s.serialize_field("address", &self.address)?;
+        s.serialize_field("notes", &self.notes)?;
+        s.end()
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for AddressEntry {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(serde::Deserialize)]
+        struct Helper {
+            label: String,
+            address: String,
+            notes: String,
+        }
+        let h = Helper::deserialize(deserializer)?;
+        Ok(AddressEntry {
+            label: h.label,
+            address: h.address,
+            notes: h.notes,
+        })
     }
 }
