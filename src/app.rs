@@ -549,12 +549,27 @@ impl App {
                 // Refresh after transaction
                 self.request_refresh();
             }
-            WalletEvent::IotaNameResolved { name, address } => {
+            WalletEvent::IotaNameResolved {
+                name,
+                label,
+                notes,
+                address,
+            } => {
                 if let Some(addr) = address {
+                    let display_label = if label.is_empty() {
+                        name.clone()
+                    } else {
+                        label
+                    };
+                    let display_notes = if notes.is_empty() {
+                        "IOTA-Name".into()
+                    } else {
+                        notes
+                    };
                     self.address_book.push(AddressEntry {
-                        label: name.clone(),
+                        label: display_label,
                         address: addr,
-                        notes: "IOTA-Name".into(),
+                        notes: display_notes,
                     });
                     save_address_book(&self.address_book);
                     self.set_status(format!("Resolved @{}", name));

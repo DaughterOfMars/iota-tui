@@ -141,7 +141,11 @@ pub enum WalletCmd {
         new_alias: String,
     },
     RequestFaucet(Address),
-    LookupIotaName(String),
+    LookupIotaName {
+        name: String,
+        label: String,
+        notes: String,
+    },
 }
 
 #[derive(Debug)]
@@ -176,6 +180,8 @@ pub enum WalletEvent {
     FaucetRequested(String),
     IotaNameResolved {
         name: String,
+        label: String,
+        notes: String,
         address: Option<String>,
     },
     Error(String),
@@ -245,7 +251,9 @@ impl WalletBackend {
                 WalletCmd::SetActiveKey(idx) => self.handle_set_active_key(idx),
                 WalletCmd::RenameKey { idx, new_alias } => self.handle_rename_key(idx, &new_alias),
                 WalletCmd::RequestFaucet(addr) => self.handle_faucet(addr).await,
-                WalletCmd::LookupIotaName(name) => self.handle_iota_name_lookup(&name).await,
+                WalletCmd::LookupIotaName { name, label, notes } => {
+                    self.handle_iota_name_lookup(&name, &label, &notes).await
+                }
             };
 
             if let Err(e) = result {
@@ -723,6 +731,8 @@ impl WalletBackend {
     async fn handle_iota_name_lookup(
         &self,
         name: &str,
+        label: &str,
+        notes: &str,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let client = self.client.as_ref().ok_or("Not connected")?;
         // Auto-append .iota if the name doesn't contain a TLD
@@ -736,6 +746,8 @@ impl WalletBackend {
         self.event_tx
             .send(WalletEvent::IotaNameResolved {
                 name: name.to_string(),
+                label: label.to_string(),
+                notes: notes.to_string(),
                 address,
             })
             .await?;

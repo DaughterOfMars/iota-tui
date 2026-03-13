@@ -349,7 +349,7 @@ fn draw_detail_popup(frame: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn draw_address_form(frame: &mut Frame, app: &App, area: Rect, title: &str) {
-    let fields = ["Label", "Address", "Notes"];
+    let fields = ["Label", "Address (0x... or IOTA-Name)", "Notes"];
     let mut lines = vec![Line::from("")];
 
     for (i, field) in fields.iter().enumerate() {

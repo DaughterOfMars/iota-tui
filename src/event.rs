@@ -165,12 +165,23 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
                 let [label, address, notes] = app.address_edit_buffers.clone();
                 if !label.is_empty() && !address.is_empty() {
                     if app.popup == Some(Popup::AddAddress) {
-                        app.address_book.push(crate::app::AddressEntry {
-                            label,
-                            address,
-                            notes,
-                        });
-                        app.set_status("Address added");
+                        // Auto-detect IOTA name: if address doesn't start with 0x, resolve it
+                        if !address.starts_with("0x") {
+                            app.send_cmd(WalletCmd::LookupIotaName {
+                                name: address,
+                                label,
+                                notes,
+                            });
+                            app.set_status("Looking up IOTA name...");
+                        } else {
+                            app.address_book.push(crate::app::AddressEntry {
+                                label,
+                                address,
+                                notes,
+                            });
+                            save_address_book(&app.address_book);
+                            app.set_status("Address added");
+                        }
                     } else if let Some(user_idx) = app.user_address_index(app.address_selected) {
                         if let Some(entry) = app.address_book.get_mut(user_idx) {
                             entry.label = label;
@@ -178,8 +189,8 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
                             entry.notes = notes;
                             app.set_status("Address updated");
                         }
+                        save_address_book(&app.address_book);
                     }
-                    save_address_book(&app.address_book);
                 }
                 app.popup = None;
                 app.input_mode = InputMode::Normal;
@@ -445,7 +456,11 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
             KeyCode::Enter => {
                 let name = app.stop_input();
                 if !name.is_empty() {
-                    app.send_cmd(WalletCmd::LookupIotaName(name));
+                    app.send_cmd(WalletCmd::LookupIotaName {
+                        name,
+                        label: String::new(),
+                        notes: String::new(),
+                    });
                     app.set_status("Looking up IOTA name...");
                 }
                 app.popup = None;
