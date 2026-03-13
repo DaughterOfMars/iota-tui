@@ -799,6 +799,12 @@ fn handle_keys_key(app: &mut App, key: KeyEvent) {
 }
 
 fn handle_tx_key(app: &mut App, key: KeyEvent) {
+    // Global tx builder keybind: clear/reset (when not editing)
+    if app.input_mode != InputMode::Editing && key.code == KeyCode::Char('c') {
+        app.reset_tx_builder();
+        app.set_status("Transaction cleared");
+        return;
+    }
     match app.tx_step {
         TxBuilderStep::SelectSender => match key.code {
             KeyCode::Up => {

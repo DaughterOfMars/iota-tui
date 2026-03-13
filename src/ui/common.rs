@@ -126,7 +126,9 @@ fn screen_hint(screen: Screen) -> &'static str {
         Screen::Keys => {
             " Up/Down:navigate  Enter:active  Space:visible  g:gen  i:import  e:rename  ?:help"
         }
-        Screen::TxBuilder => " Left/Right:step  Up/Down:navigate  a:add  Enter:confirm  ?:help",
+        Screen::TxBuilder => {
+            " Left/Right:step  Up/Down:navigate  a:add  c:clear  Enter:confirm  ?:help"
+        }
     }
 }
 
