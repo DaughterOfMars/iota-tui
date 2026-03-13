@@ -217,6 +217,7 @@ impl WalletBackend {
             };
 
             if let Err(e) = result {
+                log_error(&e.to_string());
                 let _ = self.event_tx.send(WalletEvent::Error(e.to_string())).await;
             }
         }
@@ -925,5 +926,27 @@ fn keypair_address(kp: &SimpleKeypair) -> String {
         MultisigMemberPublicKey::Secp256k1(pk) => pk.derive_address().to_string(),
         MultisigMemberPublicKey::Secp256r1(pk) => pk.derive_address().to_string(),
         _ => "unknown".to_string(),
+    }
+}
+
+fn log_error(msg: &str) {
+    use std::io::Write;
+    let path = dirs::data_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("iota-wallet-tui")
+        .join("error.log");
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        let secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let _ = writeln!(file, "[{}] {}", secs, msg);
     }
 }
