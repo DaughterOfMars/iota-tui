@@ -50,16 +50,6 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             app.open_popup(Popup::SwitchNetwork);
             return;
         }
-        KeyCode::Char('s') => {
-            app.show_all_addresses = !app.show_all_addresses;
-            app.set_status(if app.show_all_addresses {
-                "Showing all addresses"
-            } else {
-                "Showing active address only"
-            });
-            app.request_refresh();
-            return;
-        }
         KeyCode::Char('1') => {
             app.navigate(Screen::Coins);
             return;
@@ -791,6 +781,12 @@ fn handle_keys_key(app: &mut App, key: KeyEvent) {
         }
         KeyCode::Char('p') => {
             app.keys_show_private = !app.keys_show_private;
+        }
+        KeyCode::Char(' ') => {
+            if let Some(key) = app.keys.get_mut(app.keys_selected) {
+                key.visible = !key.visible;
+                app.request_refresh();
+            }
         }
         KeyCode::Char('d') | KeyCode::Delete => {
             if !app.keys.is_empty() {

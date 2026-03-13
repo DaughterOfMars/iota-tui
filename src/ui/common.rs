@@ -118,12 +118,14 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
 
 fn screen_hint(screen: Screen) -> &'static str {
     match screen {
-        Screen::Coins => " j/k:navigate  Enter:details  f:faucet  s:all addrs  r:refresh  ?:help",
-        Screen::Objects => " j/k:navigate  Enter:details  s:all addrs  r:refresh  ?:help",
+        Screen::Coins => " j/k:navigate  Enter:details  f:faucet  r:refresh  ?:help",
+        Screen::Objects => " j/k:navigate  Enter:details  r:refresh  ?:help",
         Screen::Transactions => " j/k:navigate  Enter:details  r:refresh  ?:help",
         Screen::Packages => " r:refresh  ?:help",
         Screen::AddressBook => " j/k:navigate  a:add  e:edit  d:delete  l:iota-name  ?:help",
-        Screen::Keys => " j/k:navigate  Enter:active  g:gen  i:import  e:rename  n:network  ?:help",
+        Screen::Keys => {
+            " j/k:navigate  Enter:active  Space:visible  g:gen  i:import  e:rename  ?:help"
+        }
         Screen::TxBuilder => " h/l:step  j/k:navigate  a:add  Enter:confirm  ?:help",
     }
 }
@@ -235,7 +237,7 @@ fn draw_help_popup(frame: &mut Frame, app: &mut App, area: Rect) {
         Line::from("  i          Import key"),
         Line::from("  p          Toggle private key visibility"),
         Line::from("  n          Switch network"),
-        Line::from("  s          Toggle show all addresses"),
+        Line::from("  Space      Toggle key visibility (Keys screen)"),
         Line::from("  r          Refresh data from network"),
         Line::from("  f          Request faucet (testnet/devnet)"),
         Line::from(""),

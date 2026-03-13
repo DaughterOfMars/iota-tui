@@ -69,7 +69,7 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
     // borders (2) + header (1) + header margin (1) = 4 rows overhead
     let visible_rows = area.height.saturating_sub(4) as usize;
 
-    let show_all = app.show_all_addresses;
+    let show_all = app.show_multiple_owners();
 
     let header_cols: Vec<&str> = if show_all {
         vec!["Symbol", "Type", "Balance", "Object ID", "Owner"]

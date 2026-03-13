@@ -45,11 +45,11 @@ fn draw_key_table(frame: &mut Frame, app: &App, area: Rect) {
 
     let visible_rows = area.height.saturating_sub(4) as usize;
 
-    let header = Row::new(vec!["", "Alias", "Scheme", "Address"])
+    let header = Row::new(vec!["", "Show", "Alias", "Scheme", "Address"])
         .style(common::header_style())
         .bottom_margin(1);
 
-    let addr_width = area.width.saturating_sub(40) as usize;
+    let addr_width = area.width.saturating_sub(46) as usize;
 
     let rows: Vec<Row> = app
         .keys
@@ -65,9 +65,11 @@ fn draw_key_table(frame: &mut Frame, app: &App, area: Rect) {
             };
 
             let active_marker = if key.is_active { "*" } else { " " };
+            let visible_marker = if key.visible { "[x]" } else { "[ ]" };
 
             Row::new(vec![
                 active_marker.to_string(),
+                visible_marker.to_string(),
                 key.alias.clone(),
                 key.scheme.clone(),
                 common::truncate_address(&key.address, addr_width.max(20)),
@@ -78,6 +80,7 @@ fn draw_key_table(frame: &mut Frame, app: &App, area: Rect) {
 
     let widths = [
         Constraint::Length(3),
+        Constraint::Length(5),
         Constraint::Length(14),
         Constraint::Length(12),
         Constraint::Min(24),

@@ -93,6 +93,7 @@ pub struct KeyDisplay {
     pub address: String,
     pub scheme: String,
     pub is_active: bool,
+    pub visible: bool,
     pub private_key_hex: String,
 }
 
@@ -328,9 +329,6 @@ pub struct App {
     pub autocomplete: Vec<(String, String)>, // (alias/label, address)
     pub autocomplete_idx: Option<usize>,
 
-    // Show data from all owned addresses
-    pub show_all_addresses: bool,
-
     // Popup scroll state
     pub popup_scroll: usize,
 
@@ -347,6 +345,7 @@ impl App {
                 address: k.address.clone(),
                 scheme: k.scheme.clone(),
                 is_active: k.is_active,
+                visible: k.is_active,
                 private_key_hex: hex::encode(&k.private_key_bytes),
             })
             .collect();
@@ -409,8 +408,6 @@ impl App {
             autocomplete: vec![],
             autocomplete_idx: None,
 
-            show_all_addresses: false,
-
             popup_scroll: 0,
 
             tab_areas: vec![],
@@ -431,7 +428,7 @@ impl App {
             WalletEvent::Balances(balances) => {
                 for b in &balances {
                     if b.coin_type.contains("IOTA") {
-                        if self.show_all_addresses {
+                        if self.visible_key_count() > 1 {
                             self.total_balance_iota += b.total_balance;
                         } else {
                             self.total_balance_iota = b.total_balance;
@@ -451,7 +448,7 @@ impl App {
                         owner_alias: owner_alias.clone(),
                     })
                     .collect();
-                if self.show_all_addresses {
+                if self.visible_key_count() > 1 {
                     // Append (data was cleared at refresh start)
                     self.coins.extend(new_coins);
                 } else {
@@ -485,7 +482,7 @@ impl App {
                         owner_alias: owner_alias.clone(),
                     })
                     .collect();
-                if self.show_all_addresses {
+                if self.visible_key_count() > 1 {
                     self.objects.extend(new_objects);
                 } else {
                     self.objects = new_objects;
@@ -512,6 +509,7 @@ impl App {
                     address,
                     scheme,
                     is_active: is_first,
+                    visible: is_first,
                     private_key_hex,
                 });
                 self.set_status(format!("Key '{}' ready", alias));
@@ -570,15 +568,28 @@ impl App {
         let _ = self.cmd_tx.try_send(cmd);
     }
 
-    /// Request a data refresh for the active key's address (or all keys)
+    /// Number of keys with visibility enabled.
+    pub fn visible_key_count(&self) -> usize {
+        self.keys.iter().filter(|k| k.visible).count()
+    }
+
+    /// Returns true when multiple keys are visible (show Owner column).
+    pub fn show_multiple_owners(&self) -> bool {
+        self.visible_key_count() > 1
+    }
+
+    /// Request a data refresh for visible keys' addresses.
     pub fn request_refresh(&mut self) {
         self.loading = true;
-        if self.show_all_addresses {
-            // Clear existing data before fetching from all addresses
+        let visible_keys: Vec<KeyDisplay> =
+            self.keys.iter().filter(|k| k.visible).cloned().collect();
+
+        if visible_keys.len() > 1 {
+            // Clear existing data before fetching from multiple addresses
             self.coins.clear();
             self.objects.clear();
             self.total_balance_iota = 0;
-            for key in self.keys.clone() {
+            for key in &visible_keys {
                 if let Some(addr) = parse_address(&key.address) {
                     self.send_cmd(WalletCmd::RefreshCoins {
                         addr,
@@ -597,7 +608,7 @@ impl App {
                     self.send_cmd(WalletCmd::RefreshTransactions(addr));
                 }
             }
-        } else if let Some(key) = self.active_key().cloned() {
+        } else if let Some(key) = visible_keys.first().or(self.active_key()).cloned() {
             if let Some(addr) = parse_address(&key.address) {
                 self.send_cmd(WalletCmd::RefreshCoins {
                     addr,
@@ -821,7 +832,7 @@ impl App {
                         ("Raw Balance", c.balance.to_string()),
                         ("Object ID", c.object_id.clone()),
                     ];
-                    if self.show_all_addresses {
+                    if self.show_multiple_owners() {
                         fields.push(("Owner", c.owner_alias.clone()));
                     }
                     ("Coin Details", fields)
@@ -838,7 +849,7 @@ impl App {
                         ("Digest", o.digest.clone()),
                         ("Owner", o.owner.clone()),
                     ];
-                    if self.show_all_addresses {
+                    if self.show_multiple_owners() {
                         fields.push(("Key", o.owner_alias.clone()));
                     }
                     ("Object Details", fields)

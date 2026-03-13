@@ -38,7 +38,7 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
 
     let visible_rows = area.height.saturating_sub(4) as usize;
 
-    let show_all = app.show_all_addresses;
+    let show_all = app.show_multiple_owners();
 
     let header_cols: Vec<&str> = if show_all {
         vec!["Object ID", "Type", "Version", "Digest", "Owner"]
