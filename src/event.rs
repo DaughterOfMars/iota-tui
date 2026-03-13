@@ -341,6 +341,49 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
                 app.popup = None;
             }
         }
+        Some(Popup::ConfirmDeleteAddress) => match key.code {
+            KeyCode::Enter | KeyCode::Char('y') => {
+                if let Some(user_idx) = app.user_address_index(app.address_selected) {
+                    if user_idx < app.address_book.len() {
+                        app.address_book.remove(user_idx);
+                        let combined_len = app.key_entry_count() + app.address_book.len();
+                        if app.address_selected >= combined_len && app.address_selected > 0 {
+                            app.address_selected -= 1;
+                        }
+                        save_address_book(&app.address_book);
+                        app.set_status("Address removed");
+                    }
+                }
+                app.popup = None;
+            }
+            KeyCode::Esc | KeyCode::Char('n') => {
+                app.popup = None;
+            }
+            _ => {}
+        },
+        Some(Popup::ConfirmDeleteKey) => match key.code {
+            KeyCode::Enter | KeyCode::Char('y') => {
+                let idx = app.keys_selected;
+                if idx < app.keys.len() {
+                    let removed = app.keys.remove(idx);
+                    app.send_cmd(WalletCmd::DeleteKey(idx));
+                    if removed.is_active && !app.keys.is_empty() {
+                        app.keys[0].is_active = true;
+                        app.send_cmd(WalletCmd::SetActiveKey(0));
+                        app.request_refresh();
+                    }
+                    if app.keys_selected >= app.keys.len() && app.keys_selected > 0 {
+                        app.keys_selected -= 1;
+                    }
+                    app.set_status("Key removed");
+                }
+                app.popup = None;
+            }
+            KeyCode::Esc | KeyCode::Char('n') => {
+                app.popup = None;
+            }
+            _ => {}
+        },
         None => {}
     }
 }
@@ -589,14 +632,7 @@ fn handle_address_key(app: &mut App, key: KeyEvent) {
         KeyCode::Char('d') | KeyCode::Delete => {
             if let Some(user_idx) = app.user_address_index(app.address_selected) {
                 if user_idx < app.address_book.len() {
-                    app.address_book.remove(user_idx);
-                    if app.address_selected >= combined_len.saturating_sub(1)
-                        && app.address_selected > 0
-                    {
-                        app.address_selected -= 1;
-                    }
-                    save_address_book(&app.address_book);
-                    app.set_status("Address removed");
+                    app.open_popup(Popup::ConfirmDeleteAddress);
                 }
             } else {
                 app.set_status("Key entries cannot be deleted here");
@@ -656,18 +692,7 @@ fn handle_keys_key(app: &mut App, key: KeyEvent) {
         }
         KeyCode::Char('d') | KeyCode::Delete => {
             if !app.keys.is_empty() {
-                let idx = app.keys_selected;
-                let removed = app.keys.remove(idx);
-                app.send_cmd(WalletCmd::DeleteKey(idx));
-                if removed.is_active && !app.keys.is_empty() {
-                    app.keys[0].is_active = true;
-                    app.send_cmd(WalletCmd::SetActiveKey(0));
-                    app.request_refresh();
-                }
-                if app.keys_selected >= app.keys.len() && app.keys_selected > 0 {
-                    app.keys_selected -= 1;
-                }
-                app.set_status("Key removed");
+                app.open_popup(Popup::ConfirmDeleteKey);
             }
         }
         _ => {}

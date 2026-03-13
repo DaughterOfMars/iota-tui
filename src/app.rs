@@ -241,6 +241,8 @@ pub enum Popup {
     AddCommandForm,
     RenameKey,
     SwitchNetwork,
+    ConfirmDeleteAddress,
+    ConfirmDeleteKey,
 }
 
 // ── App State ──────────────────────────────────────────────────────

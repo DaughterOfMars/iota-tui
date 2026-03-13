@@ -181,6 +181,16 @@ pub fn draw_popup(frame: &mut Frame, app: &mut App) {
             frame.render_widget(Clear, popup_area);
             draw_switch_network_popup(frame, popup_area);
         }
+        Some(Popup::ConfirmDeleteAddress) => {
+            let popup_area = centered_rect_min(55, 40, 44, 10, area);
+            frame.render_widget(Clear, popup_area);
+            draw_confirm_delete_address(frame, app, popup_area);
+        }
+        Some(Popup::ConfirmDeleteKey) => {
+            let popup_area = centered_rect_min(55, 40, 44, 10, area);
+            frame.render_widget(Clear, popup_area);
+            draw_confirm_delete_key(frame, app, popup_area);
+        }
         None => {}
     }
 }
@@ -473,6 +483,78 @@ fn draw_switch_network_popup(frame: &mut Frame, area: Rect) {
         .title_style(Style::default().fg(ACCENT).bold())
         .borders(Borders::ALL)
         .border_style(Style::default().fg(ACCENT));
+
+    frame.render_widget(Paragraph::new(text).block(block), area);
+}
+
+fn draw_confirm_delete_address(frame: &mut Frame, app: &App, area: Rect) {
+    let label = app
+        .user_address_index(app.address_selected)
+        .and_then(|i| app.address_book.get(i))
+        .map(|e| e.label.as_str())
+        .unwrap_or("?");
+
+    let text = vec![
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Delete this address?",
+            Style::default().fg(Color::Red).bold(),
+        )]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            format!("  \"{}\"", label),
+            Style::default().fg(Color::White).bold(),
+        )]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Enter/y", Style::default().fg(ACCENT).bold()),
+            Span::raw(" confirm   "),
+            Span::styled("Esc/n", Style::default().fg(ACCENT).bold()),
+            Span::raw(" cancel"),
+        ]),
+    ];
+
+    let block = Block::default()
+        .title(" Confirm Delete ")
+        .title_style(Style::default().fg(Color::Red).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Red));
+
+    frame.render_widget(Paragraph::new(text).block(block), area);
+}
+
+fn draw_confirm_delete_key(frame: &mut Frame, app: &App, area: Rect) {
+    let alias = app
+        .keys
+        .get(app.keys_selected)
+        .map(|k| k.alias.as_str())
+        .unwrap_or("?");
+
+    let text = vec![
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Delete this key?",
+            Style::default().fg(Color::Red).bold(),
+        )]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            format!("  \"{}\"", alias),
+            Style::default().fg(Color::White).bold(),
+        )]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Enter/y", Style::default().fg(ACCENT).bold()),
+            Span::raw(" confirm   "),
+            Span::styled("Esc/n", Style::default().fg(ACCENT).bold()),
+            Span::raw(" cancel"),
+        ]),
+    ];
+
+    let block = Block::default()
+        .title(" Confirm Delete ")
+        .title_style(Style::default().fg(Color::Red).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Red));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
 }
