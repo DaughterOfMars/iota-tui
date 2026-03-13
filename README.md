@@ -37,15 +37,38 @@ Data is stored in `~/Library/Application Support/iota-wallet-tui/` (macOS) inclu
 
 ## Screens
 
-| # | Screen        | Description                                    |
-|---|---------------|------------------------------------------------|
-| 1 | Coins         | View coin balances across visible addresses    |
-| 2 | Objects        | Browse owned objects                           |
-| 3 | Transactions  | View transaction history                       |
-| 4 | Packages      | Package explorer (placeholder)                 |
-| 5 | Address Book  | Manage saved addresses and IOTA-Names          |
-| 6 | Keys          | Manage cryptographic keys                      |
-| 7 | Tx Builder    | Build and execute programmable transactions    |
+### Coins
+View coin balances across visible addresses
+![Coins page](/screenshots/coins_page.png)
+
+### Objects
+Browse owned objects
+![Objects Page](/screenshots/objects_page.png)
+
+### Transactions
+View transaction history
+
+![Transactions Page](/screenshots/transactions_page.png)
+
+### Packages
+Package explorer (placeholder)
+
+![Packages Page](/screenshots/packages_page.png)
+
+### Address Book
+Manage saved addresses and IOTA-Names
+
+![Address Book Page](/screenshots/address_book_page.png)
+
+### Keys
+Manage cryptographic keys
+
+![Keys Page](/screenshots/keys_page.png)
+
+### Tx Builder
+Build and execute programmable transactions
+
+![Tx Builder Page](/screenshots/tx_builder_page.png)
 
 ## Keybindings
 
@@ -80,19 +103,6 @@ Data is stored in `~/Library/Application Support/iota-wallet-tui/` (macOS) inclu
 | `q`/`Ctrl-c` | Quit                           |
 
 Mouse click and scroll are supported for tabs, lists, and popups.
-
-## Development
-
-```sh
-# Run
-cargo run
-
-# Format (requires nightly)
-cargo +nightly fmt
-
-# Build release
-cargo build --release
-```
 
 ## License
 
