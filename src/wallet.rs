@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::path::PathBuf;
 
 use base64ct::Encoding;
@@ -9,7 +10,7 @@ use iota_sdk::graphql_client::{
     Client, PaginationFilter, faucet::FaucetClient, query_types::ObjectFilter,
 };
 use iota_sdk::transaction_builder::TransactionBuilder;
-use iota_sdk::types::{Address, ObjectType};
+use iota_sdk::types::{Address, ObjectType, StructTag, TypeTag};
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -241,7 +242,7 @@ impl WalletBackend {
             .data()
             .iter()
             .map(|c| CoinInfo {
-                coin_type: c.coin_type().to_string(),
+                coin_type: prettify_type(c.coin_type()),
                 symbol: extract_symbol(&c.coin_type().to_string()),
                 balance: c.balance() as u128,
                 object_id: c.id().to_string(),
@@ -270,7 +271,7 @@ impl WalletBackend {
             .iter()
             .map(|obj| {
                 let type_name = match obj.object_type() {
-                    ObjectType::Struct(s) => s.to_string(),
+                    ObjectType::Struct(s) => prettify_struct(&s),
                     ObjectType::Package => "Package".into(),
                 };
                 let owner = format!("{:?}", obj.owner);
@@ -648,6 +649,39 @@ fn format_gas(nanos: u64) -> String {
         format!("{:.1}K", nanos as f64 / 1_000.0)
     } else {
         format!("{}", nanos)
+    }
+}
+
+fn prettify_type(tag: &TypeTag) -> String {
+    match tag {
+        TypeTag::Vector(type_tag) => {
+            format!("vector<{}>", prettify_type(type_tag))
+        }
+        TypeTag::Struct(struct_tag) => prettify_struct(struct_tag),
+        _ => tag.to_string(),
+    }
+}
+
+fn prettify_struct(tag: &StructTag) -> String {
+    const SYSTEM_ADDRESSES: &[Address] = &[Address::STD, Address::FRAMEWORK, Address::SYSTEM];
+    const SYSTEM_ADDRESS_NAMES: &[&str] = &["std", "framework", "system"];
+    if let Some(pos) = SYSTEM_ADDRESSES.iter().position(|a| a == &tag.address()) {
+        let mut s = String::new();
+        write!(
+            &mut s,
+            "{}::{}::{}",
+            SYSTEM_ADDRESS_NAMES[pos],
+            tag.module(),
+            tag.name()
+        )
+        .unwrap();
+        if !tag.type_params().is_empty() {
+            let params: Vec<String> = tag.type_params().iter().map(|t| prettify_type(t)).collect();
+            write!(&mut s, "<{}>", params.join(", ")).unwrap();
+        }
+        s
+    } else {
+        tag.to_string()
     }
 }
 
