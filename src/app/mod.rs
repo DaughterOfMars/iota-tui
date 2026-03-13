@@ -506,15 +506,46 @@ impl App {
         )
     }
 
+    /// Returns true if the current form field accepts an object ID.
+    pub fn is_object_field(&self) -> bool {
+        let Some(ct) = self.tx_adding_cmd else {
+            return false;
+        };
+        matches!(
+            (ct, self.tx_edit_field),
+            (AddCommandType::TransferObjects, 1)
+                | (AddCommandType::SplitCoins, 0)
+                | (AddCommandType::MergeCoins, 0)
+                | (AddCommandType::MergeCoins, 1)
+                | (AddCommandType::Unstake, 0)
+        )
+    }
+
+    /// Returns true if the current object field should suggest coins specifically.
+    fn is_coin_field(&self) -> bool {
+        let Some(ct) = self.tx_adding_cmd else {
+            return false;
+        };
+        matches!(
+            (ct, self.tx_edit_field),
+            (AddCommandType::SplitCoins, 0)
+                | (AddCommandType::MergeCoins, 0)
+                | (AddCommandType::MergeCoins, 1)
+        )
+    }
+
     /// Compute autocomplete suggestions based on current input.
     pub fn update_autocomplete(&mut self) {
-        if !self.is_address_field() || self.input_buffer.is_empty() {
+        let is_addr = self.is_address_field();
+        let is_obj = self.is_object_field();
+
+        if (!is_addr && !is_obj) || self.input_buffer.is_empty() {
             self.autocomplete.clear();
             self.autocomplete_idx = None;
             return;
         }
 
-        if self.input_buffer.starts_with("0x") {
+        if is_addr && self.input_buffer.starts_with("0x") {
             self.autocomplete.clear();
             self.autocomplete_idx = None;
             return;
@@ -523,14 +554,42 @@ impl App {
         let query = self.input_buffer.to_lowercase();
         let mut matches: Vec<(String, String)> = Vec::new();
 
-        for key in &self.keys {
-            if key.alias.to_lowercase().contains(&query) {
-                matches.push((key.alias.clone(), key.address.clone()));
+        if is_addr {
+            for key in &self.keys {
+                if key.alias.to_lowercase().contains(&query) {
+                    matches.push((key.alias.clone(), key.address.clone()));
+                }
             }
-        }
-        for entry in &self.address_book {
-            if entry.label.to_lowercase().contains(&query) {
-                matches.push((entry.label.clone(), entry.address.clone()));
+            for entry in &self.address_book {
+                if entry.label.to_lowercase().contains(&query) {
+                    matches.push((entry.label.clone(), entry.address.clone()));
+                }
+            }
+        } else if is_obj {
+            if self.is_coin_field() {
+                for coin in &self.coins {
+                    let label = format!("{} ({})", coin.symbol, coin.balance_display);
+                    if label.to_lowercase().contains(&query)
+                        || coin.object_id.to_lowercase().contains(&query)
+                    {
+                        matches.push((label, coin.object_id.clone()));
+                    }
+                }
+            } else {
+                for obj in &self.objects {
+                    let short_type = obj.type_name.rsplit("::").next().unwrap_or(&obj.type_name);
+                    let label = format!(
+                        "{} {}",
+                        short_type,
+                        &obj.object_id[..12.min(obj.object_id.len())]
+                    );
+                    if label.to_lowercase().contains(&query)
+                        || obj.object_id.to_lowercase().contains(&query)
+                        || obj.type_name.to_lowercase().contains(&query)
+                    {
+                        matches.push((label, obj.object_id.clone()));
+                    }
+                }
             }
         }
 
@@ -549,13 +608,15 @@ impl App {
 
     /// Accept the currently highlighted autocomplete suggestion.
     /// Returns true if a suggestion was accepted.
+    /// For address fields, inserts the alias (resolved later). For object fields, inserts the ID.
     pub fn accept_autocomplete(&mut self) -> bool {
         if self.autocomplete.is_empty() {
             return false;
         }
         let idx = self.autocomplete_idx.unwrap_or(0);
-        if let Some((label, _)) = self.autocomplete.get(idx) {
-            self.input_buffer = label.clone();
+        let is_obj = self.is_object_field();
+        if let Some((label, value)) = self.autocomplete.get(idx) {
+            self.input_buffer = if is_obj { value.clone() } else { label.clone() };
             self.input_cursor = self.input_buffer.len();
             self.autocomplete.clear();
             self.autocomplete_idx = None;
