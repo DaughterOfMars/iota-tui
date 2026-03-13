@@ -6,6 +6,7 @@ use crate::wallet::{StoredKey, WalletCmd, WalletEvent};
 pub enum Screen {
     Coins,
     Objects,
+    Transactions,
     Packages,
     AddressBook,
     Keys,
@@ -13,9 +14,10 @@ pub enum Screen {
 }
 
 impl Screen {
-    pub const ALL: [Screen; 6] = [
+    pub const ALL: [Screen; 7] = [
         Screen::Coins,
         Screen::Objects,
+        Screen::Transactions,
         Screen::Packages,
         Screen::AddressBook,
         Screen::Keys,
@@ -26,6 +28,7 @@ impl Screen {
         match self {
             Screen::Coins => "Coins",
             Screen::Objects => "Objects",
+            Screen::Transactions => "Transactions",
             Screen::Packages => "Packages",
             Screen::AddressBook => "Address Book",
             Screen::Keys => "Keys",
@@ -58,6 +61,14 @@ pub struct ObjectDisplay {
     pub version: String,
     pub digest: String,
     pub owner: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct TransactionDisplay {
+    pub digest: String,
+    pub status: String,
+    pub gas_used: String,
+    pub epoch: String,
 }
 
 #[derive(Debug, Clone)]
@@ -274,6 +285,10 @@ pub struct App {
     pub objects_selected: usize,
     pub objects_offset: usize,
 
+    pub transactions: Vec<TransactionDisplay>,
+    pub transactions_selected: usize,
+    pub transactions_offset: usize,
+
     pub address_book: Vec<AddressEntry>,
     pub address_selected: usize,
     pub address_offset: usize,
@@ -345,6 +360,10 @@ impl App {
             objects_selected: 0,
             objects_offset: 0,
 
+            transactions: vec![],
+            transactions_selected: 0,
+            transactions_offset: 0,
+
             address_book,
             address_selected: 0,
             address_offset: 0,
@@ -405,6 +424,12 @@ impl App {
                     .collect();
                 if self.coins_selected >= self.coins.len() {
                     self.coins_selected = self.coins.len().saturating_sub(1);
+                }
+            }
+            WalletEvent::Transactions(txs) => {
+                self.transactions = txs;
+                if self.transactions_selected >= self.transactions.len() {
+                    self.transactions_selected = self.transactions.len().saturating_sub(1);
                 }
             }
             WalletEvent::Objects(objects) => {
@@ -484,6 +509,7 @@ impl App {
                 self.send_cmd(WalletCmd::RefreshCoins(addr));
                 self.send_cmd(WalletCmd::RefreshObjects(addr));
                 self.send_cmd(WalletCmd::RefreshBalances(addr));
+                self.send_cmd(WalletCmd::RefreshTransactions(addr));
             }
         }
     }

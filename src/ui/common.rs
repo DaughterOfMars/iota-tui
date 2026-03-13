@@ -120,6 +120,7 @@ fn screen_hint(screen: Screen) -> &'static str {
     match screen {
         Screen::Coins => " j/k:navigate  Enter:details  f:faucet  r:refresh  ?:help",
         Screen::Objects => " j/k:navigate  Enter:details  r:refresh  ?:help",
+        Screen::Transactions => " j/k:navigate  Enter:details  r:refresh  ?:help",
         Screen::Packages => " r:refresh  ?:help",
         Screen::AddressBook => " j/k:navigate  a:add  e:edit  d:delete  ?:help",
         Screen::Keys => " j/k:navigate  Enter:active  g:gen  i:import  e:rename  n:network  ?:help",

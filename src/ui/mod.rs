@@ -4,6 +4,7 @@ mod common;
 mod keys;
 mod objects;
 mod packages;
+mod transactions;
 mod tx_builder;
 
 use crate::app::{App, Screen};
@@ -26,6 +27,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     match app.screen {
         Screen::Coins => coins::draw(frame, app, layout[2]),
         Screen::Objects => objects::draw(frame, app, layout[2]),
+        Screen::Transactions => transactions::draw(frame, app, layout[2]),
         Screen::Packages => packages::draw(frame, app, layout[2]),
         Screen::AddressBook => address_book::draw(frame, app, layout[2]),
         Screen::Keys => keys::draw(frame, app, layout[2]),

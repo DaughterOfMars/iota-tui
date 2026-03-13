@@ -76,6 +76,7 @@ pub enum WalletCmd {
     RefreshBalances(Address),
     RefreshCoins(Address),
     RefreshObjects(Address),
+    RefreshTransactions(Address),
     GenerateKey {
         scheme: String,
         alias: String,
@@ -105,6 +106,7 @@ pub enum WalletEvent {
     Balances(Vec<BalanceInfo>),
     Coins(Vec<CoinInfo>),
     Objects(Vec<ObjectInfo>),
+    Transactions(Vec<crate::app::TransactionDisplay>),
     KeyGenerated {
         alias: String,
         address: String,
@@ -163,6 +165,7 @@ impl WalletBackend {
                 WalletCmd::RefreshBalances(addr) => self.handle_balances(addr).await,
                 WalletCmd::RefreshCoins(addr) => self.handle_coins(addr).await,
                 WalletCmd::RefreshObjects(addr) => self.handle_objects(addr).await,
+                WalletCmd::RefreshTransactions(addr) => self.handle_transactions(addr).await,
                 WalletCmd::GenerateKey { scheme, alias } => {
                     self.handle_generate_key(&scheme, &alias)
                 }
@@ -283,6 +286,51 @@ impl WalletBackend {
             .collect();
 
         self.event_tx.send(WalletEvent::Objects(objects)).await?;
+        Ok(())
+    }
+
+    async fn handle_transactions(
+        &self,
+        addr: Address,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        use iota_sdk::graphql_client::query_types::TransactionsFilter;
+
+        let client = self.client.as_ref().ok_or("Not connected")?;
+
+        let filter = TransactionsFilter {
+            sign_address: Some(addr),
+            ..Default::default()
+        };
+
+        let page = client
+            .transactions_effects(filter, PaginationFilter::default())
+            .await?;
+
+        let txs: Vec<crate::app::TransactionDisplay> = page
+            .data()
+            .iter()
+            .map(|effects| {
+                let v1 = effects.as_v1();
+                let status = match &v1.status {
+                    iota_sdk::types::ExecutionStatus::Success => "Success".to_string(),
+                    iota_sdk::types::ExecutionStatus::Failure { error, .. } => {
+                        format!("Failed: {:?}", error)
+                    }
+                    _ => "Unknown".to_string(),
+                };
+                let gas = &v1.gas_used;
+                let total_gas = gas.computation_cost + gas.storage_cost
+                    - gas.storage_rebate.min(gas.storage_cost);
+                crate::app::TransactionDisplay {
+                    digest: v1.transaction_digest.to_string(),
+                    status,
+                    gas_used: format_gas(total_gas),
+                    epoch: format!("{}", v1.epoch),
+                }
+            })
+            .collect();
+
+        self.event_tx.send(WalletEvent::Transactions(txs)).await?;
         Ok(())
     }
 
@@ -589,6 +637,18 @@ fn parse_iota_amount(s: &str) -> Result<u64, Box<dyn std::error::Error + Send + 
         return Ok(n);
     }
     Err(format!("Invalid amount: {}", s).into())
+}
+
+fn format_gas(nanos: u64) -> String {
+    if nanos >= 1_000_000_000 {
+        format!("{:.4} IOTA", nanos as f64 / 1_000_000_000.0)
+    } else if nanos >= 1_000_000 {
+        format!("{:.2}M", nanos as f64 / 1_000_000.0)
+    } else if nanos >= 1_000 {
+        format!("{:.1}K", nanos as f64 / 1_000.0)
+    } else {
+        format!("{}", nanos)
+    }
 }
 
 fn extract_symbol(coin_type: &str) -> String {

@@ -59,18 +59,22 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             return;
         }
         KeyCode::Char('3') => {
-            app.navigate(Screen::Packages);
+            app.navigate(Screen::Transactions);
             return;
         }
         KeyCode::Char('4') => {
-            app.navigate(Screen::AddressBook);
+            app.navigate(Screen::Packages);
             return;
         }
         KeyCode::Char('5') => {
-            app.navigate(Screen::Keys);
+            app.navigate(Screen::AddressBook);
             return;
         }
         KeyCode::Char('6') => {
+            app.navigate(Screen::Keys);
+            return;
+        }
+        KeyCode::Char('7') => {
             app.navigate(Screen::TxBuilder);
             return;
         }
@@ -96,6 +100,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
     match app.screen {
         Screen::Coins => handle_coins_key(app, key),
         Screen::Objects => handle_objects_key(app, key),
+        Screen::Transactions => handle_transactions_key(app, key),
         Screen::Packages => {}
         Screen::AddressBook => handle_address_key(app, key),
         Screen::Keys => handle_keys_key(app, key),
@@ -586,6 +591,43 @@ fn handle_objects_key(app: &mut App, key: KeyEvent) {
     App::scroll_into_view(app.objects_selected, &mut app.objects_offset, 20);
 }
 
+fn handle_transactions_key(app: &mut App, key: KeyEvent) {
+    let len = app.transactions.len();
+    match key.code {
+        KeyCode::Up | KeyCode::Char('k') => {
+            if app.transactions_selected > 0 {
+                app.transactions_selected -= 1;
+            }
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            if app.transactions_selected + 1 < len {
+                app.transactions_selected += 1;
+            }
+        }
+        KeyCode::Home | KeyCode::Char('g') => {
+            app.transactions_selected = 0;
+        }
+        KeyCode::End | KeyCode::Char('G') => {
+            if len > 0 {
+                app.transactions_selected = len - 1;
+            }
+        }
+        KeyCode::PageUp => {
+            app.transactions_selected = app.transactions_selected.saturating_sub(10);
+        }
+        KeyCode::PageDown => {
+            app.transactions_selected = (app.transactions_selected + 10).min(len.saturating_sub(1));
+        }
+        KeyCode::Enter => {
+            if let Some(tx) = app.transactions.get(app.transactions_selected) {
+                app.set_status(format!("Tx: {}", &tx.digest));
+            }
+        }
+        _ => {}
+    }
+    App::scroll_into_view(app.transactions_selected, &mut app.transactions_offset, 20);
+}
+
 fn handle_address_key(app: &mut App, key: KeyEvent) {
     let combined_len = app.key_entry_count() + app.address_book.len();
     match key.code {
@@ -816,6 +858,11 @@ fn scroll_selection(app: &mut App, delta: i32) {
             app.objects_selected = apply_delta(app.objects_selected, delta, app.objects.len());
             App::scroll_into_view(app.objects_selected, &mut app.objects_offset, 20);
         }
+        Screen::Transactions => {
+            app.transactions_selected =
+                apply_delta(app.transactions_selected, delta, app.transactions.len());
+            App::scroll_into_view(app.transactions_selected, &mut app.transactions_offset, 20);
+        }
         Screen::AddressBook => {
             let combined_len = app.key_entry_count() + app.address_book.len();
             app.address_selected = apply_delta(app.address_selected, delta, combined_len);
@@ -889,6 +936,12 @@ fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                         let idx = app.objects_offset + visual_index;
                         if idx < app.objects.len() {
                             app.objects_selected = idx;
+                        }
+                    }
+                    Screen::Transactions => {
+                        let idx = app.transactions_offset + visual_index;
+                        if idx < app.transactions.len() {
+                            app.transactions_selected = idx;
                         }
                     }
                     Screen::Packages => {}
