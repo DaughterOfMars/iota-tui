@@ -12,7 +12,7 @@ use futures::StreamExt;
 use ratatui::{Terminal, backend::CrosstermBackend};
 use tokio::sync::mpsc;
 
-use wallet::{Network, WalletBackend, WalletCmd};
+use wallet::{WalletBackend, WalletCmd};
 
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
@@ -51,8 +51,9 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> colo
 
     let mut app = app::App::new(cmd_tx.clone(), initial_keys);
 
-    // Auto-connect to testnet
-    let _ = cmd_tx.send(WalletCmd::Connect(Network::Testnet)).await;
+    // Connect to last used network (defaults to testnet)
+    let saved_network = wallet::load_network();
+    let _ = cmd_tx.send(WalletCmd::Connect(saved_network)).await;
 
     let mut event_stream = EventStream::new();
     let mut tick_interval = tokio::time::interval(std::time::Duration::from_millis(100));

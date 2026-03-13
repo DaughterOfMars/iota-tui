@@ -67,6 +67,38 @@ impl Network {
             Network::Custom(url) => url.as_str(),
         }
     }
+
+    pub fn from_name(name: &str) -> Self {
+        match name {
+            "mainnet" => Network::Mainnet,
+            "testnet" => Network::Testnet,
+            "devnet" => Network::Devnet,
+            url => Network::Custom(url.to_string()),
+        }
+    }
+}
+
+fn network_config_path() -> PathBuf {
+    dirs::data_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("iota-wallet-tui")
+        .join("network.txt")
+}
+
+pub fn save_network(network: &Network) {
+    let path = network_config_path();
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(&path, network.name());
+}
+
+pub fn load_network() -> Network {
+    let path = network_config_path();
+    std::fs::read_to_string(&path)
+        .ok()
+        .map(|s| Network::from_name(s.trim()))
+        .unwrap_or(Network::Testnet)
 }
 
 // ── Commands and Responses ─────────────────────────────────────────
@@ -235,6 +267,7 @@ impl WalletBackend {
         };
         self.client = Some(client);
         self.faucet = faucet;
+        save_network(&network);
         self.event_tx
             .send(WalletEvent::Connected(network.name().to_string()))
             .await?;
