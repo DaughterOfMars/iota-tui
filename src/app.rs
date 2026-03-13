@@ -252,6 +252,7 @@ pub enum Popup {
     AddCommandForm,
     RenameKey,
     SwitchNetwork,
+    Detail,
     ConfirmDeleteAddress,
     ConfirmDeleteKey,
 }
@@ -663,6 +664,91 @@ impl App {
             }
         }
         input.to_string()
+    }
+
+    /// Returns (title, key-value lines) for the detail popup of the selected item.
+    pub fn detail_info(&self) -> (&'static str, Vec<(&'static str, String)>) {
+        match self.screen {
+            Screen::Coins => {
+                if let Some(c) = self.coins.get(self.coins_selected) {
+                    (
+                        "Coin Details",
+                        vec![
+                            ("Symbol", c.symbol.clone()),
+                            ("Coin Type", c.coin_type.clone()),
+                            ("Balance", c.balance_display.clone()),
+                            ("Raw Balance", c.balance.to_string()),
+                            ("Object ID", c.object_id.clone()),
+                        ],
+                    )
+                } else {
+                    ("Coin Details", vec![])
+                }
+            }
+            Screen::Objects => {
+                if let Some(o) = self.objects.get(self.objects_selected) {
+                    (
+                        "Object Details",
+                        vec![
+                            ("Object ID", o.object_id.clone()),
+                            ("Type", o.type_name.clone()),
+                            ("Version", o.version.clone()),
+                            ("Digest", o.digest.clone()),
+                            ("Owner", o.owner.clone()),
+                        ],
+                    )
+                } else {
+                    ("Object Details", vec![])
+                }
+            }
+            Screen::Transactions => {
+                if let Some(tx) = self.transactions.get(self.transactions_selected) {
+                    (
+                        "Transaction Details",
+                        vec![
+                            ("Digest", tx.digest.clone()),
+                            ("Status", tx.status.clone()),
+                            ("Gas Used", tx.gas_used.clone()),
+                            ("Epoch", tx.epoch.clone()),
+                        ],
+                    )
+                } else {
+                    ("Transaction Details", vec![])
+                }
+            }
+            Screen::Keys => {
+                if let Some(k) = self.keys.get(self.keys_selected) {
+                    let mut fields = vec![
+                        ("Alias", k.alias.clone()),
+                        ("Address", k.address.clone()),
+                        ("Scheme", k.scheme.clone()),
+                        ("Active", if k.is_active { "Yes" } else { "No" }.to_string()),
+                    ];
+                    if self.keys_show_private {
+                        fields.push(("Private Key", k.private_key_hex.clone()));
+                    }
+                    ("Key Details", fields)
+                } else {
+                    ("Key Details", vec![])
+                }
+            }
+            Screen::AddressBook => {
+                let combined = self.combined_address_book();
+                if let Some(entry) = combined.get(self.address_selected) {
+                    (
+                        "Address Details",
+                        vec![
+                            ("Label", entry.label.clone()),
+                            ("Address", entry.address.clone()),
+                            ("Notes", entry.notes.clone()),
+                        ],
+                    )
+                } else {
+                    ("Address Details", vec![])
+                }
+            }
+            _ => ("Details", vec![]),
+        }
     }
 
     /// Adjust a scroll offset so that `selected` is visible within `visible_rows`.

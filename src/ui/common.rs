@@ -137,6 +137,11 @@ pub fn draw_popup(frame: &mut Frame, app: &mut App) {
             frame.render_widget(Clear, popup_area);
             draw_help_popup(frame, app, popup_area);
         }
+        Some(Popup::Detail) => {
+            let popup_area = centered_rect_min(65, 70, 50, 16, area);
+            frame.render_widget(Clear, popup_area);
+            draw_detail_popup(frame, app, popup_area);
+        }
         Some(Popup::Confirm) => {
             let popup_area = centered_rect_min(50, 30, 40, 8, area);
             frame.render_widget(Clear, popup_area);
@@ -257,6 +262,63 @@ fn draw_help_popup(frame: &mut Frame, app: &mut App, area: Rect) {
         .border_style(Style::default().fg(ACCENT));
 
     let paragraph = Paragraph::new(text)
+        .block(block)
+        .wrap(Wrap { trim: false })
+        .scroll((app.popup_scroll as u16, 0));
+    frame.render_widget(paragraph, area);
+
+    render_popup_scrollbar(frame, area, app.popup_scroll, content_len, inner_height);
+}
+
+fn draw_detail_popup(frame: &mut Frame, app: &mut App, area: Rect) {
+    let (title, fields) = app.detail_info();
+
+    let mut lines: Vec<Line> = vec![Line::from("")];
+    if fields.is_empty() {
+        lines.push(Line::from(vec![Span::styled(
+            "  No item selected",
+            Style::default().fg(DIM),
+        )]));
+    } else {
+        for (label, value) in &fields {
+            lines.push(Line::from(vec![Span::styled(
+                format!("  {}", label),
+                Style::default().fg(ACCENT).bold(),
+            )]));
+            // Wrap long values across multiple lines
+            let max_w = area.width.saturating_sub(6) as usize;
+            if value.is_empty() {
+                lines.push(Line::from(vec![Span::styled(
+                    "  (empty)",
+                    Style::default().fg(DIM),
+                )]));
+            } else if value.len() <= max_w {
+                lines.push(Line::from(format!("  {}", value)));
+            } else {
+                for chunk in value.as_bytes().chunks(max_w) {
+                    let s = String::from_utf8_lossy(chunk);
+                    lines.push(Line::from(format!("  {}", s)));
+                }
+            }
+            lines.push(Line::from(""));
+        }
+    }
+    lines.push(Line::from(vec![Span::styled(
+        "  Esc to close",
+        Style::default().fg(DIM),
+    )]));
+
+    let content_len = lines.len();
+    let inner_height = area.height.saturating_sub(2) as usize;
+    clamp_scroll(&mut app.popup_scroll, content_len, inner_height);
+
+    let block = Block::default()
+        .title(format!(" {} ", title))
+        .title_style(Style::default().fg(ACCENT).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ACCENT));
+
+    let paragraph = Paragraph::new(lines)
         .block(block)
         .wrap(Wrap { trim: false })
         .scroll((app.popup_scroll as u16, 0));

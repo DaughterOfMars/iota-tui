@@ -126,6 +126,22 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
             }
             _ => {}
         },
+        Some(Popup::Detail) => match key.code {
+            KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => app.popup = None,
+            KeyCode::Down | KeyCode::Char('j') => {
+                app.popup_scroll = app.popup_scroll.saturating_add(1);
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                app.popup_scroll = app.popup_scroll.saturating_sub(1);
+            }
+            KeyCode::PageDown => {
+                app.popup_scroll = app.popup_scroll.saturating_add(5);
+            }
+            KeyCode::PageUp => {
+                app.popup_scroll = app.popup_scroll.saturating_sub(5);
+            }
+            _ => {}
+        },
         Some(Popup::Confirm) => match key.code {
             KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => app.popup = None,
             _ => {}
@@ -533,10 +549,8 @@ fn handle_coins_key(app: &mut App, key: KeyEvent) {
             app.coins_selected = (app.coins_selected + 10).min(len.saturating_sub(1));
         }
         KeyCode::Enter => {
-            if let Some(coin) = app.coins.get(app.coins_selected) {
-                let id = &coin.object_id;
-                let display = if id.len() > 20 { &id[..20] } else { id };
-                app.set_status(format!("Object: {}", display));
+            if !app.coins.is_empty() {
+                app.open_popup(Popup::Detail);
             }
         }
         KeyCode::Char('f') => {
@@ -580,10 +594,8 @@ fn handle_objects_key(app: &mut App, key: KeyEvent) {
             app.objects_selected = (app.objects_selected + 10).min(len.saturating_sub(1));
         }
         KeyCode::Enter => {
-            if let Some(obj) = app.objects.get(app.objects_selected) {
-                let id = &obj.object_id;
-                let display = if id.len() > 20 { &id[..20] } else { id };
-                app.set_status(format!("Object: {}", display));
+            if !app.objects.is_empty() {
+                app.open_popup(Popup::Detail);
             }
         }
         _ => {}
@@ -619,8 +631,8 @@ fn handle_transactions_key(app: &mut App, key: KeyEvent) {
             app.transactions_selected = (app.transactions_selected + 10).min(len.saturating_sub(1));
         }
         KeyCode::Enter => {
-            if let Some(tx) = app.transactions.get(app.transactions_selected) {
-                app.set_status(format!("Tx: {}", &tx.digest));
+            if !app.transactions.is_empty() {
+                app.open_popup(Popup::Detail);
             }
         }
         _ => {}
@@ -647,6 +659,11 @@ fn handle_address_key(app: &mut App, key: KeyEvent) {
         KeyCode::End => {
             if combined_len > 0 {
                 app.address_selected = combined_len - 1;
+            }
+        }
+        KeyCode::Enter => {
+            if combined_len > 0 {
+                app.open_popup(Popup::Detail);
             }
         }
         KeyCode::Char('a') => {
