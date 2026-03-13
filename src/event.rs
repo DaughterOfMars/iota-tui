@@ -34,7 +34,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
 
     match key.code {
         KeyCode::Char('q') => {
-            app.running = false;
+            app.open_popup(Popup::ConfirmQuit);
             return;
         }
         KeyCode::Char('?') => {
@@ -401,6 +401,15 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
                 app.popup = None;
             }
             KeyCode::Esc | KeyCode::Char('n') => {
+                app.popup = None;
+            }
+            _ => {}
+        },
+        Some(Popup::ConfirmQuit) => match key.code {
+            KeyCode::Enter | KeyCode::Char('y') => {
+                app.running = false;
+            }
+            KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('q') => {
                 app.popup = None;
             }
             _ => {}

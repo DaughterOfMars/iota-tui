@@ -255,6 +255,7 @@ pub enum Popup {
     Detail,
     ConfirmDeleteAddress,
     ConfirmDeleteKey,
+    ConfirmQuit,
 }
 
 // ── App State ──────────────────────────────────────────────────────
