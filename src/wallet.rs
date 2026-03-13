@@ -692,7 +692,13 @@ impl WalletBackend {
         name: &str,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let client = self.client.as_ref().ok_or("Not connected")?;
-        let result = client.iota_names_lookup(name).await?;
+        // Auto-append @iota if the name doesn't contain a separator
+        let qualified = if name.contains('@') {
+            name.to_string()
+        } else {
+            format!("{}@iota", name)
+        };
+        let result = client.iota_names_lookup(&qualified).await?;
         let address = result.map(|a| a.to_string());
         self.event_tx
             .send(WalletEvent::IotaNameResolved {
