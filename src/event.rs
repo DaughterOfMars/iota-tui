@@ -38,7 +38,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             return;
         }
         KeyCode::Char('?') => {
-            app.popup = Some(Popup::Help);
+            app.open_popup(Popup::Help);
             return;
         }
         KeyCode::Char('r') => {
@@ -47,7 +47,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             return;
         }
         KeyCode::Char('n') => {
-            app.popup = Some(Popup::SwitchNetwork);
+            app.open_popup(Popup::SwitchNetwork);
             return;
         }
         KeyCode::Char('1') => {
@@ -105,7 +105,23 @@ fn handle_key(app: &mut App, key: KeyEvent) {
 
 fn handle_popup_key(app: &mut App, key: KeyEvent) {
     match app.popup {
-        Some(Popup::Help | Popup::Confirm) => match key.code {
+        Some(Popup::Help) => match key.code {
+            KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => app.popup = None,
+            KeyCode::Down | KeyCode::Char('j') => {
+                app.popup_scroll = app.popup_scroll.saturating_add(1);
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                app.popup_scroll = app.popup_scroll.saturating_sub(1);
+            }
+            KeyCode::PageDown => {
+                app.popup_scroll = app.popup_scroll.saturating_add(5);
+            }
+            KeyCode::PageUp => {
+                app.popup_scroll = app.popup_scroll.saturating_sub(5);
+            }
+            _ => {}
+        },
+        Some(Popup::Confirm) => match key.code {
             KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => app.popup = None,
             _ => {}
         },
@@ -178,7 +194,7 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
                 app.tx_adding_cmd = Some(ct);
                 app.tx_edit_field = 0;
                 app.tx_edit_buffers = vec![String::new(); field_count];
-                app.popup = Some(Popup::AddCommandForm);
+                app.open_popup(Popup::AddCommandForm);
                 app.start_input("");
             }
         }
@@ -551,7 +567,7 @@ fn handle_address_key(app: &mut App, key: KeyEvent) {
         KeyCode::Char('a') => {
             app.address_edit_field = 0;
             app.address_edit_buffers = [String::new(), String::new(), String::new()];
-            app.popup = Some(Popup::AddAddress);
+            app.open_popup(Popup::AddAddress);
             app.start_input("");
         }
         KeyCode::Char('e') => {
@@ -563,7 +579,7 @@ fn handle_address_key(app: &mut App, key: KeyEvent) {
                     let notes = entry.notes.clone();
                     app.address_edit_field = 0;
                     app.address_edit_buffers = [label.clone(), address, notes];
-                    app.popup = Some(Popup::EditAddress);
+                    app.open_popup(Popup::EditAddress);
                     app.start_input(&label);
                 }
             } else {
@@ -622,16 +638,16 @@ fn handle_keys_key(app: &mut App, key: KeyEvent) {
             app.request_refresh();
         }
         KeyCode::Char('g') => {
-            app.popup = Some(Popup::GenerateKey);
+            app.open_popup(Popup::GenerateKey);
         }
         KeyCode::Char('i') => {
-            app.popup = Some(Popup::ImportKey);
+            app.open_popup(Popup::ImportKey);
             app.start_input("");
         }
         KeyCode::Char('e') => {
             if let Some(key_display) = app.keys.get(app.keys_selected) {
                 let current = key_display.alias.clone();
-                app.popup = Some(Popup::RenameKey);
+                app.open_popup(Popup::RenameKey);
                 app.start_input(&current);
             }
         }
@@ -685,7 +701,7 @@ fn handle_tx_key(app: &mut App, key: KeyEvent) {
                 app.tx_step = TxBuilderStep::SetGas;
             }
             KeyCode::Char('a') => {
-                app.popup = Some(Popup::AddCommand);
+                app.open_popup(Popup::AddCommand);
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 if app.tx_cmd_selected > 0 {
@@ -894,10 +910,18 @@ fn handle_mouse(app: &mut App, mouse: MouseEvent) {
             }
         }
         MouseEventKind::ScrollUp => {
-            scroll_selection(app, -1);
+            if app.popup.is_some() {
+                app.popup_scroll = app.popup_scroll.saturating_sub(1);
+            } else {
+                scroll_selection(app, -1);
+            }
         }
         MouseEventKind::ScrollDown => {
-            scroll_selection(app, 1);
+            if app.popup.is_some() {
+                app.popup_scroll = app.popup_scroll.saturating_add(1);
+            } else {
+                scroll_selection(app, 1);
+            }
         }
         _ => {}
     }

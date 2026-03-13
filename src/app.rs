@@ -296,6 +296,9 @@ pub struct App {
     pub autocomplete: Vec<(String, String)>, // (alias/label, address)
     pub autocomplete_idx: Option<usize>,
 
+    // Popup scroll state
+    pub popup_scroll: usize,
+
     // Layout state for mouse hit-testing
     pub tab_areas: Vec<ratatui::layout::Rect>,
 }
@@ -362,6 +365,8 @@ impl App {
 
             autocomplete: vec![],
             autocomplete_idx: None,
+
+            popup_scroll: 0,
 
             tab_areas: vec![],
         }
@@ -497,6 +502,12 @@ impl App {
         self.screen = screen;
         self.input_mode = InputMode::Normal;
         self.popup = None;
+        self.popup_scroll = 0;
+    }
+
+    pub fn open_popup(&mut self, popup: Popup) {
+        self.popup = Some(popup);
+        self.popup_scroll = 0;
     }
 
     pub fn active_key(&self) -> Option<&KeyDisplay> {

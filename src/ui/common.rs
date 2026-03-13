@@ -3,7 +3,9 @@ use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph, Wrap},
+    widgets::{
+        Block, Borders, Clear, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap,
+    },
 };
 
 use crate::app::{App, InputMode, Popup, Screen};
@@ -125,14 +127,14 @@ fn screen_hint(screen: Screen) -> &'static str {
     }
 }
 
-pub fn draw_popup(frame: &mut Frame, app: &App) {
+pub fn draw_popup(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
 
     match app.popup {
         Some(Popup::Help) => {
             let popup_area = centered_rect_min(70, 80, 50, 24, area);
             frame.render_widget(Clear, popup_area);
-            draw_help_popup(frame, popup_area);
+            draw_help_popup(frame, app, popup_area);
         }
         Some(Popup::Confirm) => {
             let popup_area = centered_rect_min(50, 30, 40, 8, area);
@@ -183,7 +185,7 @@ pub fn draw_popup(frame: &mut Frame, app: &App) {
     }
 }
 
-fn draw_help_popup(frame: &mut Frame, area: Rect) {
+fn draw_help_popup(frame: &mut Frame, app: &mut App, area: Rect) {
     let text = vec![
         Line::from(vec![Span::styled(
             "IOTA Wallet TUI",
@@ -233,14 +235,23 @@ fn draw_help_popup(frame: &mut Frame, area: Rect) {
         )]),
     ];
 
+    let content_len = text.len();
+    let inner_height = area.height.saturating_sub(2) as usize; // border top + bottom
+    clamp_scroll(&mut app.popup_scroll, content_len, inner_height);
+
     let block = Block::default()
         .title(" Help ")
         .title_style(Style::default().fg(ACCENT).bold())
         .borders(Borders::ALL)
         .border_style(Style::default().fg(ACCENT));
 
-    let paragraph = Paragraph::new(text).block(block).wrap(Wrap { trim: false });
+    let paragraph = Paragraph::new(text)
+        .block(block)
+        .wrap(Wrap { trim: false })
+        .scroll((app.popup_scroll as u16, 0));
     frame.render_widget(paragraph, area);
+
+    render_popup_scrollbar(frame, area, app.popup_scroll, content_len, inner_height);
 }
 
 fn draw_confirm_popup(frame: &mut Frame, area: Rect) {
@@ -518,7 +529,7 @@ fn draw_add_command_popup(frame: &mut Frame, area: Rect) {
     frame.render_widget(Paragraph::new(text).block(block), area);
 }
 
-fn draw_add_command_form(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_add_command_form(frame: &mut Frame, app: &mut App, area: Rect) {
     use crate::app::AddCommandType;
     let Some(ct) = app.tx_adding_cmd else {
         return;
@@ -602,6 +613,10 @@ fn draw_add_command_form(frame: &mut Frame, app: &App, area: Rect) {
         Style::default().fg(DIM),
     )]));
 
+    let content_len = lines.len();
+    let inner_height = area.height.saturating_sub(2) as usize;
+    clamp_scroll(&mut app.popup_scroll, content_len, inner_height);
+
     let block = Block::default()
         .title(format!(" {} ", ct.label()))
         .title_style(Style::default().fg(ACCENT).bold())
@@ -611,9 +626,12 @@ fn draw_add_command_form(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(
         Paragraph::new(lines)
             .block(block)
-            .wrap(Wrap { trim: false }),
+            .wrap(Wrap { trim: false })
+            .scroll((app.popup_scroll as u16, 0)),
         area,
     );
+
+    render_popup_scrollbar(frame, area, app.popup_scroll, content_len, inner_height);
 }
 
 pub fn centered_rect_min(
@@ -666,4 +684,33 @@ pub fn dim_style() -> Style {
 
 pub fn accent_style() -> Style {
     Style::default().fg(ACCENT)
+}
+
+/// Clamp scroll offset so content doesn't scroll past the end.
+fn clamp_scroll(scroll: &mut usize, content_len: usize, visible: usize) {
+    let max = content_len.saturating_sub(visible);
+    if *scroll > max {
+        *scroll = max;
+    }
+}
+
+/// Render a scrollbar on the right edge of a popup area.
+/// Only draws if content overflows the visible area.
+fn render_popup_scrollbar(
+    frame: &mut Frame,
+    area: Rect,
+    scroll: usize,
+    content_len: usize,
+    visible: usize,
+) {
+    if content_len <= visible {
+        return;
+    }
+    let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+        .thumb_style(Style::default().fg(ACCENT))
+        .track_style(Style::default().fg(DIM));
+    let mut state = ScrollbarState::new(content_len.saturating_sub(visible)).position(scroll);
+    // Render inside the border (inset by 1 on each side)
+    let inner = Rect::new(area.x + 1, area.y + 1, area.width - 2, area.height - 2);
+    frame.render_stateful_widget(scrollbar, inner, &mut state);
 }
