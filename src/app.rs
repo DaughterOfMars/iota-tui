@@ -51,6 +51,7 @@ pub struct CoinDisplay {
     pub balance: u128,
     pub balance_display: String,
     pub object_id: String,
+    pub owner_alias: String,
 }
 
 #[derive(Debug, Clone)]
@@ -61,6 +62,7 @@ pub struct ObjectDisplay {
     pub version: String,
     pub digest: String,
     pub owner: String,
+    pub owner_alias: String,
 }
 
 #[derive(Debug, Clone)]
@@ -250,7 +252,6 @@ pub enum InputMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Popup {
     Help,
-    Confirm,
     AddAddress,
     EditAddress,
     GenerateKey,
@@ -325,6 +326,9 @@ pub struct App {
     // Autocomplete state for address fields
     pub autocomplete: Vec<(String, String)>, // (alias/label, address)
     pub autocomplete_idx: Option<usize>,
+
+    // Show data from all owned addresses
+    pub show_all_addresses: bool,
 
     // Popup scroll state
     pub popup_scroll: usize,
@@ -404,6 +408,8 @@ impl App {
             autocomplete: vec![],
             autocomplete_idx: None,
 
+            show_all_addresses: false,
+
             popup_scroll: 0,
 
             tab_areas: vec![],
@@ -424,12 +430,16 @@ impl App {
             WalletEvent::Balances(balances) => {
                 for b in &balances {
                     if b.coin_type.contains("IOTA") {
-                        self.total_balance_iota = b.total_balance;
+                        if self.show_all_addresses {
+                            self.total_balance_iota += b.total_balance;
+                        } else {
+                            self.total_balance_iota = b.total_balance;
+                        }
                     }
                 }
             }
-            WalletEvent::Coins(coins) => {
-                self.coins = coins
+            WalletEvent::Coins { coins, owner_alias } => {
+                let new_coins: Vec<CoinDisplay> = coins
                     .into_iter()
                     .map(|c| CoinDisplay {
                         balance_display: format_balance(c.balance, 9),
@@ -437,8 +447,15 @@ impl App {
                         symbol: c.symbol,
                         balance: c.balance,
                         object_id: c.object_id,
+                        owner_alias: owner_alias.clone(),
                     })
                     .collect();
+                if self.show_all_addresses {
+                    // Append (data was cleared at refresh start)
+                    self.coins.extend(new_coins);
+                } else {
+                    self.coins = new_coins;
+                }
                 if self.coins_selected >= self.coins.len() {
                     self.coins_selected = self.coins.len().saturating_sub(1);
                 }
@@ -449,8 +466,11 @@ impl App {
                     self.transactions_selected = self.transactions.len().saturating_sub(1);
                 }
             }
-            WalletEvent::Objects(objects) => {
-                self.objects = objects
+            WalletEvent::Objects {
+                objects,
+                owner_alias,
+            } => {
+                let new_objects: Vec<ObjectDisplay> = objects
                     .into_iter()
                     .map(|o| ObjectDisplay {
                         object_id: o.object_id,
@@ -461,8 +481,14 @@ impl App {
                             .unwrap_or_else(|| "?".into()),
                         digest: o.digest,
                         owner: o.owner,
+                        owner_alias: owner_alias.clone(),
                     })
                     .collect();
+                if self.show_all_addresses {
+                    self.objects.extend(new_objects);
+                } else {
+                    self.objects = new_objects;
+                }
                 if self.objects_selected >= self.objects.len() {
                     self.objects_selected = self.objects.len().saturating_sub(1);
                 }
@@ -530,13 +556,43 @@ impl App {
         let _ = self.cmd_tx.try_send(cmd);
     }
 
-    /// Request a data refresh for the active key's address
+    /// Request a data refresh for the active key's address (or all keys)
     pub fn request_refresh(&mut self) {
-        if let Some(key) = self.active_key().cloned() {
+        self.loading = true;
+        if self.show_all_addresses {
+            // Clear existing data before fetching from all addresses
+            self.coins.clear();
+            self.objects.clear();
+            self.total_balance_iota = 0;
+            for key in self.keys.clone() {
+                if let Some(addr) = parse_address(&key.address) {
+                    self.send_cmd(WalletCmd::RefreshCoins {
+                        addr,
+                        alias: key.alias.clone(),
+                    });
+                    self.send_cmd(WalletCmd::RefreshObjects {
+                        addr,
+                        alias: key.alias.clone(),
+                    });
+                    self.send_cmd(WalletCmd::RefreshBalances(addr));
+                }
+            }
+            // Transactions only for active key
+            if let Some(key) = self.active_key().cloned() {
+                if let Some(addr) = parse_address(&key.address) {
+                    self.send_cmd(WalletCmd::RefreshTransactions(addr));
+                }
+            }
+        } else if let Some(key) = self.active_key().cloned() {
             if let Some(addr) = parse_address(&key.address) {
-                self.loading = true;
-                self.send_cmd(WalletCmd::RefreshCoins(addr));
-                self.send_cmd(WalletCmd::RefreshObjects(addr));
+                self.send_cmd(WalletCmd::RefreshCoins {
+                    addr,
+                    alias: key.alias.clone(),
+                });
+                self.send_cmd(WalletCmd::RefreshObjects {
+                    addr,
+                    alias: key.alias.clone(),
+                });
                 self.send_cmd(WalletCmd::RefreshBalances(addr));
                 self.send_cmd(WalletCmd::RefreshTransactions(addr));
             }
@@ -713,32 +769,34 @@ impl App {
         match self.screen {
             Screen::Coins => {
                 if let Some(c) = self.coins.get(self.coins_selected) {
-                    (
-                        "Coin Details",
-                        vec![
-                            ("Symbol", c.symbol.clone()),
-                            ("Coin Type", c.coin_type.clone()),
-                            ("Balance", c.balance_display.clone()),
-                            ("Raw Balance", c.balance.to_string()),
-                            ("Object ID", c.object_id.clone()),
-                        ],
-                    )
+                    let mut fields = vec![
+                        ("Symbol", c.symbol.clone()),
+                        ("Coin Type", c.coin_type.clone()),
+                        ("Balance", c.balance_display.clone()),
+                        ("Raw Balance", c.balance.to_string()),
+                        ("Object ID", c.object_id.clone()),
+                    ];
+                    if self.show_all_addresses {
+                        fields.push(("Owner", c.owner_alias.clone()));
+                    }
+                    ("Coin Details", fields)
                 } else {
                     ("Coin Details", vec![])
                 }
             }
             Screen::Objects => {
                 if let Some(o) = self.objects.get(self.objects_selected) {
-                    (
-                        "Object Details",
-                        vec![
-                            ("Object ID", o.object_id.clone()),
-                            ("Type", o.type_name.clone()),
-                            ("Version", o.version.clone()),
-                            ("Digest", o.digest.clone()),
-                            ("Owner", o.owner.clone()),
-                        ],
-                    )
+                    let mut fields = vec![
+                        ("Object ID", o.object_id.clone()),
+                        ("Type", o.type_name.clone()),
+                        ("Version", o.version.clone()),
+                        ("Digest", o.digest.clone()),
+                        ("Owner", o.owner.clone()),
+                    ];
+                    if self.show_all_addresses {
+                        fields.push(("Key", o.owner_alias.clone()));
+                    }
+                    ("Object Details", fields)
                 } else {
                     ("Object Details", vec![])
                 }

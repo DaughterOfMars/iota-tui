@@ -50,6 +50,16 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             app.open_popup(Popup::SwitchNetwork);
             return;
         }
+        KeyCode::Char('s') => {
+            app.show_all_addresses = !app.show_all_addresses;
+            app.set_status(if app.show_all_addresses {
+                "Showing all addresses"
+            } else {
+                "Showing active address only"
+            });
+            app.request_refresh();
+            return;
+        }
         KeyCode::Char('1') => {
             app.navigate(Screen::Coins);
             return;
@@ -140,10 +150,6 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
             KeyCode::PageUp => {
                 app.popup_scroll = app.popup_scroll.saturating_sub(5);
             }
-            _ => {}
-        },
-        Some(Popup::Confirm) => match key.code {
-            KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => app.popup = None,
             _ => {}
         },
         Some(Popup::AddAddress | Popup::EditAddress) => match key.code {

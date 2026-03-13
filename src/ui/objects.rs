@@ -38,11 +38,18 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
 
     let visible_rows = area.height.saturating_sub(4) as usize;
 
-    let header = Row::new(vec!["Object ID", "Type", "Version", "Digest"])
+    let show_all = app.show_all_addresses;
+
+    let header_cols: Vec<&str> = if show_all {
+        vec!["Object ID", "Type", "Version", "Digest", "Owner"]
+    } else {
+        vec!["Object ID", "Type", "Version", "Digest"]
+    };
+    let header = Row::new(header_cols)
         .style(common::header_style())
         .bottom_margin(1);
 
-    let max_type_width = area.width.saturating_sub(60) as usize;
+    let max_type_width = area.width.saturating_sub(if show_all { 74 } else { 60 }) as usize;
 
     let rows: Vec<Row> = app
         .objects
@@ -57,22 +64,36 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
                 Style::default()
             };
 
-            Row::new(vec![
+            let mut cells = vec![
                 common::truncate_address(&obj.object_id, 20),
                 common::truncate_type(&obj.type_name, max_type_width),
                 obj.version.clone(),
                 common::truncate_address(&obj.digest, 16),
-            ])
-            .style(style)
+            ];
+            if show_all {
+                cells.push(obj.owner_alias.clone());
+            }
+
+            Row::new(cells).style(style)
         })
         .collect();
 
-    let widths = [
-        Constraint::Length(22),
-        Constraint::Min(20),
-        Constraint::Length(8),
-        Constraint::Length(18),
-    ];
+    let widths: Vec<Constraint> = if show_all {
+        vec![
+            Constraint::Length(22),
+            Constraint::Min(20),
+            Constraint::Length(8),
+            Constraint::Length(18),
+            Constraint::Length(14),
+        ]
+    } else {
+        vec![
+            Constraint::Length(22),
+            Constraint::Min(20),
+            Constraint::Length(8),
+            Constraint::Length(18),
+        ]
+    };
 
     let title = if app.objects.len() > visible_rows {
         format!(

@@ -118,8 +118,8 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
 
 fn screen_hint(screen: Screen) -> &'static str {
     match screen {
-        Screen::Coins => " j/k:navigate  Enter:details  f:faucet  r:refresh  ?:help",
-        Screen::Objects => " j/k:navigate  Enter:details  r:refresh  ?:help",
+        Screen::Coins => " j/k:navigate  Enter:details  f:faucet  s:all addrs  r:refresh  ?:help",
+        Screen::Objects => " j/k:navigate  Enter:details  s:all addrs  r:refresh  ?:help",
         Screen::Transactions => " j/k:navigate  Enter:details  r:refresh  ?:help",
         Screen::Packages => " r:refresh  ?:help",
         Screen::AddressBook => " j/k:navigate  a:add  e:edit  d:delete  ?:help",
@@ -141,11 +141,6 @@ pub fn draw_popup(frame: &mut Frame, app: &mut App) {
             let popup_area = centered_rect_min(65, 70, 50, 16, area);
             frame.render_widget(Clear, popup_area);
             draw_detail_popup(frame, app, popup_area);
-        }
-        Some(Popup::Confirm) => {
-            let popup_area = centered_rect_min(50, 30, 40, 8, area);
-            frame.render_widget(Clear, popup_area);
-            draw_confirm_popup(frame, popup_area);
         }
         Some(Popup::AddAddress) => {
             let popup_area = centered_rect_min(60, 60, 48, 14, area);
@@ -235,6 +230,7 @@ fn draw_help_popup(frame: &mut Frame, app: &mut App, area: Rect) {
         Line::from("  i          Import key"),
         Line::from("  p          Toggle private key visibility"),
         Line::from("  n          Switch network"),
+        Line::from("  s          Toggle show all addresses"),
         Line::from("  r          Refresh data from network"),
         Line::from("  f          Request faucet (testnet/devnet)"),
         Line::from(""),
@@ -330,36 +326,6 @@ fn draw_detail_popup(frame: &mut Frame, app: &mut App, area: Rect) {
     frame.render_widget(paragraph, area);
 
     render_popup_scrollbar(frame, area, app.popup_scroll, content_len, inner_height);
-}
-
-fn draw_confirm_popup(frame: &mut Frame, area: Rect) {
-    let text = vec![
-        Line::from(""),
-        Line::from(vec![Span::styled(
-            "Transaction submitted!",
-            Style::default().fg(Color::Green).bold(),
-        )]),
-        Line::from(""),
-        Line::from("Check the status bar for the digest."),
-        Line::from(""),
-        Line::from(vec![Span::styled(
-            "Press Enter to close",
-            Style::default().fg(DIM),
-        )]),
-    ];
-
-    let block = Block::default()
-        .title(" Confirmed ")
-        .title_style(Style::default().fg(Color::Green).bold())
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Green));
-
-    frame.render_widget(
-        Paragraph::new(text)
-            .block(block)
-            .alignment(Alignment::Center),
-        area,
-    );
 }
 
 fn draw_address_form(frame: &mut Frame, app: &App, area: Rect, title: &str) {

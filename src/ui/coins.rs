@@ -69,7 +69,14 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
     // borders (2) + header (1) + header margin (1) = 4 rows overhead
     let visible_rows = area.height.saturating_sub(4) as usize;
 
-    let header = Row::new(vec!["Symbol", "Type", "Balance", "Object ID"])
+    let show_all = app.show_all_addresses;
+
+    let header_cols: Vec<&str> = if show_all {
+        vec!["Symbol", "Type", "Balance", "Object ID", "Owner"]
+    } else {
+        vec!["Symbol", "Type", "Balance", "Object ID"]
+    };
+    let header = Row::new(header_cols)
         .style(common::header_style())
         .bottom_margin(1);
 
@@ -88,22 +95,36 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
 
             let id_display = common::truncate_address(&coin.object_id, 24);
 
-            Row::new(vec![
+            let mut cells = vec![
                 coin.symbol.clone(),
                 common::truncate_type(&coin.coin_type, 30),
                 coin.balance_display.clone(),
                 id_display,
-            ])
-            .style(style)
+            ];
+            if show_all {
+                cells.push(coin.owner_alias.clone());
+            }
+
+            Row::new(cells).style(style)
         })
         .collect();
 
-    let widths = [
-        Constraint::Length(10),
-        Constraint::Min(20),
-        Constraint::Length(20),
-        Constraint::Length(26),
-    ];
+    let widths: Vec<Constraint> = if show_all {
+        vec![
+            Constraint::Length(10),
+            Constraint::Min(20),
+            Constraint::Length(20),
+            Constraint::Length(26),
+            Constraint::Length(14),
+        ]
+    } else {
+        vec![
+            Constraint::Length(10),
+            Constraint::Min(20),
+            Constraint::Length(20),
+            Constraint::Length(26),
+        ]
+    };
 
     let title = if app.coins.len() > visible_rows {
         format!(

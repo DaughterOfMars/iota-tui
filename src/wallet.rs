@@ -75,8 +75,14 @@ impl Network {
 pub enum WalletCmd {
     Connect(Network),
     RefreshBalances(Address),
-    RefreshCoins(Address),
-    RefreshObjects(Address),
+    RefreshCoins {
+        addr: Address,
+        alias: String,
+    },
+    RefreshObjects {
+        addr: Address,
+        alias: String,
+    },
     RefreshTransactions(Address),
     GenerateKey {
         scheme: String,
@@ -109,8 +115,14 @@ pub enum WalletCmd {
 pub enum WalletEvent {
     Connected(String),
     Balances(Vec<BalanceInfo>),
-    Coins(Vec<CoinInfo>),
-    Objects(Vec<ObjectInfo>),
+    Coins {
+        coins: Vec<CoinInfo>,
+        owner_alias: String,
+    },
+    Objects {
+        objects: Vec<ObjectInfo>,
+        owner_alias: String,
+    },
     Transactions(Vec<crate::app::TransactionDisplay>),
     KeyGenerated {
         alias: String,
@@ -169,8 +181,8 @@ impl WalletBackend {
             let result = match cmd {
                 WalletCmd::Connect(network) => self.handle_connect(network).await,
                 WalletCmd::RefreshBalances(addr) => self.handle_balances(addr).await,
-                WalletCmd::RefreshCoins(addr) => self.handle_coins(addr).await,
-                WalletCmd::RefreshObjects(addr) => self.handle_objects(addr).await,
+                WalletCmd::RefreshCoins { addr, alias } => self.handle_coins(addr, alias).await,
+                WalletCmd::RefreshObjects { addr, alias } => self.handle_objects(addr, alias).await,
                 WalletCmd::RefreshTransactions(addr) => self.handle_transactions(addr).await,
                 WalletCmd::GenerateKey { scheme, alias } => {
                     self.handle_generate_key(&scheme, &alias)
@@ -241,6 +253,7 @@ impl WalletBackend {
     async fn handle_coins(
         &self,
         addr: Address,
+        alias: String,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let client = self.client.as_ref().ok_or("Not connected")?;
 
@@ -258,13 +271,19 @@ impl WalletBackend {
             })
             .collect();
 
-        self.event_tx.send(WalletEvent::Coins(coins)).await?;
+        self.event_tx
+            .send(WalletEvent::Coins {
+                coins,
+                owner_alias: alias,
+            })
+            .await?;
         Ok(())
     }
 
     async fn handle_objects(
         &self,
         addr: Address,
+        alias: String,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let client = self.client.as_ref().ok_or("Not connected")?;
 
@@ -295,7 +314,12 @@ impl WalletBackend {
             })
             .collect();
 
-        self.event_tx.send(WalletEvent::Objects(objects)).await?;
+        self.event_tx
+            .send(WalletEvent::Objects {
+                objects,
+                owner_alias: alias,
+            })
+            .await?;
         Ok(())
     }
 
