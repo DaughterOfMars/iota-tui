@@ -267,6 +267,7 @@ pub enum Popup {
     ConfirmDeleteKey,
     ConfirmQuit,
     LookupIotaName,
+    ErrorLog,
 }
 
 // ── App State ──────────────────────────────────────────────────────
@@ -330,6 +331,9 @@ pub struct App {
     // Autocomplete state for address fields
     pub autocomplete: Vec<(String, String)>, // (alias/label, address)
     pub autocomplete_idx: Option<usize>,
+
+    // Error log content (loaded on demand)
+    pub error_log_lines: Vec<String>,
 
     // Popup scroll state
     pub popup_scroll: usize,
@@ -410,6 +414,8 @@ impl App {
 
             autocomplete: vec![],
             autocomplete_idx: None,
+
+            error_log_lines: vec![],
 
             popup_scroll: 0,
 
@@ -694,6 +700,20 @@ impl App {
         self.tx_dry_running = false;
         self.tx_dry_run_dirty = true;
         self.tx_gas_edited = false;
+    }
+
+    pub fn load_error_log(&mut self) {
+        let path = dirs::data_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join("iota-wallet-tui")
+            .join("error.log");
+        self.error_log_lines = std::fs::read_to_string(&path)
+            .unwrap_or_default()
+            .lines()
+            .rev()
+            .take(100)
+            .map(|s| s.to_string())
+            .collect();
     }
 
     pub fn active_key(&self) -> Option<&KeyDisplay> {

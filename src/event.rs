@@ -50,6 +50,11 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             app.open_popup(Popup::SwitchNetwork);
             return;
         }
+        KeyCode::Char('E') => {
+            app.load_error_log();
+            app.open_popup(Popup::ErrorLog);
+            return;
+        }
         KeyCode::Char('1') => {
             app.navigate(Screen::Coins);
             return;
@@ -446,6 +451,22 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
                 app.popup = None;
             }
             _ => handle_input_key(app, key),
+        },
+        Some(Popup::ErrorLog) => match key.code {
+            KeyCode::Esc | KeyCode::Char('q') => app.popup = None,
+            KeyCode::Down => {
+                app.popup_scroll = app.popup_scroll.saturating_add(1);
+            }
+            KeyCode::Up => {
+                app.popup_scroll = app.popup_scroll.saturating_sub(1);
+            }
+            KeyCode::PageDown => {
+                app.popup_scroll = app.popup_scroll.saturating_add(5);
+            }
+            KeyCode::PageUp => {
+                app.popup_scroll = app.popup_scroll.saturating_sub(5);
+            }
+            _ => {}
         },
         Some(Popup::ConfirmQuit) => match key.code {
             KeyCode::Enter | KeyCode::Char('y') => {

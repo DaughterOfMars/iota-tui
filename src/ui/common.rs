@@ -206,6 +206,11 @@ pub fn draw_popup(frame: &mut Frame, app: &mut App) {
             frame.render_widget(Clear, popup_area);
             draw_iota_name_lookup(frame, app, popup_area);
         }
+        Some(Popup::ErrorLog) => {
+            let popup_area = centered_rect_min(80, 80, 60, 20, area);
+            frame.render_widget(Clear, popup_area);
+            draw_error_log_popup(frame, app, popup_area);
+        }
         Some(Popup::ConfirmQuit) => {
             let popup_area = centered_rect_min(50, 30, 40, 7, area);
             frame.render_widget(Clear, popup_area);
@@ -253,6 +258,7 @@ fn draw_help_popup(frame: &mut Frame, app: &mut App, area: Rect) {
             Style::default().bold().underlined(),
         )]),
         Line::from("  ?          Show this help"),
+        Line::from("  E          View error log"),
         Line::from("  q/Ctrl-c   Quit"),
         Line::from(""),
         Line::from(vec![
@@ -666,6 +672,41 @@ fn draw_iota_name_lookup(frame: &mut Frame, app: &App, area: Rect) {
         .border_style(Style::default().fg(ACCENT));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
+}
+
+fn draw_error_log_popup(frame: &mut Frame, app: &mut App, area: Rect) {
+    let lines: Vec<Line> = if app.error_log_lines.is_empty() {
+        vec![
+            Line::from(""),
+            Line::from(vec![Span::styled(
+                "  No errors logged.",
+                Style::default().fg(DIM),
+            )]),
+        ]
+    } else {
+        app.error_log_lines
+            .iter()
+            .map(|l| Line::from(l.as_str()))
+            .collect()
+    };
+
+    let content_len = lines.len();
+    let inner_height = area.height.saturating_sub(2) as usize;
+    clamp_scroll(&mut app.popup_scroll, content_len, inner_height);
+
+    let block = Block::default()
+        .title(" Error Log (newest first) ")
+        .title_style(Style::default().fg(Color::Red).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Red));
+
+    let paragraph = Paragraph::new(lines)
+        .block(block)
+        .wrap(Wrap { trim: false })
+        .scroll((app.popup_scroll as u16, 0));
+    frame.render_widget(paragraph, area);
+
+    render_popup_scrollbar(frame, area, app.popup_scroll, content_len, inner_height);
 }
 
 fn draw_confirm_quit(frame: &mut Frame, area: Rect) {
