@@ -271,6 +271,7 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
                     app.tx_edit_buffers[app.tx_edit_field] = app.input_buffer.clone();
                     if let Some(cmd) = build_command_from_form(app) {
                         app.tx_commands.push(cmd);
+                        app.tx_dry_run_dirty = true;
                         app.set_status("Command added");
                     }
                     app.popup = None;
@@ -781,11 +782,13 @@ fn handle_tx_key(app: &mut App, key: KeyEvent) {
             KeyCode::Up | KeyCode::Char('k') => {
                 if app.tx_sender > 0 {
                     app.tx_sender -= 1;
+                    app.tx_dry_run_dirty = true;
                 }
             }
             KeyCode::Down | KeyCode::Char('j') => {
                 if app.tx_sender + 1 < app.keys.len() {
                     app.tx_sender += 1;
+                    app.tx_dry_run_dirty = true;
                 }
             }
             KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
@@ -816,6 +819,7 @@ fn handle_tx_key(app: &mut App, key: KeyEvent) {
             KeyCode::Char('d') | KeyCode::Delete => {
                 if !app.tx_commands.is_empty() {
                     app.tx_commands.remove(app.tx_cmd_selected);
+                    app.tx_dry_run_dirty = true;
                     if app.tx_cmd_selected >= app.tx_commands.len() && app.tx_cmd_selected > 0 {
                         app.tx_cmd_selected -= 1;
                     }
@@ -884,11 +888,12 @@ fn submit_transaction(app: &mut App) {
 }
 
 fn trigger_dry_run(app: &mut App) {
-    if app.keys.is_empty() || app.tx_commands.is_empty() {
+    if !app.tx_dry_run_dirty || app.keys.is_empty() || app.tx_commands.is_empty() {
         return;
     }
     app.tx_dry_run = None;
     app.tx_dry_running = true;
+    app.tx_dry_run_dirty = false;
     app.send_cmd(WalletCmd::DryRun {
         sender_idx: app.tx_sender,
         commands: app.tx_commands.clone(),
@@ -921,7 +926,11 @@ fn scroll_selection(app: &mut App, delta: i32) {
         }
         Screen::TxBuilder => match app.tx_step {
             TxBuilderStep::SelectSender => {
+                let old = app.tx_sender;
                 app.tx_sender = apply_delta(app.tx_sender, delta, app.keys.len());
+                if app.tx_sender != old {
+                    app.tx_dry_run_dirty = true;
+                }
             }
             TxBuilderStep::EditCommands => {
                 app.tx_cmd_selected =
@@ -1018,6 +1027,9 @@ fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                             match app.tx_step {
                                 TxBuilderStep::SelectSender => {
                                     if step_row < app.keys.len() {
+                                        if app.tx_sender != step_row {
+                                            app.tx_dry_run_dirty = true;
+                                        }
                                         app.tx_sender = step_row;
                                     }
                                 }

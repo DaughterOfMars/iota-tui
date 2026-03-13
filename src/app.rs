@@ -319,6 +319,7 @@ pub struct App {
     pub tx_adding_cmd: Option<AddCommandType>,
     pub tx_dry_run: Option<DryRunInfo>,
     pub tx_dry_running: bool,
+    pub tx_dry_run_dirty: bool,
     pub tx_gas_edited: bool,
 
     // Autocomplete state for address fields
@@ -397,6 +398,7 @@ impl App {
             tx_adding_cmd: None,
             tx_dry_run: None,
             tx_dry_running: false,
+            tx_dry_run_dirty: true,
             tx_gas_edited: false,
 
             autocomplete: vec![],
