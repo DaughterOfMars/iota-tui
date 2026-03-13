@@ -508,7 +508,10 @@ impl App {
                     &digest[..8],
                     &digest[digest.len().saturating_sub(6)..]
                 ));
-                self.popup = Some(Popup::Confirm);
+                // Clear the transaction builder
+                self.reset_tx_builder();
+                // Navigate to transaction screen to see the result
+                self.navigate(Screen::Transactions);
                 // Refresh after transaction
                 self.request_refresh();
             }
@@ -562,6 +565,20 @@ impl App {
     pub fn open_popup(&mut self, popup: Popup) {
         self.popup = Some(popup);
         self.popup_scroll = 0;
+    }
+
+    pub fn reset_tx_builder(&mut self) {
+        self.tx_step = TxBuilderStep::SelectSender;
+        self.tx_commands.clear();
+        self.tx_cmd_selected = 0;
+        self.tx_gas_budget = "10000000".into();
+        self.tx_edit_field = 0;
+        self.tx_edit_buffers = vec![];
+        self.tx_adding_cmd = None;
+        self.tx_dry_run = None;
+        self.tx_dry_running = false;
+        self.tx_dry_run_dirty = true;
+        self.tx_gas_edited = false;
     }
 
     pub fn active_key(&self) -> Option<&KeyDisplay> {
