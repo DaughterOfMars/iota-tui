@@ -91,6 +91,7 @@ pub enum WalletCmd {
         gas_budget: u64,
     },
     DeleteKey(usize),
+    SetActiveKey(usize),
     RenameKey {
         idx: usize,
         new_alias: String,
@@ -179,6 +180,7 @@ impl WalletBackend {
                         .await
                 }
                 WalletCmd::DeleteKey(idx) => self.handle_delete_key(idx),
+                WalletCmd::SetActiveKey(idx) => self.handle_set_active_key(idx),
                 WalletCmd::RenameKey { idx, new_alias } => self.handle_rename_key(idx, &new_alias),
                 WalletCmd::RequestFaucet(addr) => self.handle_faucet(addr).await,
             };
@@ -369,6 +371,17 @@ impl WalletBackend {
             self.keypairs.remove(idx);
             self.save_keys();
         }
+        Ok(())
+    }
+
+    fn handle_set_active_key(
+        &mut self,
+        idx: usize,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        for (i, key) in self.keys.iter_mut().enumerate() {
+            key.is_active = i == idx;
+        }
+        self.save_keys();
         Ok(())
     }
 

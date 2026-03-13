@@ -576,6 +576,24 @@ fn draw_add_command_form(frame: &mut Frame, app: &App, area: Rect) {
             format!("  {}", display),
             input_style,
         )]));
+
+        if is_active && !app.autocomplete.is_empty() {
+            for (j, (alias, addr)) in app.autocomplete.iter().enumerate() {
+                let is_sel = app.autocomplete_idx == Some(j);
+                let trunc = truncate_address(addr, 24);
+                let style = if is_sel {
+                    Style::default().fg(ACCENT).bold()
+                } else {
+                    Style::default().fg(DIM)
+                };
+                let prefix = if is_sel { "▸ " } else { "  " };
+                lines.push(Line::from(vec![Span::styled(
+                    format!("    {}{} → {}", prefix, alias, trunc),
+                    style,
+                )]));
+            }
+        }
+
         lines.push(Line::from(""));
     }
 

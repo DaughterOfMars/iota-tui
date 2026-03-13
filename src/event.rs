@@ -184,18 +184,45 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
         }
         Some(Popup::AddCommandForm) => match key.code {
             KeyCode::Esc => {
-                app.popup = None;
-                app.tx_adding_cmd = None;
-                app.input_mode = InputMode::Normal;
-                app.input_clear();
+                if app.autocomplete_idx.is_some() {
+                    // First Esc dismisses autocomplete selection
+                    app.autocomplete_idx = None;
+                } else {
+                    app.popup = None;
+                    app.tx_adding_cmd = None;
+                    app.input_mode = InputMode::Normal;
+                    app.input_clear();
+                    app.autocomplete.clear();
+                }
+            }
+            KeyCode::Down if !app.autocomplete.is_empty() => {
+                let len = app.autocomplete.len();
+                app.autocomplete_idx = Some(match app.autocomplete_idx {
+                    None => 0,
+                    Some(i) => (i + 1).min(len - 1),
+                });
+            }
+            KeyCode::Up if app.autocomplete_idx.is_some() => {
+                app.autocomplete_idx = match app.autocomplete_idx {
+                    Some(0) => None,
+                    Some(i) => Some(i - 1),
+                    None => None,
+                };
             }
             KeyCode::Tab => {
-                let val = app.input_buffer.clone();
-                app.tx_edit_buffers[app.tx_edit_field] = val;
-                let count = app.tx_edit_buffers.len();
-                app.tx_edit_field = (app.tx_edit_field + 1) % count;
-                let next_val = app.tx_edit_buffers[app.tx_edit_field].clone();
-                app.start_input(&next_val);
+                // If autocomplete has a selection, accept it and stay in field
+                if app.accept_autocomplete() {
+                    app.update_autocomplete();
+                } else {
+                    // Otherwise cycle to next field
+                    let val = app.input_buffer.clone();
+                    app.tx_edit_buffers[app.tx_edit_field] = val;
+                    let count = app.tx_edit_buffers.len();
+                    app.tx_edit_field = (app.tx_edit_field + 1) % count;
+                    let next_val = app.tx_edit_buffers[app.tx_edit_field].clone();
+                    app.start_input(&next_val);
+                    app.update_autocomplete();
+                }
             }
             KeyCode::Enter => {
                 app.tx_edit_buffers[app.tx_edit_field] = app.input_buffer.clone();
@@ -207,8 +234,13 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
                 app.tx_adding_cmd = None;
                 app.input_mode = InputMode::Normal;
                 app.input_clear();
+                app.autocomplete.clear();
+                app.autocomplete_idx = None;
             }
-            _ => handle_input_key(app, key),
+            _ => {
+                handle_input_key(app, key);
+                app.update_autocomplete();
+            }
         },
         Some(Popup::GenerateKey) => {
             let scheme = match key.code {
@@ -581,9 +613,11 @@ fn handle_keys_key(app: &mut App, key: KeyEvent) {
             }
         }
         KeyCode::Enter => {
+            let idx = app.keys_selected;
             for (i, k) in app.keys.iter_mut().enumerate() {
-                k.is_active = i == app.keys_selected;
+                k.is_active = i == idx;
             }
+            app.send_cmd(WalletCmd::SetActiveKey(idx));
             app.set_status("Active key changed");
             app.request_refresh();
         }
@@ -605,20 +639,19 @@ fn handle_keys_key(app: &mut App, key: KeyEvent) {
             app.keys_show_private = !app.keys_show_private;
         }
         KeyCode::Char('d') | KeyCode::Delete => {
-            if app.keys.len() > 1 {
+            if !app.keys.is_empty() {
                 let idx = app.keys_selected;
                 let removed = app.keys.remove(idx);
                 app.send_cmd(WalletCmd::DeleteKey(idx));
                 if removed.is_active && !app.keys.is_empty() {
                     app.keys[0].is_active = true;
+                    app.send_cmd(WalletCmd::SetActiveKey(0));
                     app.request_refresh();
                 }
                 if app.keys_selected >= app.keys.len() && app.keys_selected > 0 {
                     app.keys_selected -= 1;
                 }
                 app.set_status("Key removed");
-            } else if !app.keys.is_empty() {
-                app.set_status("Cannot remove last key");
             }
         }
         _ => {}

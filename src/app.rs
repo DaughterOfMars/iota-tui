@@ -292,6 +292,10 @@ pub struct App {
     pub tx_edit_buffers: Vec<String>,
     pub tx_adding_cmd: Option<AddCommandType>,
 
+    // Autocomplete state for address fields
+    pub autocomplete: Vec<(String, String)>, // (alias/label, address)
+    pub autocomplete_idx: Option<usize>,
+
     // Layout state for mouse hit-testing
     pub tab_areas: Vec<ratatui::layout::Rect>,
 }
@@ -355,6 +359,9 @@ impl App {
             tx_edit_field: 0,
             tx_edit_buffers: vec![],
             tx_adding_cmd: None,
+
+            autocomplete: vec![],
+            autocomplete_idx: None,
 
             tab_areas: vec![],
         }
@@ -525,6 +532,78 @@ impl App {
         } else {
             None
         }
+    }
+
+    /// Returns true if the current form field accepts an address (alias-completable).
+    pub fn is_address_field(&self) -> bool {
+        let Some(ct) = self.tx_adding_cmd else {
+            return false;
+        };
+        matches!(
+            (ct, self.tx_edit_field),
+            (AddCommandType::TransferIota, 0)
+                | (AddCommandType::TransferObjects, 0)
+                | (AddCommandType::Stake, 1)
+        )
+    }
+
+    /// Compute autocomplete suggestions based on current input.
+    pub fn update_autocomplete(&mut self) {
+        if !self.is_address_field() || self.input_buffer.is_empty() {
+            self.autocomplete.clear();
+            self.autocomplete_idx = None;
+            return;
+        }
+
+        // Don't suggest if it looks like a raw address
+        if self.input_buffer.starts_with("0x") {
+            self.autocomplete.clear();
+            self.autocomplete_idx = None;
+            return;
+        }
+
+        let query = self.input_buffer.to_lowercase();
+        let mut matches: Vec<(String, String)> = Vec::new();
+
+        for key in &self.keys {
+            if key.alias.to_lowercase().contains(&query) {
+                matches.push((key.alias.clone(), key.address.clone()));
+            }
+        }
+        for entry in &self.address_book {
+            if entry.label.to_lowercase().contains(&query) {
+                matches.push((entry.label.clone(), entry.address.clone()));
+            }
+        }
+
+        matches.truncate(5);
+        if let Some(idx) = self.autocomplete_idx {
+            if idx >= matches.len() {
+                self.autocomplete_idx = if matches.is_empty() {
+                    None
+                } else {
+                    Some(matches.len() - 1)
+                };
+            }
+        }
+        self.autocomplete = matches;
+    }
+
+    /// Accept the currently highlighted autocomplete suggestion.
+    /// Returns true if a suggestion was accepted.
+    pub fn accept_autocomplete(&mut self) -> bool {
+        if self.autocomplete.is_empty() {
+            return false;
+        }
+        let idx = self.autocomplete_idx.unwrap_or(0);
+        if let Some((label, _)) = self.autocomplete.get(idx) {
+            self.input_buffer = label.clone();
+            self.input_cursor = self.input_buffer.len();
+            self.autocomplete.clear();
+            self.autocomplete_idx = None;
+            return true;
+        }
+        false
     }
 
     /// Resolve an alias or label to an address.
