@@ -122,7 +122,7 @@ fn screen_hint(screen: Screen) -> &'static str {
         Screen::Objects => " j/k:navigate  Enter:details  s:all addrs  r:refresh  ?:help",
         Screen::Transactions => " j/k:navigate  Enter:details  r:refresh  ?:help",
         Screen::Packages => " r:refresh  ?:help",
-        Screen::AddressBook => " j/k:navigate  a:add  e:edit  d:delete  ?:help",
+        Screen::AddressBook => " j/k:navigate  a:add  e:edit  d:delete  l:iota-name  ?:help",
         Screen::Keys => " j/k:navigate  Enter:active  g:gen  i:import  e:rename  n:network  ?:help",
         Screen::TxBuilder => " h/l:step  j/k:navigate  a:add  Enter:confirm  ?:help",
     }
@@ -191,6 +191,11 @@ pub fn draw_popup(frame: &mut Frame, app: &mut App) {
             let popup_area = centered_rect_min(55, 40, 44, 10, area);
             frame.render_widget(Clear, popup_area);
             draw_confirm_delete_key(frame, app, popup_area);
+        }
+        Some(Popup::LookupIotaName) => {
+            let popup_area = centered_rect_min(60, 30, 48, 10, area);
+            frame.render_widget(Clear, popup_area);
+            draw_iota_name_lookup(frame, app, popup_area);
         }
         Some(Popup::ConfirmQuit) => {
             let popup_area = centered_rect_min(50, 30, 40, 7, area);
@@ -589,6 +594,36 @@ fn draw_confirm_delete_key(frame: &mut Frame, app: &App, area: Rect) {
         .title_style(Style::default().fg(Color::Red).bold())
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Red));
+
+    frame.render_widget(Paragraph::new(text).block(block), area);
+}
+
+fn draw_iota_name_lookup(frame: &mut Frame, app: &App, area: Rect) {
+    let text = vec![
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Enter an IOTA name (e.g. alice@iota):",
+            Style::default().bold(),
+        )]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            format!("  {}|", &app.input_buffer),
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::UNDERLINED),
+        )]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Enter: lookup  Esc: cancel",
+            Style::default().fg(DIM),
+        )]),
+    ];
+
+    let block = Block::default()
+        .title(" IOTA-Name Lookup ")
+        .title_style(Style::default().fg(ACCENT).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ACCENT));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
 }

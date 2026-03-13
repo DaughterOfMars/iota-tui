@@ -109,6 +109,7 @@ pub enum WalletCmd {
         new_alias: String,
     },
     RequestFaucet(Address),
+    LookupIotaName(String),
 }
 
 #[derive(Debug)]
@@ -141,6 +142,10 @@ pub enum WalletEvent {
         digest: String,
     },
     FaucetRequested(String),
+    IotaNameResolved {
+        name: String,
+        address: Option<String>,
+    },
     Error(String),
 }
 
@@ -208,6 +213,7 @@ impl WalletBackend {
                 WalletCmd::SetActiveKey(idx) => self.handle_set_active_key(idx),
                 WalletCmd::RenameKey { idx, new_alias } => self.handle_rename_key(idx, &new_alias),
                 WalletCmd::RequestFaucet(addr) => self.handle_faucet(addr).await,
+                WalletCmd::LookupIotaName(name) => self.handle_iota_name_lookup(&name).await,
             };
 
             if let Err(e) = result {
@@ -676,6 +682,22 @@ impl WalletBackend {
         };
         self.event_tx
             .send(WalletEvent::FaucetRequested(msg))
+            .await?;
+        Ok(())
+    }
+
+    async fn handle_iota_name_lookup(
+        &self,
+        name: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let client = self.client.as_ref().ok_or("Not connected")?;
+        let result = client.iota_names_lookup(name).await?;
+        let address = result.map(|a| a.to_string());
+        self.event_tx
+            .send(WalletEvent::IotaNameResolved {
+                name: name.to_string(),
+                address,
+            })
             .await?;
         Ok(())
     }

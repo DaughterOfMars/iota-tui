@@ -264,6 +264,7 @@ pub enum Popup {
     ConfirmDeleteAddress,
     ConfirmDeleteKey,
     ConfirmQuit,
+    LookupIotaName,
 }
 
 // ── App State ──────────────────────────────────────────────────────
@@ -540,6 +541,19 @@ impl App {
                 self.navigate(Screen::Transactions);
                 // Refresh after transaction
                 self.request_refresh();
+            }
+            WalletEvent::IotaNameResolved { name, address } => {
+                if let Some(addr) = address {
+                    self.address_book.push(AddressEntry {
+                        label: name.clone(),
+                        address: addr,
+                        notes: "IOTA-Name".into(),
+                    });
+                    save_address_book(&self.address_book);
+                    self.set_status(format!("Resolved @{}", name));
+                } else {
+                    self.set_status(format!("Name '{}' not found", name));
+                }
             }
             WalletEvent::FaucetRequested(msg) => {
                 self.set_status(msg);

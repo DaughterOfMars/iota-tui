@@ -419,6 +419,22 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
             }
             _ => {}
         },
+        Some(Popup::LookupIotaName) => match key.code {
+            KeyCode::Esc => {
+                app.popup = None;
+                app.input_mode = InputMode::Normal;
+                app.input_clear();
+            }
+            KeyCode::Enter => {
+                let name = app.stop_input();
+                if !name.is_empty() {
+                    app.send_cmd(WalletCmd::LookupIotaName(name));
+                    app.set_status("Looking up IOTA name...");
+                }
+                app.popup = None;
+            }
+            _ => handle_input_key(app, key),
+        },
         Some(Popup::ConfirmQuit) => match key.code {
             KeyCode::Enter | KeyCode::Char('y') => {
                 app.running = false;
@@ -719,6 +735,10 @@ fn handle_address_key(app: &mut App, key: KeyEvent) {
             } else {
                 app.set_status("Key entries cannot be deleted here");
             }
+        }
+        KeyCode::Char('l') => {
+            app.open_popup(Popup::LookupIotaName);
+            app.start_input("");
         }
         _ => {}
     }
