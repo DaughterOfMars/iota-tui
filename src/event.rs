@@ -112,10 +112,10 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
     match app.popup {
         Some(Popup::Help) => match key.code {
             KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => app.popup = None,
-            KeyCode::Down | KeyCode::Char('j') => {
+            KeyCode::Down => {
                 app.popup_scroll = app.popup_scroll.saturating_add(1);
             }
-            KeyCode::Up | KeyCode::Char('k') => {
+            KeyCode::Up => {
                 app.popup_scroll = app.popup_scroll.saturating_sub(1);
             }
             KeyCode::PageDown => {
@@ -128,10 +128,10 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
         },
         Some(Popup::Detail) => match key.code {
             KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => app.popup = None,
-            KeyCode::Down | KeyCode::Char('j') => {
+            KeyCode::Down => {
                 app.popup_scroll = app.popup_scroll.saturating_add(1);
             }
-            KeyCode::Up | KeyCode::Char('k') => {
+            KeyCode::Up => {
                 app.popup_scroll = app.popup_scroll.saturating_sub(1);
             }
             KeyCode::PageDown => {
@@ -553,20 +553,20 @@ fn handle_input_key(app: &mut App, key: KeyEvent) {
 fn handle_coins_key(app: &mut App, key: KeyEvent) {
     let len = app.coins.len();
     match key.code {
-        KeyCode::Up | KeyCode::Char('k') => {
+        KeyCode::Up => {
             if app.coins_selected > 0 {
                 app.coins_selected -= 1;
             }
         }
-        KeyCode::Down | KeyCode::Char('j') => {
+        KeyCode::Down => {
             if app.coins_selected + 1 < len {
                 app.coins_selected += 1;
             }
         }
-        KeyCode::Home | KeyCode::Char('g') => {
+        KeyCode::Home => {
             app.coins_selected = 0;
         }
-        KeyCode::End | KeyCode::Char('G') => {
+        KeyCode::End => {
             if len > 0 {
                 app.coins_selected = len - 1;
             }
@@ -598,20 +598,20 @@ fn handle_coins_key(app: &mut App, key: KeyEvent) {
 fn handle_objects_key(app: &mut App, key: KeyEvent) {
     let len = app.objects.len();
     match key.code {
-        KeyCode::Up | KeyCode::Char('k') => {
+        KeyCode::Up => {
             if app.objects_selected > 0 {
                 app.objects_selected -= 1;
             }
         }
-        KeyCode::Down | KeyCode::Char('j') => {
+        KeyCode::Down => {
             if app.objects_selected + 1 < len {
                 app.objects_selected += 1;
             }
         }
-        KeyCode::Home | KeyCode::Char('g') => {
+        KeyCode::Home => {
             app.objects_selected = 0;
         }
-        KeyCode::End | KeyCode::Char('G') => {
+        KeyCode::End => {
             if len > 0 {
                 app.objects_selected = len - 1;
             }
@@ -635,20 +635,20 @@ fn handle_objects_key(app: &mut App, key: KeyEvent) {
 fn handle_transactions_key(app: &mut App, key: KeyEvent) {
     let len = app.transactions.len();
     match key.code {
-        KeyCode::Up | KeyCode::Char('k') => {
+        KeyCode::Up => {
             if app.transactions_selected > 0 {
                 app.transactions_selected -= 1;
             }
         }
-        KeyCode::Down | KeyCode::Char('j') => {
+        KeyCode::Down => {
             if app.transactions_selected + 1 < len {
                 app.transactions_selected += 1;
             }
         }
-        KeyCode::Home | KeyCode::Char('g') => {
+        KeyCode::Home => {
             app.transactions_selected = 0;
         }
-        KeyCode::End | KeyCode::Char('G') => {
+        KeyCode::End => {
             if len > 0 {
                 app.transactions_selected = len - 1;
             }
@@ -672,12 +672,12 @@ fn handle_transactions_key(app: &mut App, key: KeyEvent) {
 fn handle_address_key(app: &mut App, key: KeyEvent) {
     let combined_len = app.key_entry_count() + app.address_book.len();
     match key.code {
-        KeyCode::Up | KeyCode::Char('k') => {
+        KeyCode::Up => {
             if app.address_selected > 0 {
                 app.address_selected -= 1;
             }
         }
-        KeyCode::Down | KeyCode::Char('j') => {
+        KeyCode::Down => {
             if app.address_selected + 1 < combined_len {
                 app.address_selected += 1;
             }
@@ -738,12 +738,12 @@ fn handle_address_key(app: &mut App, key: KeyEvent) {
 fn handle_keys_key(app: &mut App, key: KeyEvent) {
     let len = app.keys.len();
     match key.code {
-        KeyCode::Up | KeyCode::Char('k') => {
+        KeyCode::Up => {
             if app.keys_selected > 0 {
                 app.keys_selected -= 1;
             }
         }
-        KeyCode::Down | KeyCode::Char('j') => {
+        KeyCode::Down => {
             if app.keys_selected + 1 < len {
                 app.keys_selected += 1;
             }
@@ -801,39 +801,39 @@ fn handle_keys_key(app: &mut App, key: KeyEvent) {
 fn handle_tx_key(app: &mut App, key: KeyEvent) {
     match app.tx_step {
         TxBuilderStep::SelectSender => match key.code {
-            KeyCode::Up | KeyCode::Char('k') => {
+            KeyCode::Up => {
                 if app.tx_sender > 0 {
                     app.tx_sender -= 1;
                     app.tx_dry_run_dirty = true;
                 }
             }
-            KeyCode::Down | KeyCode::Char('j') => {
+            KeyCode::Down => {
                 if app.tx_sender + 1 < app.keys.len() {
                     app.tx_sender += 1;
                     app.tx_dry_run_dirty = true;
                 }
             }
-            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
+            KeyCode::Enter | KeyCode::Right => {
                 app.tx_step = TxBuilderStep::EditCommands;
             }
             _ => {}
         },
         TxBuilderStep::EditCommands => match key.code {
-            KeyCode::Left | KeyCode::Char('h') => {
+            KeyCode::Left => {
                 app.tx_step = TxBuilderStep::SelectSender;
             }
-            KeyCode::Right | KeyCode::Char('l') => {
+            KeyCode::Right => {
                 app.tx_step = TxBuilderStep::SetGas;
             }
             KeyCode::Char('a') => {
                 app.open_popup(Popup::AddCommand);
             }
-            KeyCode::Up | KeyCode::Char('k') => {
+            KeyCode::Up => {
                 if app.tx_cmd_selected > 0 {
                     app.tx_cmd_selected -= 1;
                 }
             }
-            KeyCode::Down | KeyCode::Char('j') => {
+            KeyCode::Down => {
                 if app.tx_cmd_selected + 1 < app.tx_commands.len() {
                     app.tx_cmd_selected += 1;
                 }
@@ -863,10 +863,10 @@ fn handle_tx_key(app: &mut App, key: KeyEvent) {
                 }
             } else {
                 match key.code {
-                    KeyCode::Left | KeyCode::Char('h') => {
+                    KeyCode::Left => {
                         app.tx_step = TxBuilderStep::EditCommands;
                     }
-                    KeyCode::Right | KeyCode::Char('l') => {
+                    KeyCode::Right => {
                         app.tx_step = TxBuilderStep::Review;
                         trigger_dry_run(app);
                     }
@@ -878,7 +878,7 @@ fn handle_tx_key(app: &mut App, key: KeyEvent) {
             }
         }
         TxBuilderStep::Review => match key.code {
-            KeyCode::Left | KeyCode::Char('h') => {
+            KeyCode::Left => {
                 app.tx_step = TxBuilderStep::SetGas;
             }
             KeyCode::Enter => {

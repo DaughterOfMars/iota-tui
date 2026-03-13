@@ -118,15 +118,15 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
 
 fn screen_hint(screen: Screen) -> &'static str {
     match screen {
-        Screen::Coins => " j/k:navigate  Enter:details  f:faucet  r:refresh  ?:help",
-        Screen::Objects => " j/k:navigate  Enter:details  r:refresh  ?:help",
-        Screen::Transactions => " j/k:navigate  Enter:details  r:refresh  ?:help",
+        Screen::Coins => " Up/Down:navigate  Enter:details  f:faucet  r:refresh  ?:help",
+        Screen::Objects => " Up/Down:navigate  Enter:details  r:refresh  ?:help",
+        Screen::Transactions => " Up/Down:navigate  Enter:details  r:refresh  ?:help",
         Screen::Packages => " r:refresh  ?:help",
-        Screen::AddressBook => " j/k:navigate  a:add  e:edit  d:delete  l:iota-name  ?:help",
+        Screen::AddressBook => " Up/Down:navigate  a:add  e:edit  d:delete  l:iota-name  ?:help",
         Screen::Keys => {
-            " j/k:navigate  Enter:active  Space:visible  g:gen  i:import  e:rename  ?:help"
+            " Up/Down:navigate  Enter:active  Space:visible  g:gen  i:import  e:rename  ?:help"
         }
-        Screen::TxBuilder => " h/l:step  j/k:navigate  a:add  Enter:confirm  ?:help",
+        Screen::TxBuilder => " Left/Right:step  Up/Down:navigate  a:add  Enter:confirm  ?:help",
     }
 }
 
@@ -221,8 +221,8 @@ fn draw_help_popup(frame: &mut Frame, app: &mut App, area: Rect) {
         )]),
         Line::from("  1-6        Switch screens"),
         Line::from("  Tab/S-Tab  Cycle screens"),
-        Line::from("  j/k        Move up/down"),
-        Line::from("  h/l        Move left/right (Tx Builder)"),
+        Line::from("  Up/Down    Move up/down"),
+        Line::from("  Left/Right Move left/right (Tx Builder)"),
         Line::from("  Enter      Select / Confirm"),
         Line::from("  Esc        Cancel / Close popup"),
         Line::from(""),
