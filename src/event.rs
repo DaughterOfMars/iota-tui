@@ -295,15 +295,37 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
                 _ => None,
             };
             if let Some(scheme) = scheme {
-                let alias = format!("key-{}", app.keys.len());
-                app.send_cmd(WalletCmd::GenerateKey {
-                    scheme: scheme.to_string(),
-                    alias,
-                });
-                app.set_status(format!("Generating {} keypair...", scheme));
-                app.popup = None;
+                app.keys_gen_scheme = Some(scheme.to_string());
+                let default_alias = format!("key-{}", app.keys.len());
+                app.open_popup(Popup::GenerateKeyAlias);
+                app.start_input(&default_alias);
             }
         }
+        Some(Popup::GenerateKeyAlias) => match key.code {
+            KeyCode::Esc => {
+                app.popup = None;
+                app.keys_gen_scheme = None;
+                app.input_mode = InputMode::Normal;
+                app.input_clear();
+            }
+            KeyCode::Enter => {
+                let alias = app.stop_input();
+                if let Some(scheme) = app.keys_gen_scheme.take() {
+                    let alias = if alias.is_empty() {
+                        format!("key-{}", app.keys.len())
+                    } else {
+                        alias
+                    };
+                    app.send_cmd(WalletCmd::GenerateKey {
+                        scheme: scheme.clone(),
+                        alias,
+                    });
+                    app.set_status(format!("Generating {} keypair...", scheme));
+                }
+                app.popup = None;
+            }
+            _ => handle_input_key(app, key),
+        },
         Some(Popup::ImportKey) => match key.code {
             KeyCode::Esc => {
                 app.popup = None;

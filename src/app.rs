@@ -256,6 +256,7 @@ pub enum Popup {
     AddAddress,
     EditAddress,
     GenerateKey,
+    GenerateKeyAlias,
     ImportKey,
     AddCommand,
     AddCommandForm,
@@ -311,6 +312,7 @@ pub struct App {
     pub keys_selected: usize,
     pub keys_offset: usize,
     pub keys_show_private: bool,
+    pub keys_gen_scheme: Option<String>,
 
     pub tx_step: TxBuilderStep,
     pub tx_sender: usize,
@@ -391,6 +393,7 @@ impl App {
             keys_selected: 0,
             keys_offset: 0,
             keys_show_private: false,
+            keys_gen_scheme: None,
 
             tx_step: TxBuilderStep::SelectSender,
             tx_sender: 0,

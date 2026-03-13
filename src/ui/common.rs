@@ -161,6 +161,11 @@ pub fn draw_popup(frame: &mut Frame, app: &mut App) {
             frame.render_widget(Clear, popup_area);
             draw_generate_key_popup(frame, popup_area);
         }
+        Some(Popup::GenerateKeyAlias) => {
+            let popup_area = centered_rect_min(50, 30, 40, 8, area);
+            frame.render_widget(Clear, popup_area);
+            draw_generate_key_alias_popup(frame, app, popup_area);
+        }
         Some(Popup::ImportKey) => {
             let popup_area = centered_rect_min(60, 30, 48, 10, area);
             frame.render_widget(Clear, popup_area);
@@ -426,6 +431,37 @@ fn draw_generate_key_popup(frame: &mut Frame, area: Rect) {
 
     let block = Block::default()
         .title(" Generate Key ")
+        .title_style(Style::default().fg(ACCENT).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ACCENT));
+
+    frame.render_widget(Paragraph::new(text).block(block), area);
+}
+
+fn draw_generate_key_alias_popup(frame: &mut Frame, app: &App, area: Rect) {
+    let scheme = app.keys_gen_scheme.as_deref().unwrap_or("unknown");
+    let text = vec![
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            format!("  Alias for new {} key:", scheme),
+            Style::default().bold(),
+        )]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            format!("  {}|", &app.input_buffer),
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::UNDERLINED),
+        )]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Enter: confirm  Esc: cancel",
+            Style::default().fg(DIM),
+        )]),
+    ];
+
+    let block = Block::default()
+        .title(" Key Alias ")
         .title_style(Style::default().fg(ACCENT).bold())
         .borders(Borders::ALL)
         .border_style(Style::default().fg(ACCENT));
