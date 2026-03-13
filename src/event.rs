@@ -882,6 +882,10 @@ fn submit_transaction(app: &mut App) {
         app.set_status("No commands added");
         return;
     }
+    if let Err(msg) = app.validate_balance() {
+        app.set_status(msg);
+        return;
+    }
 
     let gas_budget: u64 = app.tx_gas_budget.parse().unwrap_or(10_000_000);
 

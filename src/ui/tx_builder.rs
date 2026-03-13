@@ -258,6 +258,12 @@ fn draw_review(frame: &mut Frame, app: &App, area: Rect) {
         })
         .unwrap_or_else(|| "None".into());
 
+    let transfer_nanos = app.total_transfer_nanos();
+    let gas_budget: u64 = app.tx_gas_budget.parse().unwrap_or(10_000_000);
+    let total_cost = transfer_nanos as u128 + gas_budget as u128;
+    let balance = app.total_balance_iota;
+    let balance_ok = total_cost <= balance;
+
     let mut lines = vec![
         Line::from(""),
         Line::from(vec![
@@ -271,6 +277,25 @@ fn draw_review(frame: &mut Frame, app: &App, area: Rect) {
                 app.tx_gas_budget,
                 parse_gas_iota(&app.tx_gas_budget)
             )),
+        ]),
+        Line::from(vec![
+            Span::styled("  Transfer:   ", Style::default().fg(Color::White).bold()),
+            Span::raw(format!(
+                "{} NANOS ({} IOTA)",
+                transfer_nanos,
+                parse_gas_iota(&transfer_nanos.to_string())
+            )),
+        ]),
+        Line::from(vec![
+            Span::styled("  Balance:    ", Style::default().fg(Color::White).bold()),
+            Span::styled(
+                format!("{} IOTA", parse_gas_iota(&balance.to_string())),
+                if balance_ok {
+                    Style::default().fg(Color::Green)
+                } else {
+                    Style::default().fg(Color::Red).bold()
+                },
+            ),
         ]),
         Line::from(""),
         Line::from(vec![Span::styled(

@@ -623,6 +623,37 @@ impl App {
         self.popup_scroll = 0;
     }
 
+    /// Calculate total IOTA nanos being transferred by all TransferIota commands.
+    pub fn total_transfer_nanos(&self) -> u64 {
+        self.tx_commands
+            .iter()
+            .filter_map(|cmd| {
+                if let PtbCommand::TransferIota { amount, .. } = cmd {
+                    parse_iota_amount(amount)
+                } else {
+                    None
+                }
+            })
+            .sum()
+    }
+
+    /// Validate that available balance covers transfers + gas.
+    /// Returns Ok(()) or an error message.
+    pub fn validate_balance(&self) -> Result<(), String> {
+        let gas_budget: u64 = self.tx_gas_budget.parse().unwrap_or(10_000_000);
+        let transfer_total = self.total_transfer_nanos();
+        let required = transfer_total as u128 + gas_budget as u128;
+        if required > self.total_balance_iota {
+            Err(format!(
+                "Insufficient balance: need {} IOTA but have {}",
+                format_iota(required),
+                format_iota(self.total_balance_iota),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
     pub fn reset_tx_builder(&mut self) {
         self.tx_step = TxBuilderStep::SelectSender;
         self.tx_commands.clear();
@@ -977,6 +1008,28 @@ fn format_balance(raw: u128, decimals: u32) -> String {
 
 fn parse_address(hex: &str) -> Option<iota_sdk::types::Address> {
     iota_sdk::types::Address::from_hex(hex).ok()
+}
+
+/// Parse an IOTA amount string (decimal IOTA or raw nanos) into nanos.
+fn parse_iota_amount(s: &str) -> Option<u64> {
+    if let Ok(f) = s.parse::<f64>() {
+        Some((f * 1_000_000_000.0) as u64)
+    } else {
+        s.parse::<u64>().ok()
+    }
+}
+
+/// Format nanos as a human-readable IOTA amount.
+fn format_iota(nanos: u128) -> String {
+    let whole = nanos / 1_000_000_000;
+    let frac = nanos % 1_000_000_000;
+    if frac == 0 {
+        format!("{}", whole)
+    } else {
+        let frac_str = format!("{:09}", frac);
+        let trimmed = frac_str.trim_end_matches('0');
+        format!("{}.{}", whole, trimmed)
+    }
 }
 
 // Make AddressEntry serializable for persistence
