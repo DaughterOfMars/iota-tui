@@ -345,7 +345,7 @@ impl App {
                 address: k.address.clone(),
                 scheme: k.scheme.clone(),
                 is_active: k.is_active,
-                visible: k.is_active,
+                visible: true,
                 private_key_hex: hex::encode(&k.private_key_bytes),
             })
             .collect();
@@ -509,7 +509,7 @@ impl App {
                     address,
                     scheme,
                     is_active: is_first,
-                    visible: is_first,
+                    visible: true,
                     private_key_hex,
                 });
                 self.set_status(format!("Key '{}' ready", alias));
