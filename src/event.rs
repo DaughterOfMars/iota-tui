@@ -247,32 +247,39 @@ fn handle_popup_key(app: &mut App, key: KeyEvent) {
                 };
             }
             KeyCode::Tab => {
-                // If autocomplete has a selection, accept it and stay in field
+                // Accept autocomplete if active, then advance to next field
                 if app.accept_autocomplete() {
-                    app.update_autocomplete();
-                } else {
-                    // Otherwise cycle to next field
-                    let val = app.input_buffer.clone();
-                    app.tx_edit_buffers[app.tx_edit_field] = val;
-                    let count = app.tx_edit_buffers.len();
-                    app.tx_edit_field = (app.tx_edit_field + 1) % count;
-                    let next_val = app.tx_edit_buffers[app.tx_edit_field].clone();
-                    app.start_input(&next_val);
-                    app.update_autocomplete();
+                    // accepted highlighted suggestion
+                } else if !app.autocomplete.is_empty() {
+                    app.autocomplete_idx = Some(0);
+                    app.accept_autocomplete();
                 }
+                // Move to next field
+                let val = app.input_buffer.clone();
+                app.tx_edit_buffers[app.tx_edit_field] = val;
+                let count = app.tx_edit_buffers.len();
+                app.tx_edit_field = (app.tx_edit_field + 1) % count;
+                let next_val = app.tx_edit_buffers[app.tx_edit_field].clone();
+                app.start_input(&next_val);
+                app.update_autocomplete();
             }
             KeyCode::Enter => {
-                app.tx_edit_buffers[app.tx_edit_field] = app.input_buffer.clone();
-                if let Some(cmd) = build_command_from_form(app) {
-                    app.tx_commands.push(cmd);
-                    app.set_status("Command added");
+                // If autocomplete is active, accept the suggestion instead of submitting
+                if app.autocomplete_idx.is_some() {
+                    app.accept_autocomplete();
+                } else {
+                    app.tx_edit_buffers[app.tx_edit_field] = app.input_buffer.clone();
+                    if let Some(cmd) = build_command_from_form(app) {
+                        app.tx_commands.push(cmd);
+                        app.set_status("Command added");
+                    }
+                    app.popup = None;
+                    app.tx_adding_cmd = None;
+                    app.input_mode = InputMode::Normal;
+                    app.input_clear();
+                    app.autocomplete.clear();
+                    app.autocomplete_idx = None;
                 }
-                app.popup = None;
-                app.tx_adding_cmd = None;
-                app.input_mode = InputMode::Normal;
-                app.input_clear();
-                app.autocomplete.clear();
-                app.autocomplete_idx = None;
             }
             _ => {
                 handle_input_key(app, key);
