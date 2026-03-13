@@ -72,6 +72,13 @@ pub struct TransactionDisplay {
 }
 
 #[derive(Debug, Clone)]
+pub struct DryRunInfo {
+    pub status: String,
+    pub estimated_gas: Option<u64>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 pub struct AddressEntry {
     pub label: String,
     pub address: String,
@@ -310,6 +317,9 @@ pub struct App {
     pub tx_edit_field: usize,
     pub tx_edit_buffers: Vec<String>,
     pub tx_adding_cmd: Option<AddCommandType>,
+    pub tx_dry_run: Option<DryRunInfo>,
+    pub tx_dry_running: bool,
+    pub tx_gas_edited: bool,
 
     // Autocomplete state for address fields
     pub autocomplete: Vec<(String, String)>, // (alias/label, address)
@@ -385,6 +395,9 @@ impl App {
             tx_edit_field: 0,
             tx_edit_buffers: vec![],
             tx_adding_cmd: None,
+            tx_dry_run: None,
+            tx_dry_running: false,
+            tx_gas_edited: false,
 
             autocomplete: vec![],
             autocomplete_idx: None,
@@ -477,6 +490,15 @@ impl App {
                 if is_first {
                     self.request_refresh();
                 }
+            }
+            WalletEvent::DryRunResult(info) => {
+                self.tx_dry_running = false;
+                if !self.tx_gas_edited {
+                    if let Some(gas) = info.estimated_gas {
+                        self.tx_gas_budget = gas.to_string();
+                    }
+                }
+                self.tx_dry_run = Some(info);
             }
             WalletEvent::TxSubmitted { digest } => {
                 self.set_status(format!(

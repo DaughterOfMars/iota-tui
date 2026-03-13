@@ -828,6 +828,7 @@ fn handle_tx_key(app: &mut App, key: KeyEvent) {
                 match key.code {
                     KeyCode::Enter => {
                         app.tx_gas_budget = app.stop_input();
+                        app.tx_gas_edited = true;
                     }
                     KeyCode::Esc => {
                         app.stop_input();
@@ -841,6 +842,7 @@ fn handle_tx_key(app: &mut App, key: KeyEvent) {
                     }
                     KeyCode::Right | KeyCode::Char('l') => {
                         app.tx_step = TxBuilderStep::Review;
+                        trigger_dry_run(app);
                     }
                     KeyCode::Enter | KeyCode::Char('e') => {
                         app.start_input(&app.tx_gas_budget.clone());
@@ -879,6 +881,18 @@ fn submit_transaction(app: &mut App) {
         gas_budget,
     });
     app.set_status("Submitting transaction...");
+}
+
+fn trigger_dry_run(app: &mut App) {
+    if app.keys.is_empty() || app.tx_commands.is_empty() {
+        return;
+    }
+    app.tx_dry_run = None;
+    app.tx_dry_running = true;
+    app.send_cmd(WalletCmd::DryRun {
+        sender_idx: app.tx_sender,
+        commands: app.tx_commands.clone(),
+    });
 }
 
 fn scroll_selection(app: &mut App, delta: i32) {

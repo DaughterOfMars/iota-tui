@@ -92,6 +92,10 @@ pub enum WalletCmd {
         commands: Vec<crate::app::PtbCommand>,
         gas_budget: u64,
     },
+    DryRun {
+        sender_idx: usize,
+        commands: Vec<crate::app::PtbCommand>,
+    },
     DeleteKey(usize),
     SetActiveKey(usize),
     RenameKey {
@@ -120,6 +124,7 @@ pub enum WalletEvent {
         scheme: String,
         private_key_hex: String,
     },
+    DryRunResult(crate::app::DryRunInfo),
     TxSubmitted {
         digest: String,
     },
@@ -183,6 +188,10 @@ impl WalletBackend {
                     self.handle_execute_ptb(sender_idx, commands, gas_budget)
                         .await
                 }
+                WalletCmd::DryRun {
+                    sender_idx,
+                    commands,
+                } => self.handle_dry_run(sender_idx, commands).await,
                 WalletCmd::DeleteKey(idx) => self.handle_delete_key(idx),
                 WalletCmd::SetActiveKey(idx) => self.handle_set_active_key(idx),
                 WalletCmd::RenameKey { idx, new_alias } => self.handle_rename_key(idx, &new_alias),
@@ -520,6 +529,111 @@ impl WalletBackend {
         self.event_tx
             .send(WalletEvent::TxSubmitted { digest })
             .await?;
+        Ok(())
+    }
+
+    async fn handle_dry_run(
+        &self,
+        sender_idx: usize,
+        commands: Vec<crate::app::PtbCommand>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let client = self.client.as_ref().ok_or("Not connected")?;
+        let sender_addr = Address::from_hex(&self.keys[sender_idx].address)?;
+
+        let mut builder = TransactionBuilder::new(sender_addr).with_client(client);
+
+        for cmd in &commands {
+            match cmd {
+                crate::app::PtbCommand::TransferIota { recipient, amount } => {
+                    let addr = Address::from_hex(recipient)?;
+                    let nanos = parse_iota_amount(amount)?;
+                    builder.send_iota(addr, nanos);
+                }
+                crate::app::PtbCommand::TransferObjects {
+                    recipient,
+                    object_ids,
+                } => {
+                    let addr = Address::from_hex(recipient)?;
+                    let ids: Result<Vec<iota_sdk::types::ObjectId>, _> = object_ids
+                        .iter()
+                        .map(|id| id.parse::<iota_sdk::types::ObjectId>())
+                        .collect();
+                    builder.transfer_objects(addr, ids?);
+                }
+                crate::app::PtbCommand::MoveCall {
+                    package,
+                    module,
+                    function,
+                    type_args,
+                    args,
+                } => {
+                    let pkg_addr = Address::from_hex(package)?;
+                    let call = builder.move_call(pkg_addr, module.as_str(), function.as_str());
+                    if !type_args.is_empty() {
+                        let tags: Vec<iota_sdk::types::TypeTag> = type_args
+                            .iter()
+                            .map(|s| s.parse::<iota_sdk::types::TypeTag>())
+                            .collect::<Result<Vec<_>, _>>()?;
+                        call.type_tags(tags);
+                    }
+                    let _ = args;
+                }
+                crate::app::PtbCommand::SplitCoins { coin, amounts } => {
+                    let coin_id: iota_sdk::types::ObjectId = coin.parse()?;
+                    let parsed: Result<Vec<u64>, _> =
+                        amounts.iter().map(|a| parse_iota_amount(a)).collect();
+                    builder.split_coins(coin_id, parsed?);
+                }
+                crate::app::PtbCommand::MergeCoins { primary, sources } => {
+                    let primary_id: iota_sdk::types::ObjectId = primary.parse()?;
+                    let source_ids: Result<Vec<iota_sdk::types::ObjectId>, _> = sources
+                        .iter()
+                        .map(|id| id.parse::<iota_sdk::types::ObjectId>())
+                        .collect();
+                    builder.merge_coins(primary_id, source_ids?);
+                }
+                crate::app::PtbCommand::Stake { amount, validator } => {
+                    let nanos = parse_iota_amount(&amount)?;
+                    let validator_addr = Address::from_hex(&validator)?;
+                    builder.stake(nanos, validator_addr);
+                }
+                crate::app::PtbCommand::Unstake { staked_iota_id } => {
+                    let obj_id: iota_sdk::types::ObjectId = staked_iota_id.parse()?;
+                    builder.unstake(obj_id);
+                }
+            }
+        }
+
+        let result = builder.dry_run(false).await;
+        let info = match result {
+            Ok(dry_run) => {
+                let estimated_gas = dry_run.effects.as_ref().map(|e| {
+                    let v1 = e.as_v1();
+                    let gas = &v1.gas_used;
+                    let cost = gas.computation_cost + gas.storage_cost;
+                    let rebate = gas.storage_rebate.min(gas.storage_cost);
+                    cost - rebate
+                });
+                let error = dry_run.error.clone();
+                let status = if error.is_some() {
+                    "Failed".to_string()
+                } else {
+                    "Success".to_string()
+                };
+                crate::app::DryRunInfo {
+                    status,
+                    estimated_gas,
+                    error,
+                }
+            }
+            Err(e) => crate::app::DryRunInfo {
+                status: "Error".to_string(),
+                estimated_gas: None,
+                error: Some(e.to_string()),
+            },
+        };
+
+        self.event_tx.send(WalletEvent::DryRunResult(info)).await?;
         Ok(())
     }
 

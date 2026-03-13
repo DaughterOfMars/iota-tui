@@ -214,7 +214,7 @@ fn draw_gas(frame: &mut Frame, app: &App, area: Rect) {
         Line::from(""),
         Line::from(vec![
             Span::styled(
-                "  Gas Budget (MIST): ",
+                "  Gas Budget (NANOS): ",
                 Style::default().fg(Color::White).bold(),
             ),
             Span::styled(&display, budget_style),
@@ -227,6 +227,11 @@ fn draw_gas(frame: &mut Frame, app: &App, area: Rect) {
         Line::from(""),
         Line::from(vec![Span::styled(
             format!("  {}", edit_hint),
+            common::dim_style(),
+        )]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Gas budget will be estimated via dry run if not edited.",
             common::dim_style(),
         )]),
     ];
@@ -262,7 +267,7 @@ fn draw_review(frame: &mut Frame, app: &App, area: Rect) {
         Line::from(vec![
             Span::styled("  Gas Budget: ", Style::default().fg(Color::White).bold()),
             Span::raw(format!(
-                "{} MIST ({} IOTA)",
+                "{} NANOS ({} IOTA)",
                 app.tx_gas_budget,
                 parse_gas_iota(&app.tx_gas_budget)
             )),
@@ -288,6 +293,40 @@ fn draw_review(frame: &mut Frame, app: &App, area: Rect) {
                     Style::default().fg(Color::White).bold(),
                 ),
                 Span::styled(cmd.summary(), common::accent_style()),
+            ]));
+        }
+    }
+
+    // Dry run results
+    lines.push(Line::from(""));
+    if app.tx_dry_running {
+        lines.push(Line::from(vec![Span::styled(
+            "  Dry run: simulating...",
+            Style::default().fg(Color::Yellow),
+        )]));
+    } else if let Some(ref info) = app.tx_dry_run {
+        let status_style = if info.status == "Success" {
+            Style::default().fg(Color::Green).bold()
+        } else {
+            Style::default().fg(Color::Red).bold()
+        };
+        lines.push(Line::from(vec![
+            Span::styled("  Dry Run:    ", Style::default().fg(Color::White).bold()),
+            Span::styled(&info.status, status_style),
+        ]));
+        if let Some(gas) = info.estimated_gas {
+            lines.push(Line::from(vec![
+                Span::styled("  Est. Gas:   ", Style::default().fg(Color::White).bold()),
+                Span::styled(
+                    format!("{} NANOS ({} IOTA)", gas, parse_gas_iota(&gas.to_string())),
+                    common::accent_style(),
+                ),
+            ]));
+        }
+        if let Some(ref err) = info.error {
+            lines.push(Line::from(vec![
+                Span::styled("  Error:      ", Style::default().fg(Color::Red).bold()),
+                Span::styled(err.as_str(), Style::default().fg(Color::Red)),
             ]));
         }
     }

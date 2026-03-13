@@ -16,3 +16,7 @@ Code in this repo should be formatted using the latest nightly formatter.
 ```
 cargo +nightly fmt
 ```
+
+## New Features
+
+When adding new features, each feature should be committed using conventional commit format.
