@@ -1,3 +1,5 @@
+//! Address Book screen — manage saved addresses and IOTA-Names.
+
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},

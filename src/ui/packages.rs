@@ -1,3 +1,5 @@
+//! Packages screen — placeholder for the package explorer.
+
 use ratatui::{
     Frame,
     layout::Rect,

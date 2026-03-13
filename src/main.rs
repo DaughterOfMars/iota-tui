@@ -1,3 +1,5 @@
+//! IOTA Wallet TUI — a terminal interface for the IOTA network.
+
 mod app;
 mod event;
 mod ui;

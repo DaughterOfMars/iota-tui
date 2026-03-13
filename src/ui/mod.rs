@@ -1,9 +1,12 @@
+//! UI rendering — draws all screens, popups, and shared components.
+
 mod address_book;
 mod coins;
-mod common;
+pub(crate) mod common;
 mod keys;
 mod objects;
 mod packages;
+mod popups;
 mod transactions;
 mod tx_builder;
 
@@ -38,6 +41,6 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 
     // Draw popup overlay last
     if app.popup.is_some() {
-        common::draw_popup(frame, app);
+        popups::draw_popup(frame, app);
     }
 }

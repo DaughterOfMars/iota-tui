@@ -1,3 +1,5 @@
+//! Keys screen — manage cryptographic keys with visibility and active status.
+
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},

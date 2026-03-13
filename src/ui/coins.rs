@@ -1,3 +1,5 @@
+//! Coins screen — displays coin balances across visible addresses.
+
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},

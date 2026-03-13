@@ -1,277 +1,14 @@
+//! Application state and logic for the TUI.
+
+mod types;
+
+pub use types::*;
+
 use tokio::sync::mpsc;
 
 use crate::wallet::{StoredKey, WalletCmd, WalletEvent};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Screen {
-    Coins,
-    Objects,
-    Transactions,
-    Packages,
-    AddressBook,
-    Keys,
-    TxBuilder,
-}
-
-impl Screen {
-    pub const ALL: [Screen; 7] = [
-        Screen::Coins,
-        Screen::Objects,
-        Screen::Transactions,
-        Screen::Packages,
-        Screen::AddressBook,
-        Screen::Keys,
-        Screen::TxBuilder,
-    ];
-
-    pub fn title(self) -> &'static str {
-        match self {
-            Screen::Coins => "Coins",
-            Screen::Objects => "Objects",
-            Screen::Transactions => "Transactions",
-            Screen::Packages => "Packages",
-            Screen::AddressBook => "Address Book",
-            Screen::Keys => "Keys",
-            Screen::TxBuilder => "Tx Builder",
-        }
-    }
-
-    pub fn index(self) -> usize {
-        Screen::ALL.iter().position(|&s| s == self).unwrap_or(0)
-    }
-}
-
-// ── Display types (what the UI renders) ────────────────────────────
-
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct CoinDisplay {
-    pub coin_type: String,
-    pub symbol: String,
-    pub balance: u128,
-    pub balance_display: String,
-    pub object_id: String,
-    pub owner_alias: String,
-}
-
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct ObjectDisplay {
-    pub object_id: String,
-    pub type_name: String,
-    pub version: String,
-    pub digest: String,
-    pub owner: String,
-    pub owner_alias: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct TransactionDisplay {
-    pub digest: String,
-    pub status: String,
-    pub gas_used: String,
-    pub epoch: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct DryRunInfo {
-    pub status: String,
-    pub estimated_gas: Option<u64>,
-    pub error: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-pub struct AddressEntry {
-    pub label: String,
-    pub address: String,
-    pub notes: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct KeyDisplay {
-    pub alias: String,
-    pub address: String,
-    pub scheme: String,
-    pub is_active: bool,
-    pub visible: bool,
-    pub private_key_hex: String,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TxBuilderStep {
-    SelectSender,
-    EditCommands,
-    SetGas,
-    Review,
-}
-
-impl TxBuilderStep {
-    pub const ALL: [TxBuilderStep; 4] = [
-        TxBuilderStep::SelectSender,
-        TxBuilderStep::EditCommands,
-        TxBuilderStep::SetGas,
-        TxBuilderStep::Review,
-    ];
-
-    pub fn title(self) -> &'static str {
-        match self {
-            TxBuilderStep::SelectSender => "Sender",
-            TxBuilderStep::EditCommands => "Commands",
-            TxBuilderStep::SetGas => "Gas",
-            TxBuilderStep::Review => "Review",
-        }
-    }
-}
-
-/// A visual PTB command in the transaction builder
-#[derive(Debug, Clone)]
-pub enum PtbCommand {
-    TransferIota {
-        recipient: String,
-        amount: String,
-    },
-    TransferObjects {
-        recipient: String,
-        object_ids: Vec<String>,
-    },
-    MoveCall {
-        package: String,
-        module: String,
-        function: String,
-        type_args: Vec<String>,
-        args: Vec<String>,
-    },
-    SplitCoins {
-        coin: String,
-        amounts: Vec<String>,
-    },
-    MergeCoins {
-        primary: String,
-        sources: Vec<String>,
-    },
-    Stake {
-        amount: String,
-        validator: String,
-    },
-    Unstake {
-        staked_iota_id: String,
-    },
-}
-
-impl PtbCommand {
-    pub fn label(&self) -> &'static str {
-        match self {
-            PtbCommand::TransferIota { .. } => "TransferIota",
-            PtbCommand::TransferObjects { .. } => "TransferObjects",
-            PtbCommand::MoveCall { .. } => "MoveCall",
-            PtbCommand::SplitCoins { .. } => "SplitCoins",
-            PtbCommand::MergeCoins { .. } => "MergeCoins",
-            PtbCommand::Stake { .. } => "Stake",
-            PtbCommand::Unstake { .. } => "Unstake",
-        }
-    }
-
-    pub fn summary(&self) -> String {
-        match self {
-            PtbCommand::TransferIota { recipient, amount } => {
-                format!("{} IOTA -> {}", amount, truncate_id(recipient, 16))
-            }
-            PtbCommand::TransferObjects {
-                recipient,
-                object_ids,
-            } => {
-                format!(
-                    "{} objs -> {}",
-                    object_ids.len(),
-                    truncate_id(recipient, 16)
-                )
-            }
-            PtbCommand::MoveCall {
-                package,
-                module,
-                function,
-                ..
-            } => {
-                format!("{}::{}::{}", truncate_id(package, 8), module, function)
-            }
-            PtbCommand::SplitCoins { coin, amounts } => {
-                format!("{} into {} parts", truncate_id(coin, 12), amounts.len())
-            }
-            PtbCommand::MergeCoins { primary, sources } => {
-                format!("{} + {} coins", truncate_id(primary, 12), sources.len())
-            }
-            PtbCommand::Stake { amount, validator } => {
-                format!("{} IOTA -> {}", amount, truncate_id(validator, 16))
-            }
-            PtbCommand::Unstake { staked_iota_id } => {
-                format!("{}", truncate_id(staked_iota_id, 20))
-            }
-        }
-    }
-}
-
-fn truncate_id(s: &str, max: usize) -> String {
-    if s.len() <= max {
-        s.to_string()
-    } else {
-        format!("{}..{}", &s[..max / 2], &s[s.len() - max / 2..])
-    }
-}
-
-/// Which command type is being added in the popup
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AddCommandType {
-    TransferIota,
-    TransferObjects,
-    MoveCall,
-    SplitCoins,
-    MergeCoins,
-    Stake,
-    Unstake,
-}
-
-impl AddCommandType {
-    pub fn label(self) -> &'static str {
-        match self {
-            AddCommandType::TransferIota => "Transfer IOTA",
-            AddCommandType::TransferObjects => "Transfer Objects",
-            AddCommandType::MoveCall => "Move Call",
-            AddCommandType::SplitCoins => "Split Coins",
-            AddCommandType::MergeCoins => "Merge Coins",
-            AddCommandType::Stake => "Stake",
-            AddCommandType::Unstake => "Unstake",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum InputMode {
-    Normal,
-    Editing,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Popup {
-    Help,
-    AddAddress,
-    EditAddress,
-    GenerateKey,
-    GenerateKeyAlias,
-    ImportKey,
-    AddCommand,
-    AddCommandForm,
-    RenameKey,
-    SwitchNetwork,
-    Detail,
-    ConfirmDeleteAddress,
-    ConfirmDeleteKey,
-    ConfirmQuit,
-    LookupIotaName,
-    ErrorLog,
-}
-
-// ── App State ──────────────────────────────────────────────────────
-
+/// Central application state shared between the event handler and UI renderer.
 pub struct App {
     pub running: bool,
     pub screen: Screen,
@@ -356,7 +93,6 @@ impl App {
             })
             .collect();
 
-        // Load saved address book
         let address_book = load_address_book();
 
         App {
@@ -423,7 +159,7 @@ impl App {
         }
     }
 
-    /// Handle a response from the wallet backend
+    /// Handle a response from the wallet backend.
     pub fn handle_wallet_event(&mut self, event: WalletEvent) {
         self.loading = false;
         match event {
@@ -431,7 +167,6 @@ impl App {
                 self.connected = true;
                 self.network_name = network;
                 self.set_status("Connected");
-                // Auto-refresh if we have an active key
                 self.request_refresh();
             }
             WalletEvent::Balances(balances) => {
@@ -458,7 +193,6 @@ impl App {
                     })
                     .collect();
                 if self.visible_key_count() > 1 {
-                    // Append (data was cleared at refresh start)
                     self.coins.extend(new_coins);
                 } else {
                     self.coins = new_coins;
@@ -522,7 +256,6 @@ impl App {
                     private_key_hex,
                 });
                 self.set_status(format!("Key '{}' ready", alias));
-                // If this is the first key, refresh data
                 if is_first {
                     self.request_refresh();
                 }
@@ -542,11 +275,8 @@ impl App {
                     &digest[..8],
                     &digest[digest.len().saturating_sub(6)..]
                 ));
-                // Clear the transaction builder
                 self.reset_tx_builder();
-                // Navigate to transaction screen to see the result
                 self.navigate(Screen::Transactions);
-                // Refresh after transaction
                 self.request_refresh();
             }
             WalletEvent::IotaNameResolved {
@@ -587,7 +317,7 @@ impl App {
         }
     }
 
-    /// Send a command to the wallet backend (non-blocking)
+    /// Send a command to the wallet backend (non-blocking).
     pub fn send_cmd(&self, cmd: WalletCmd) {
         let _ = self.cmd_tx.try_send(cmd);
     }
@@ -609,7 +339,6 @@ impl App {
             self.keys.iter().filter(|k| k.visible).cloned().collect();
 
         if visible_keys.len() > 1 {
-            // Clear existing data before fetching from multiple addresses
             self.coins.clear();
             self.objects.clear();
             self.total_balance_iota = 0;
@@ -626,7 +355,6 @@ impl App {
                     self.send_cmd(WalletCmd::RefreshBalances(addr));
                 }
             }
-            // Transactions only for active key
             if let Some(key) = self.active_key().cloned() {
                 if let Some(addr) = parse_address(&key.address) {
                     self.send_cmd(WalletCmd::RefreshTransactions(addr));
@@ -687,7 +415,6 @@ impl App {
     }
 
     /// Validate that available balance covers transfers + gas.
-    /// Returns Ok(()) or an error message.
     pub fn validate_balance(&self) -> Result<(), String> {
         let gas_budget: u64 = self.tx_gas_budget.parse().unwrap_or(10_000_000);
         let transfer_total = self.total_transfer_nanos();
@@ -787,7 +514,6 @@ impl App {
             return;
         }
 
-        // Don't suggest if it looks like a raw address
         if self.input_buffer.starts_with("0x") {
             self.autocomplete.clear();
             self.autocomplete_idx = None;
@@ -843,13 +569,11 @@ impl App {
     /// Returns the original string if no match is found.
     pub fn resolve_address(&self, input: &str) -> String {
         let input_lower = input.to_lowercase();
-        // Check key aliases
         for key in &self.keys {
             if key.alias.to_lowercase() == input_lower {
                 return key.address.clone();
             }
         }
-        // Check address book labels
         for entry in &self.address_book {
             if entry.label.to_lowercase() == input_lower {
                 return entry.address.clone();
@@ -1021,7 +745,7 @@ impl App {
     }
 }
 
-// ── Persistence for address book ───────────────────────────────────
+// ── Address book persistence ───────────────────────────────────────
 
 fn address_book_path() -> std::path::PathBuf {
     dirs::data_dir()
@@ -1050,7 +774,7 @@ pub fn save_address_book(entries: &[AddressEntry]) {
 
 // ── Helpers ────────────────────────────────────────────────────────
 
-/// Format a raw balance (in smallest unit) as a human-readable string
+/// Format a raw balance (in smallest unit) as a human-readable string.
 fn format_balance(raw: u128, decimals: u32) -> String {
     let divisor = 10u128.pow(decimals);
     let whole = raw / divisor;
@@ -1059,7 +783,6 @@ fn format_balance(raw: u128, decimals: u32) -> String {
         return whole.to_string();
     }
     let frac_str = format!("{:0>width$}", frac, width = decimals as usize);
-    // Trim trailing zeros but keep at least 2 decimal places
     let trimmed = frac_str.trim_end_matches('0');
     let display_frac = if trimmed.len() < 2 {
         &frac_str[..2]
@@ -1092,34 +815,5 @@ fn format_iota(nanos: u128) -> String {
         let frac_str = format!("{:09}", frac);
         let trimmed = frac_str.trim_end_matches('0');
         format!("{}.{}", whole, trimmed)
-    }
-}
-
-// Make AddressEntry serializable for persistence
-impl serde::Serialize for AddressEntry {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        use serde::ser::SerializeStruct;
-        let mut s = serializer.serialize_struct("AddressEntry", 3)?;
-        s.serialize_field("label", &self.label)?;
-        s.serialize_field("address", &self.address)?;
-        s.serialize_field("notes", &self.notes)?;
-        s.end()
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for AddressEntry {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        #[derive(serde::Deserialize)]
-        struct Helper {
-            label: String,
-            address: String,
-            notes: String,
-        }
-        let h = Helper::deserialize(deserializer)?;
-        Ok(AddressEntry {
-            label: h.label,
-            address: h.address,
-            notes: h.notes,
-        })
     }
 }

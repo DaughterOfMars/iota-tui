@@ -1,3 +1,5 @@
+//! Transaction Builder screen — compose and execute programmable transaction blocks.
+
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},

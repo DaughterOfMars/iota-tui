@@ -1,3 +1,5 @@
+//! Wallet backend — handles network communication, key management, and transaction execution.
+
 use std::fmt::Write;
 use std::path::PathBuf;
 
@@ -17,6 +19,7 @@ use tokio::sync::mpsc;
 
 // ── Types for the TUI ──────────────────────────────────────────────
 
+/// Raw coin data returned from the network.
 #[derive(Debug, Clone)]
 pub struct CoinInfo {
     pub coin_type: String,
@@ -25,6 +28,7 @@ pub struct CoinInfo {
     pub object_id: String,
 }
 
+/// Raw object data returned from the network.
 #[derive(Debug, Clone)]
 pub struct ObjectInfo {
     pub object_id: String,
@@ -34,12 +38,14 @@ pub struct ObjectInfo {
     pub owner: String,
 }
 
+/// Aggregated balance for a coin type.
 #[derive(Debug, Clone)]
 pub struct BalanceInfo {
     pub coin_type: String,
     pub total_balance: u128,
 }
 
+/// A key persisted to disk.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoredKey {
     pub alias: String,
@@ -49,6 +55,7 @@ pub struct StoredKey {
     pub is_active: bool,
 }
 
+/// IOTA network to connect to.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum Network {
@@ -103,6 +110,7 @@ pub fn load_network() -> Network {
 
 // ── Commands and Responses ─────────────────────────────────────────
 
+/// Commands sent from the UI to the wallet backend.
 #[derive(Debug)]
 pub enum WalletCmd {
     Connect(Network),
@@ -148,6 +156,7 @@ pub enum WalletCmd {
     },
 }
 
+/// Events sent from the wallet backend back to the UI.
 #[derive(Debug)]
 pub enum WalletEvent {
     Connected(String),

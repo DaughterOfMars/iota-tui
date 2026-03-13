@@ -1,3 +1,5 @@
+//! Transactions screen — displays transaction history.
+
 use ratatui::{
     Frame,
     layout::{Constraint, Rect},

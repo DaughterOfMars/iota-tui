@@ -1,3 +1,5 @@
+//! Objects screen — displays owned objects across visible addresses.
+
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
