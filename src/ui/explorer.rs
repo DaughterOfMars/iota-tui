@@ -286,9 +286,9 @@ fn draw_lookup(frame: &mut Frame, app: &App, area: Rect) {
         let has_prev = !app.explorer_search_cursors.is_empty();
         let has_next = app.explorer_search_has_next;
         let page_hint = match (has_prev, has_next) {
-            (true, true) => " | p/n: prev/next page".to_string(),
-            (true, false) => " | p: prev page".to_string(),
-            (false, true) => " | n: next page".to_string(),
+            (true, true) => " | [/]: prev/next page".to_string(),
+            (true, false) => " | [: prev page".to_string(),
+            (false, true) => " | ]: next page".to_string(),
             (false, false) => String::new(),
         };
         let title = format!(

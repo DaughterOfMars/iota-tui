@@ -591,7 +591,7 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                         app.explorer_lookup_selected = result.total_fields().saturating_sub(1);
                     }
                 }
-                KeyCode::Char('n')
+                KeyCode::Char(']')
                     if !app.explorer_search_results.is_empty() && app.explorer_search_has_next =>
                 {
                     // Save current cursor for going back
@@ -606,7 +606,7 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                     });
                     app.set_status("Loading next page...");
                 }
-                KeyCode::Char('p')
+                KeyCode::Char('[')
                     if !app.explorer_search_results.is_empty()
                         && !app.explorer_search_cursors.is_empty() =>
                 {
