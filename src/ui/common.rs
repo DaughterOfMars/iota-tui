@@ -53,6 +53,17 @@ pub fn draw_separator(frame: &mut Frame, area: Rect) {
     frame.render_widget(sep, area);
 }
 
+/// Draw a dedicated row for the status message above the status bar.
+pub fn draw_status_message(frame: &mut Frame, app: &App, area: Rect) {
+    if let Some((msg, _)) = &app.status_message {
+        let line = Line::from(vec![Span::styled(
+            msg.as_str(),
+            Style::default().fg(HIGHLIGHT),
+        )]);
+        frame.render_widget(Paragraph::new(line).alignment(Alignment::Center), area);
+    }
+}
+
 /// Draw the bottom status bar with mode, hints, network, and active address.
 pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     let active_addr = app
@@ -61,10 +72,6 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         .unwrap_or_else(|| "No active key".into());
 
     let hint = Span::styled(screen_hint(app.screen), Style::default().fg(DIM));
-    let status = app
-        .status_message
-        .as_ref()
-        .map(|(msg, _)| Span::styled(format!("  {msg}"), Style::default().fg(HIGHLIGHT)));
 
     let mode_indicator = if app.input_mode == InputMode::Editing {
         Span::styled(
@@ -111,11 +118,7 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     .split(area);
 
     frame.render_widget(Paragraph::new(Line::from(vec![mode_indicator])), cols[0]);
-    let mut left_spans = vec![hint];
-    if let Some(s) = status {
-        left_spans.push(s);
-    }
-    frame.render_widget(Paragraph::new(Line::from(left_spans)), cols[1]);
+    frame.render_widget(Paragraph::new(Line::from(vec![hint])), cols[1]);
     frame.render_widget(Paragraph::new(Line::from(vec![net_indicator])), cols[2]);
     frame.render_widget(
         Paragraph::new(Line::from(vec![right])).alignment(Alignment::Right),

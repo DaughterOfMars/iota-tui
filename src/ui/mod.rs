@@ -17,10 +17,12 @@ use ratatui::Frame;
 pub fn draw(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
 
+    let has_status = app.status_message.is_some();
     let layout = ratatui::layout::Layout::vertical([
         ratatui::layout::Constraint::Length(1), // tab bar
         ratatui::layout::Constraint::Length(1), // separator
         ratatui::layout::Constraint::Min(10),   // content
+        ratatui::layout::Constraint::Length(if has_status { 1 } else { 0 }), // status message
         ratatui::layout::Constraint::Length(1), // status bar
     ])
     .split(area);
@@ -39,7 +41,10 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         Screen::Explorer => explorer::draw(frame, app, layout[2]),
     }
 
-    common::draw_status_bar(frame, app, layout[3]);
+    if has_status {
+        common::draw_status_message(frame, app, layout[3]);
+    }
+    common::draw_status_bar(frame, app, layout[4]);
 
     // Draw popup overlay last
     if app.popup.is_some() {
