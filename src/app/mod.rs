@@ -479,6 +479,36 @@ impl App {
         }
     }
 
+    /// Navigate to Explorer > Lookup and immediately submit a lookup query.
+    pub fn explore_item(&mut self, query: String) {
+        self.screen = Screen::Explorer;
+        self.explorer_view = ExplorerView::Lookup;
+        self.input_mode = InputMode::Normal;
+        self.popup = None;
+        self.popup_scroll = 0;
+        self.explorer_search_mode = false;
+        self.explorer_lookup_result = None;
+        self.explorer_search_results.clear();
+        self.send_cmd(WalletCmd::LookupAddress(query));
+        self.set_status("Looking up...");
+    }
+
+    /// Navigate to Explorer > Lookup and immediately submit a type search.
+    pub fn explore_type(&mut self, type_filter: String) {
+        self.screen = Screen::Explorer;
+        self.explorer_view = ExplorerView::Lookup;
+        self.input_mode = InputMode::Normal;
+        self.popup = None;
+        self.popup_scroll = 0;
+        self.explorer_search_mode = true;
+        self.explorer_lookup_result = None;
+        self.explorer_search_results.clear();
+        self.explorer_search_selected = 0;
+        self.explorer_search_offset = 0;
+        self.send_cmd(WalletCmd::SearchObjectsByType(type_filter));
+        self.set_status("Searching objects by type...");
+    }
+
     pub fn open_popup(&mut self, popup: Popup) {
         self.popup = Some(popup);
         self.popup_scroll = 0;

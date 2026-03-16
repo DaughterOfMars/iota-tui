@@ -36,8 +36,17 @@ pub fn handle_coins_key(app: &mut App, key: KeyEvent) {
             app.coins_selected = (app.coins_selected + 10).min(len.saturating_sub(1));
         }
         KeyCode::Enter => {
-            if !app.coins.is_empty() {
-                app.open_popup(Popup::Detail);
+            if let Some(coin) = app.coins.get(app.coins_selected) {
+                let id = coin.object_id.clone();
+                app.explore_item(id);
+                return;
+            }
+        }
+        KeyCode::Char('t') => {
+            if let Some(coin) = app.coins.get(app.coins_selected) {
+                let ct = coin.coin_type.clone();
+                app.explore_type(ct);
+                return;
             }
         }
         KeyCode::Char('f') => {
@@ -81,8 +90,17 @@ pub fn handle_objects_key(app: &mut App, key: KeyEvent) {
             app.objects_selected = (app.objects_selected + 10).min(len.saturating_sub(1));
         }
         KeyCode::Enter => {
-            if !app.objects.is_empty() {
-                app.open_popup(Popup::Detail);
+            if let Some(obj) = app.objects.get(app.objects_selected) {
+                let id = obj.object_id.clone();
+                app.explore_item(id);
+                return;
+            }
+        }
+        KeyCode::Char('t') => {
+            if let Some(obj) = app.objects.get(app.objects_selected) {
+                let tn = obj.type_name.clone();
+                app.explore_type(tn);
+                return;
             }
         }
         _ => {}
@@ -118,8 +136,10 @@ pub fn handle_transactions_key(app: &mut App, key: KeyEvent) {
             app.transactions_selected = (app.transactions_selected + 10).min(len.saturating_sub(1));
         }
         KeyCode::Enter => {
-            if !app.transactions.is_empty() {
-                app.open_popup(Popup::Detail);
+            if let Some(tx) = app.transactions.get(app.transactions_selected) {
+                let digest = tx.digest.clone();
+                app.explore_item(digest);
+                return;
             }
         }
         _ => {}
@@ -149,8 +169,11 @@ pub fn handle_address_key(app: &mut App, key: KeyEvent) {
             }
         }
         KeyCode::Enter => {
-            if combined_len > 0 {
-                app.open_popup(Popup::Detail);
+            let combined = app.combined_address_book();
+            if let Some(entry) = combined.get(app.address_selected) {
+                let addr = entry.address.clone();
+                app.explore_item(addr);
+                return;
             }
         }
         KeyCode::Char('a') => {
@@ -221,6 +244,13 @@ pub fn handle_keys_key(app: &mut App, key: KeyEvent) {
             app.send_cmd(WalletCmd::SetActiveKey(idx));
             app.set_status("Active key changed");
             app.request_refresh();
+        }
+        KeyCode::Char('x') => {
+            if let Some(key) = app.keys.get(app.keys_selected) {
+                let addr = key.address.clone();
+                app.explore_item(addr);
+                return;
+            }
         }
         KeyCode::Char('g') => {
             app.open_popup(Popup::GenerateKey);
@@ -451,8 +481,13 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                     }
                 }
                 KeyCode::Enter => {
-                    if !app.explorer_validators.is_empty() {
-                        app.open_popup(Popup::Detail);
+                    if let Some(v) = app
+                        .explorer_validators
+                        .get(app.explorer_validators_selected)
+                    {
+                        let addr = v.address.clone();
+                        app.explore_item(addr);
+                        return;
                     }
                 }
                 _ => {}
@@ -466,6 +501,17 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
         ExplorerView::Lookup => {
             match key.code {
                 KeyCode::Enter => {
+                    // If search results are showing, explore the selected one
+                    if let Some(obj) = app
+                        .explorer_search_results
+                        .get(app.explorer_search_selected)
+                    {
+                        let id = obj.object_id.clone();
+                        app.explorer_search_results.clear();
+                        app.explore_item(id);
+                        return;
+                    }
+                    // Otherwise open lookup input
                     app.explorer_search_mode = false;
                     app.start_input("");
                 }

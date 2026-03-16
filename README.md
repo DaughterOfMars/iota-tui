@@ -83,7 +83,7 @@ Browse network state: overview, checkpoints, validators, and lookup
 | `Tab`/`S-Tab`| Cycle screens forward/backward  |
 | `Up`/`Down`  | Navigate lists                  |
 | `Left`/`Right`| Switch Tx Builder steps        |
-| `Enter`      | Select / confirm                |
+| `Enter`      | Explore item / confirm            |
 | `Esc`        | Cancel / close popup            |
 
 ### Actions
@@ -93,6 +93,9 @@ Browse network state: overview, checkpoints, validators, and lookup
 | `a`     | Add entry (address, command)        |
 | `e`     | Edit entry / rename key             |
 | `d`/`Del`| Delete entry                       |
+| `t`     | Search objects by type (Coins/Objects) |
+| `x`     | Explore address (Keys)              |
+| `s`     | Type search (Explorer Lookup)       |
 | `g`     | Generate new key                    |
 | `i`     | Import key                          |
 | `p`     | Toggle private key display          |

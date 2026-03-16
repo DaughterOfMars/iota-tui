@@ -120,13 +120,17 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
 
 fn screen_hint(screen: Screen) -> &'static str {
     match screen {
-        Screen::Coins => " Up/Down:navigate  Enter:details  f:faucet  r:refresh  ?:help",
-        Screen::Objects => " Up/Down:navigate  Enter:details  r:refresh  ?:help",
-        Screen::Transactions => " Up/Down:navigate  Enter:details  r:refresh  ?:help",
+        Screen::Coins => {
+            " Up/Down:navigate  Enter:explore  t:type-search  f:faucet  r:refresh  ?:help"
+        }
+        Screen::Objects => " Up/Down:navigate  Enter:explore  t:type-search  r:refresh  ?:help",
+        Screen::Transactions => " Up/Down:navigate  Enter:explore  r:refresh  ?:help",
         Screen::Packages => " r:refresh  ?:help",
-        Screen::AddressBook => " Up/Down:navigate  a:add  e:edit  d:delete  l:iota-name  ?:help",
+        Screen::AddressBook => {
+            " Up/Down:navigate  Enter:explore  a:add  e:edit  d:delete  l:iota-name  ?:help"
+        }
         Screen::Keys => {
-            " Up/Down:navigate  Enter:active  Space:visible  g:gen  i:import  e:rename  ?:help"
+            " Up/Down:navigate  Enter:active  x:explore  Space:visible  g:gen  i:import  e:rename  ?:help"
         }
         Screen::TxBuilder => {
             " Left/Right:step  Up/Down:navigate  a:add  c:clear  Enter:confirm  ?:help"
