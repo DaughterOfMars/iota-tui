@@ -153,14 +153,28 @@ fn draw_checkpoints(frame: &mut Frame, app: &App, area: Rect) {
         Constraint::Length(10),
     ];
 
+    let page_num = app.explorer_checkpoints_page + 1;
+    let has_prev = !app.explorer_checkpoints_cursors.is_empty();
+    let has_next = app.explorer_checkpoints_has_next;
+    let page_hint = match (has_prev, has_next) {
+        (true, true) => format!(" | [/]: prev/next page {}", page_num),
+        (true, false) => format!(" | [: prev page {}", page_num),
+        (false, true) => format!(" | ]: next page {}", page_num),
+        (false, false) => String::new(),
+    };
     let title = if app.explorer_checkpoints_filter.is_some() {
         format!(
-            " Checkpoints ({}/{}) ",
+            " Checkpoints ({}/{}){} ",
             filtered.len(),
-            app.explorer_checkpoints.len()
+            app.explorer_checkpoints.len(),
+            page_hint
         )
     } else {
-        format!(" Checkpoints ({}) ", app.explorer_checkpoints.len())
+        format!(
+            " Checkpoints ({}){} ",
+            app.explorer_checkpoints.len(),
+            page_hint
+        )
     };
     let table = Table::new(rows, widths).header(header).block(
         Block::default()

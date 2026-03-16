@@ -155,7 +155,9 @@ pub enum WalletCmd {
     },
     // Explorer commands
     RefreshNetworkOverview,
-    RefreshCheckpoints,
+    RefreshCheckpoints {
+        cursor: Option<String>,
+    },
     RefreshValidators,
     LookupAddress(String),
     SearchObjectsByType {
@@ -214,7 +216,11 @@ pub enum WalletEvent {
         latest_checkpoint: String,
         total_transactions: String,
     },
-    Checkpoints(Vec<crate::app::CheckpointDisplay>),
+    Checkpoints {
+        checkpoints: Vec<crate::app::CheckpointDisplay>,
+        cursor: Option<String>,
+        has_next: bool,
+    },
     Validators(Vec<crate::app::ValidatorDisplay>),
     ExplorerLookupResult(crate::app::LookupResult),
     AddressLookupPage {
@@ -300,7 +306,7 @@ impl WalletBackend {
                     self.handle_iota_name_lookup(&name, &label, &notes).await
                 }
                 WalletCmd::RefreshNetworkOverview => self.handle_network_overview().await,
-                WalletCmd::RefreshCheckpoints => self.handle_checkpoints().await,
+                WalletCmd::RefreshCheckpoints { cursor } => self.handle_checkpoints(cursor).await,
                 WalletCmd::RefreshValidators => self.handle_validators().await,
                 WalletCmd::LookupAddress(query) => self.handle_lookup(&query).await,
                 WalletCmd::LookupAddressPage {
@@ -877,16 +883,22 @@ impl WalletBackend {
         Ok(())
     }
 
-    async fn handle_checkpoints(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn handle_checkpoints(
+        &self,
+        cursor: Option<String>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let client = self.client.as_ref().ok_or("Not connected")?;
 
         let page = client
             .checkpoints(PaginationFilter {
                 direction: Direction::Backward,
-                cursor: None,
-                limit: Some(50),
+                cursor,
+                limit: None,
             })
             .await?;
+
+        let next_cursor = page.page_info().start_cursor.clone();
+        let has_next = page.page_info().has_previous_page;
 
         let checkpoints: Vec<crate::app::CheckpointDisplay> = page
             .data()
@@ -903,7 +915,11 @@ impl WalletBackend {
             .collect();
 
         self.event_tx
-            .send(WalletEvent::Checkpoints(checkpoints))
+            .send(WalletEvent::Checkpoints {
+                checkpoints,
+                cursor: next_cursor,
+                has_next,
+            })
             .await?;
         Ok(())
     }

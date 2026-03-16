@@ -523,6 +523,20 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                     app.explorer_checkpoints_selected = 0;
                     app.explorer_checkpoints_offset = 0;
                 }
+                KeyCode::Char(']') if app.explorer_checkpoints_has_next => {
+                    app.explorer_checkpoints_cursors
+                        .push(app.explorer_checkpoints_cursor.clone());
+                    app.explorer_checkpoints_page += 1;
+                    let cursor = app.explorer_checkpoints_cursor.clone();
+                    app.send_cmd(WalletCmd::RefreshCheckpoints { cursor });
+                    app.set_status("Loading next page...");
+                }
+                KeyCode::Char('[') if !app.explorer_checkpoints_cursors.is_empty() => {
+                    let prev = app.explorer_checkpoints_cursors.pop().flatten();
+                    app.explorer_checkpoints_page = app.explorer_checkpoints_page.saturating_sub(1);
+                    app.send_cmd(WalletCmd::RefreshCheckpoints { cursor: prev });
+                    app.set_status("Loading previous page...");
+                }
                 _ => {}
             }
             App::scroll_into_view(

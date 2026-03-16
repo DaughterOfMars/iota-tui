@@ -76,6 +76,10 @@ pub struct App {
     pub explorer_checkpoints_offset: usize,
     pub explorer_checkpoints_sort_asc: bool,
     pub explorer_checkpoints_filter: Option<String>,
+    pub explorer_checkpoints_cursor: Option<String>,
+    pub explorer_checkpoints_cursors: Vec<Option<String>>,
+    pub explorer_checkpoints_has_next: bool,
+    pub explorer_checkpoints_page: usize,
     pub explorer_validators: Vec<ValidatorDisplay>,
     pub explorer_validators_selected: usize,
     pub explorer_validators_offset: usize,
@@ -194,6 +198,10 @@ impl App {
             explorer_checkpoints_offset: 0,
             explorer_checkpoints_sort_asc: false,
             explorer_checkpoints_filter: None,
+            explorer_checkpoints_cursor: None,
+            explorer_checkpoints_cursors: vec![],
+            explorer_checkpoints_has_next: false,
+            explorer_checkpoints_page: 0,
             explorer_validators: vec![],
             explorer_validators_selected: 0,
             explorer_validators_offset: 0,
@@ -412,8 +420,14 @@ impl App {
                     total_txs: total_transactions,
                 });
             }
-            WalletEvent::Checkpoints(checkpoints) => {
+            WalletEvent::Checkpoints {
+                checkpoints,
+                cursor,
+                has_next,
+            } => {
                 self.explorer_checkpoints = checkpoints;
+                self.explorer_checkpoints_cursor = cursor;
+                self.explorer_checkpoints_has_next = has_next;
                 if self.explorer_checkpoints_selected >= self.explorer_checkpoints.len() {
                     self.explorer_checkpoints_selected =
                         self.explorer_checkpoints.len().saturating_sub(1);
@@ -555,7 +569,13 @@ impl App {
     pub fn refresh_explorer(&mut self) {
         match self.explorer_view {
             ExplorerView::Overview => self.send_cmd(WalletCmd::RefreshNetworkOverview),
-            ExplorerView::Checkpoints => self.send_cmd(WalletCmd::RefreshCheckpoints),
+            ExplorerView::Checkpoints => {
+                self.explorer_checkpoints_cursor = None;
+                self.explorer_checkpoints_cursors.clear();
+                self.explorer_checkpoints_has_next = false;
+                self.explorer_checkpoints_page = 0;
+                self.send_cmd(WalletCmd::RefreshCheckpoints { cursor: None });
+            }
             ExplorerView::Validators => self.send_cmd(WalletCmd::RefreshValidators),
             ExplorerView::Lookup => {}
         }
