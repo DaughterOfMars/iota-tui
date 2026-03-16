@@ -591,8 +591,8 @@ impl WalletBackend {
                     builder.merge_coins(primary_id, source_ids?);
                 }
                 crate::app::PtbCommand::Stake { amount, validator } => {
-                    let nanos = parse_iota_amount(&amount)?;
-                    let validator_addr = Address::from_hex(&validator)?;
+                    let nanos = parse_iota_amount(amount)?;
+                    let validator_addr = Address::from_hex(validator)?;
                     builder.stake(nanos, validator_addr);
                 }
                 crate::app::PtbCommand::Unstake { staked_iota_id } => {
@@ -673,8 +673,8 @@ impl WalletBackend {
                     builder.merge_coins(primary_id, source_ids?);
                 }
                 crate::app::PtbCommand::Stake { amount, validator } => {
-                    let nanos = parse_iota_amount(&amount)?;
-                    let validator_addr = Address::from_hex(&validator)?;
+                    let nanos = parse_iota_amount(amount)?;
+                    let validator_addr = Address::from_hex(validator)?;
                     builder.stake(nanos, validator_addr);
                 }
                 crate::app::PtbCommand::Unstake { staked_iota_id } => {
@@ -763,15 +763,15 @@ impl WalletBackend {
     }
 
     fn load_keys(&mut self) {
-        if let Ok(data) = std::fs::read_to_string(&self.keystore_path) {
-            if let Ok(keys) = serde_json::from_str::<Vec<StoredKey>>(&data) {
-                for key in &keys {
-                    if let Ok(kp) = SimpleKeypair::from_bytes(&key.private_key_bytes) {
-                        self.keypairs.push(kp);
-                    }
+        if let Ok(data) = std::fs::read_to_string(&self.keystore_path)
+            && let Ok(keys) = serde_json::from_str::<Vec<StoredKey>>(&data)
+        {
+            for key in &keys {
+                if let Ok(kp) = SimpleKeypair::from_bytes(&key.private_key_bytes) {
+                    self.keypairs.push(kp);
                 }
-                self.keys = keys;
             }
+            self.keys = keys;
         }
     }
 
@@ -794,22 +794,22 @@ impl WalletBackend {
 fn generate_keypair(
     scheme: &str,
 ) -> Result<(SimpleKeypair, String), Box<dyn std::error::Error + Send + Sync>> {
-    let mut rng = rand::rngs::OsRng;
+    let rng = rand::rngs::OsRng;
     match scheme {
         "ed25519" => {
-            let sk = Ed25519PrivateKey::generate(&mut rng);
+            let sk = Ed25519PrivateKey::generate(rng);
             let addr = sk.public_key().derive_address();
             let kp = SimpleKeypair::from(sk);
             Ok((kp, addr.to_string()))
         }
         "secp256k1" => {
-            let sk = Secp256k1PrivateKey::generate(&mut rng);
+            let sk = Secp256k1PrivateKey::generate(rng);
             let addr = sk.public_key().derive_address();
             let kp = SimpleKeypair::from(sk);
             Ok((kp, addr.to_string()))
         }
         "secp256r1" => {
-            let sk = Secp256r1PrivateKey::generate(&mut rng);
+            let sk = Secp256r1PrivateKey::generate(rng);
             let addr = sk.public_key().derive_address();
             let kp = SimpleKeypair::from(sk);
             Ok((kp, addr.to_string()))
@@ -896,7 +896,7 @@ fn prettify_struct(tag: &StructTag) -> String {
         )
         .unwrap();
         if !tag.type_params().is_empty() {
-            let params: Vec<String> = tag.type_params().iter().map(|t| prettify_type(t)).collect();
+            let params: Vec<String> = tag.type_params().iter().map(prettify_type).collect();
             write!(&mut s, "<{}>", params.join(", ")).unwrap();
         }
         s

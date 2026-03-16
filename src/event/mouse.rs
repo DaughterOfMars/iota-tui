@@ -23,11 +23,10 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                     && col < area.x + area.width
                     && row >= area.y
                     && row < area.y + area.height
+                    && let Some(&screen) = Screen::ALL.get(i)
                 {
-                    if let Some(&screen) = Screen::ALL.get(i) {
-                        app.navigate(screen);
-                        return;
-                    }
+                    app.navigate(screen);
+                    return;
                 }
             }
 

@@ -296,16 +296,16 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
         }
         Some(Popup::ConfirmDeleteAddress) => match key.code {
             KeyCode::Enter | KeyCode::Char('y') => {
-                if let Some(user_idx) = app.user_address_index(app.address_selected) {
-                    if user_idx < app.address_book.len() {
-                        app.address_book.remove(user_idx);
-                        let combined_len = app.key_entry_count() + app.address_book.len();
-                        if app.address_selected >= combined_len && app.address_selected > 0 {
-                            app.address_selected -= 1;
-                        }
-                        save_address_book(&app.address_book);
-                        app.set_status("Address removed");
+                if let Some(user_idx) = app.user_address_index(app.address_selected)
+                    && user_idx < app.address_book.len()
+                {
+                    app.address_book.remove(user_idx);
+                    let combined_len = app.key_entry_count() + app.address_book.len();
+                    if app.address_selected >= combined_len && app.address_selected > 0 {
+                        app.address_selected -= 1;
                     }
+                    save_address_book(&app.address_book);
+                    app.set_status("Address removed");
                 }
                 app.popup = None;
             }

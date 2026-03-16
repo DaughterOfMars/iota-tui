@@ -262,10 +262,10 @@ impl App {
             }
             WalletEvent::DryRunResult(info) => {
                 self.tx_dry_running = false;
-                if !self.tx_gas_edited {
-                    if let Some(gas) = info.estimated_gas {
-                        self.tx_gas_budget = gas.to_string();
-                    }
+                if !self.tx_gas_edited
+                    && let Some(gas) = info.estimated_gas
+                {
+                    self.tx_gas_budget = gas.to_string();
                 }
                 self.tx_dry_run = Some(info);
             }
@@ -355,24 +355,24 @@ impl App {
                     self.send_cmd(WalletCmd::RefreshBalances(addr));
                 }
             }
-            if let Some(key) = self.active_key().cloned() {
-                if let Some(addr) = parse_address(&key.address) {
-                    self.send_cmd(WalletCmd::RefreshTransactions(addr));
-                }
-            }
-        } else if let Some(key) = visible_keys.first().or(self.active_key()).cloned() {
-            if let Some(addr) = parse_address(&key.address) {
-                self.send_cmd(WalletCmd::RefreshCoins {
-                    addr,
-                    alias: key.alias.clone(),
-                });
-                self.send_cmd(WalletCmd::RefreshObjects {
-                    addr,
-                    alias: key.alias.clone(),
-                });
-                self.send_cmd(WalletCmd::RefreshBalances(addr));
+            if let Some(key) = self.active_key().cloned()
+                && let Some(addr) = parse_address(&key.address)
+            {
                 self.send_cmd(WalletCmd::RefreshTransactions(addr));
             }
+        } else if let Some(key) = visible_keys.first().or(self.active_key()).cloned()
+            && let Some(addr) = parse_address(&key.address)
+        {
+            self.send_cmd(WalletCmd::RefreshCoins {
+                addr,
+                alias: key.alias.clone(),
+            });
+            self.send_cmd(WalletCmd::RefreshObjects {
+                addr,
+                alias: key.alias.clone(),
+            });
+            self.send_cmd(WalletCmd::RefreshBalances(addr));
+            self.send_cmd(WalletCmd::RefreshTransactions(addr));
         }
     }
 
@@ -381,10 +381,10 @@ impl App {
     }
 
     pub fn clear_expired_status(&mut self) {
-        if let Some((_, instant)) = &self.status_message {
-            if instant.elapsed().as_secs() >= 5 {
-                self.status_message = None;
-            }
+        if let Some((_, instant)) = &self.status_message
+            && instant.elapsed().as_secs() >= 5
+        {
+            self.status_message = None;
         }
     }
 
@@ -594,14 +594,14 @@ impl App {
         }
 
         matches.truncate(5);
-        if let Some(idx) = self.autocomplete_idx {
-            if idx >= matches.len() {
-                self.autocomplete_idx = if matches.is_empty() {
-                    None
-                } else {
-                    Some(matches.len() - 1)
-                };
-            }
+        if let Some(idx) = self.autocomplete_idx
+            && idx >= matches.len()
+        {
+            self.autocomplete_idx = if matches.is_empty() {
+                None
+            } else {
+                Some(matches.len() - 1)
+            };
         }
         self.autocomplete = matches;
     }

@@ -207,9 +207,7 @@ impl PtbCommand {
             PtbCommand::Stake { amount, validator } => {
                 format!("{} IOTA -> {}", amount, truncate_id(validator, 16))
             }
-            PtbCommand::Unstake { staked_iota_id } => {
-                format!("{}", truncate_id(staked_iota_id, 20))
-            }
+            PtbCommand::Unstake { staked_iota_id } => truncate_id(staked_iota_id, 20),
         }
     }
 }

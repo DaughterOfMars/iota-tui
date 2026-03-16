@@ -41,11 +41,11 @@ pub fn handle_coins_key(app: &mut App, key: KeyEvent) {
             }
         }
         KeyCode::Char('f') => {
-            if let Some(key) = app.active_key() {
-                if let Ok(addr) = iota_sdk::types::Address::from_hex(&key.address) {
-                    app.send_cmd(WalletCmd::RequestFaucet(addr));
-                    app.set_status("Requesting faucet...");
-                }
+            if let Some(key) = app.active_key()
+                && let Ok(addr) = iota_sdk::types::Address::from_hex(&key.address)
+            {
+                app.send_cmd(WalletCmd::RequestFaucet(addr));
+                app.set_status("Requesting faucet...");
             }
         }
         _ => {}
