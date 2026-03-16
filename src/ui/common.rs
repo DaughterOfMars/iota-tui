@@ -60,10 +60,11 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         .map(|k| format!("{}..{}", &k.address[..8], &k.address[k.address.len() - 6..]))
         .unwrap_or_else(|| "No active key".into());
 
-    let left = match &app.status_message {
-        Some((msg, _)) => Span::styled(msg.as_str(), Style::default().fg(HIGHLIGHT)),
-        None => Span::styled(screen_hint(app.screen), Style::default().fg(DIM)),
-    };
+    let hint = Span::styled(screen_hint(app.screen), Style::default().fg(DIM));
+    let status = app
+        .status_message
+        .as_ref()
+        .map(|(msg, _)| Span::styled(format!("  {msg}"), Style::default().fg(HIGHLIGHT)));
 
     let mode_indicator = if app.input_mode == InputMode::Editing {
         Span::styled(
@@ -110,7 +111,11 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     .split(area);
 
     frame.render_widget(Paragraph::new(Line::from(vec![mode_indicator])), cols[0]);
-    frame.render_widget(Paragraph::new(Line::from(vec![left])), cols[1]);
+    let mut left_spans = vec![hint];
+    if let Some(s) = status {
+        left_spans.push(s);
+    }
+    frame.render_widget(Paragraph::new(Line::from(left_spans)), cols[1]);
     frame.render_widget(Paragraph::new(Line::from(vec![net_indicator])), cols[2]);
     frame.render_widget(
         Paragraph::new(Line::from(vec![right])).alignment(Alignment::Right),
