@@ -22,7 +22,7 @@ cargo +nightly fmt
 Code in this repo should pass a clippy lint:
 
 ```
-cargo clippy --all-targets --all-features -D warnings
+cargo clippy --all-targets --all-features -- -D warnings
 ```
 
 ## New Features
