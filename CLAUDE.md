@@ -17,6 +17,14 @@ Code in this repo should be formatted using the latest nightly formatter.
 cargo +nightly fmt
 ```
 
+## Linting
+
+Code in this repo should pass a clippy lint:
+
+```
+cargo clippy --all-targets --all-features -D warnings
+```
+
 ## New Features
 
 When adding new features, each feature should be committed using conventional commit format.
