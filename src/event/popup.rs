@@ -202,14 +202,16 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                         app.tx_commands.push(cmd);
                         app.tx_dry_run_dirty = true;
                         app.set_status("Command added");
+                        app.popup = None;
+                        app.tx_adding_cmd = None;
+                        app.input_mode = InputMode::Normal;
+                        app.input_clear();
+                        app.autocomplete.clear();
+                        app.autocomplete_idx = None;
+                        app.tx_multi_values.clear();
+                    } else {
+                        app.set_status("Fill in all required fields");
                     }
-                    app.popup = None;
-                    app.tx_adding_cmd = None;
-                    app.input_mode = InputMode::Normal;
-                    app.input_clear();
-                    app.autocomplete.clear();
-                    app.autocomplete_idx = None;
-                    app.tx_multi_values.clear();
                 }
             }
             _ => {
