@@ -561,10 +561,10 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                         if app.explorer_search_selected > 0 {
                             app.explorer_search_selected -= 1;
                         }
-                    } else if app.explorer_lookup_result.is_some() {
-                        if app.explorer_lookup_selected > 0 {
-                            app.explorer_lookup_selected -= 1;
-                        }
+                    } else if app.explorer_lookup_result.is_some()
+                        && app.explorer_lookup_selected > 0
+                    {
+                        app.explorer_lookup_selected -= 1;
                     }
                 }
                 KeyCode::Down => {
@@ -616,6 +616,55 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                     app.send_cmd(WalletCmd::SearchObjectsByType {
                         type_filter,
                         cursor: prev_cursor,
+                    });
+                    app.set_status("Loading previous page...");
+                }
+                // Address lookup pagination: next page
+                KeyCode::Char(']')
+                    if app.explorer_search_results.is_empty()
+                        && app.explorer_lookup_address.is_some()
+                        && matches!(
+                            app.explorer_lookup_result,
+                            Some(crate::app::LookupResult::Address { .. })
+                        )
+                        && (app.explorer_lookup_obj_has_next
+                            || app.explorer_lookup_tx_has_next) =>
+                {
+                    app.explorer_lookup_obj_cursors
+                        .push(app.explorer_lookup_obj_cursor.clone());
+                    app.explorer_lookup_tx_cursors
+                        .push(app.explorer_lookup_tx_cursor.clone());
+                    app.explorer_lookup_obj_page += 1;
+                    app.explorer_lookup_tx_page += 1;
+                    let address = app.explorer_lookup_address.clone().unwrap();
+                    let obj_cursor = app.explorer_lookup_obj_cursor.clone();
+                    let tx_cursor = app.explorer_lookup_tx_cursor.clone();
+                    app.send_cmd(WalletCmd::LookupAddressPage {
+                        address,
+                        obj_cursor,
+                        tx_cursor,
+                    });
+                    app.set_status("Loading next page...");
+                }
+                // Address lookup pagination: prev page
+                KeyCode::Char('[')
+                    if app.explorer_search_results.is_empty()
+                        && app.explorer_lookup_address.is_some()
+                        && matches!(
+                            app.explorer_lookup_result,
+                            Some(crate::app::LookupResult::Address { .. })
+                        )
+                        && !app.explorer_lookup_obj_cursors.is_empty() =>
+                {
+                    let prev_obj = app.explorer_lookup_obj_cursors.pop().flatten();
+                    let prev_tx = app.explorer_lookup_tx_cursors.pop().flatten();
+                    app.explorer_lookup_obj_page = app.explorer_lookup_obj_page.saturating_sub(1);
+                    app.explorer_lookup_tx_page = app.explorer_lookup_tx_page.saturating_sub(1);
+                    let address = app.explorer_lookup_address.clone().unwrap();
+                    app.send_cmd(WalletCmd::LookupAddressPage {
+                        address,
+                        obj_cursor: prev_obj,
+                        tx_cursor: prev_tx,
                     });
                     app.set_status("Loading previous page...");
                 }

@@ -88,6 +88,16 @@ pub struct App {
     pub explorer_search_cursors: Vec<Option<String>>,
     pub explorer_lookup_selected: usize,
     pub explorer_lookup_offset: usize,
+    // Address lookup pagination state
+    pub explorer_lookup_address: Option<String>,
+    pub explorer_lookup_obj_cursor: Option<String>,
+    pub explorer_lookup_obj_cursors: Vec<Option<String>>,
+    pub explorer_lookup_obj_has_next: bool,
+    pub explorer_lookup_obj_page: usize,
+    pub explorer_lookup_tx_cursor: Option<String>,
+    pub explorer_lookup_tx_cursors: Vec<Option<String>>,
+    pub explorer_lookup_tx_has_next: bool,
+    pub explorer_lookup_tx_page: usize,
 
     // Autocomplete state for address/object fields
     pub autocomplete: Vec<(String, String)>, // (alias/label, address/object_id)
@@ -193,6 +203,15 @@ impl App {
             explorer_search_cursors: vec![],
             explorer_lookup_selected: 0,
             explorer_lookup_offset: 0,
+            explorer_lookup_address: None,
+            explorer_lookup_obj_cursor: None,
+            explorer_lookup_obj_cursors: vec![],
+            explorer_lookup_obj_has_next: false,
+            explorer_lookup_obj_page: 0,
+            explorer_lookup_tx_cursor: None,
+            explorer_lookup_tx_cursors: vec![],
+            explorer_lookup_tx_has_next: false,
+            explorer_lookup_tx_page: 0,
 
             autocomplete: vec![],
             autocomplete_idx: None,
@@ -389,6 +408,22 @@ impl App {
             WalletEvent::ExplorerLookupResult(result) => {
                 self.explorer_lookup_selected = 0;
                 self.explorer_lookup_offset = 0;
+                self.explorer_lookup_address = None;
+                self.explorer_lookup_result = Some(result);
+            }
+            WalletEvent::AddressLookupPage {
+                result,
+                obj_cursor,
+                obj_has_next,
+                tx_cursor,
+                tx_has_next,
+            } => {
+                self.explorer_lookup_selected = 0;
+                self.explorer_lookup_offset = 0;
+                self.explorer_lookup_obj_cursor = obj_cursor;
+                self.explorer_lookup_obj_has_next = obj_has_next;
+                self.explorer_lookup_tx_cursor = tx_cursor;
+                self.explorer_lookup_tx_has_next = tx_has_next;
                 self.explorer_lookup_result = Some(result);
             }
             WalletEvent::ObjectSearchResults {
@@ -510,6 +545,15 @@ impl App {
         self.explorer_lookup_result = None;
         self.explorer_lookup_selected = 0;
         self.explorer_lookup_offset = 0;
+        self.explorer_lookup_address = Some(query.clone());
+        self.explorer_lookup_obj_cursor = None;
+        self.explorer_lookup_obj_cursors.clear();
+        self.explorer_lookup_obj_has_next = false;
+        self.explorer_lookup_obj_page = 0;
+        self.explorer_lookup_tx_cursor = None;
+        self.explorer_lookup_tx_cursors.clear();
+        self.explorer_lookup_tx_has_next = false;
+        self.explorer_lookup_tx_page = 0;
         self.explorer_search_results.clear();
         self.explorer_search_has_next = false;
         self.explorer_search_cursor = None;

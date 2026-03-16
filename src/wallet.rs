@@ -162,6 +162,11 @@ pub enum WalletCmd {
         type_filter: String,
         cursor: Option<String>,
     },
+    LookupAddressPage {
+        address: String,
+        obj_cursor: Option<String>,
+        tx_cursor: Option<String>,
+    },
 }
 
 /// Events sent from the wallet backend back to the UI.
@@ -212,6 +217,13 @@ pub enum WalletEvent {
     Checkpoints(Vec<crate::app::CheckpointDisplay>),
     Validators(Vec<crate::app::ValidatorDisplay>),
     ExplorerLookupResult(crate::app::LookupResult),
+    AddressLookupPage {
+        result: crate::app::LookupResult,
+        obj_cursor: Option<String>,
+        obj_has_next: bool,
+        tx_cursor: Option<String>,
+        tx_has_next: bool,
+    },
     ObjectSearchResults {
         objects: Vec<crate::app::ObjectDisplay>,
         has_next_page: bool,
@@ -291,6 +303,14 @@ impl WalletBackend {
                 WalletCmd::RefreshCheckpoints => self.handle_checkpoints().await,
                 WalletCmd::RefreshValidators => self.handle_validators().await,
                 WalletCmd::LookupAddress(query) => self.handle_lookup(&query).await,
+                WalletCmd::LookupAddressPage {
+                    address,
+                    obj_cursor,
+                    tx_cursor,
+                } => {
+                    self.handle_address_page(&address, obj_cursor, tx_cursor)
+                        .await
+                }
                 WalletCmd::SearchObjectsByType {
                     type_filter,
                     cursor,
@@ -429,7 +449,13 @@ impl WalletBackend {
         };
 
         let page = client
-            .transactions_effects(filter, PaginationFilter::default())
+            .transactions_effects(
+                filter,
+                PaginationFilter {
+                    direction: Direction::Backward,
+                    ..PaginationFilter::default()
+                },
+            )
             .await?;
 
         let txs: Vec<crate::app::TransactionDisplay> = page
@@ -940,7 +966,7 @@ impl WalletBackend {
                 };
                 let owner_str = format_owner(&obj.owner);
 
-                let mut info_fields = vec![
+                let info_fields = vec![
                     LookupField {
                         key: "Object ID".into(),
                         value: obj.object_id().to_string(),
@@ -968,25 +994,34 @@ impl WalletBackend {
                     },
                 ];
 
-                // Fetch move object content (JSON fields)
-                if let Ok(Some(json)) = client.move_object_contents(obj_id, None).await {
-                    if let Some(map) = json.as_object() {
-                        for (k, v) in map {
-                            let val_str = format_json_value(v);
-                            let action = guess_action_from_value(&val_str);
-                            info_fields.push(LookupField {
-                                key: format!("  .{}", k),
-                                value: val_str,
-                                action,
-                            });
-                        }
-                    }
-                }
-
                 let mut sections = vec![LookupSection {
                     title: "Object".into(),
                     fields: info_fields,
                 }];
+
+                // Fetch move object content (JSON fields) into a separate section
+                if let Ok(Some(json)) = client.move_object_contents(obj_id, None).await
+                    && let Some(map) = json.as_object()
+                {
+                    let field_entries: Vec<LookupField> = map
+                        .iter()
+                        .map(|(k, v)| {
+                            let val_str = format_json_value(v);
+                            let action = guess_action_from_value(&val_str);
+                            LookupField {
+                                key: k.clone(),
+                                value: val_str,
+                                action,
+                            }
+                        })
+                        .collect();
+                    if !field_entries.is_empty() {
+                        sections.push(LookupSection {
+                            title: format!("Fields ({})", field_entries.len()),
+                            fields: field_entries,
+                        });
+                    }
+                }
 
                 // Fetch dynamic fields
                 let df_page = client
@@ -1001,12 +1036,12 @@ impl WalletBackend {
                                 .name
                                 .json
                                 .as_ref()
-                                .map(|j| format_json_value(j))
+                                .map(format_json_value)
                                 .unwrap_or_else(|| format!("{}", df.name.type_));
                             let val_str = df
                                 .value_as_json
                                 .as_ref()
-                                .map(|j| format_json_value(j))
+                                .map(format_json_value)
                                 .unwrap_or_else(|| "?".into());
                             let action = guess_action_from_value(&val_str);
                             df_fields.push(LookupField {
@@ -1035,146 +1070,62 @@ impl WalletBackend {
         if let Ok(digest) = hex_query
             .parse::<iota_sdk::types::Digest>()
             .or_else(|_| query.parse::<iota_sdk::types::Digest>())
+            && let Ok(Some(td)) = client.transaction_data_effects(digest).await
         {
-            if let Ok(Some(td)) = client.transaction_data_effects(digest).await {
-                let sections = match &td.effects {
-                    iota_sdk::types::TransactionEffects::V1(v1) => build_tx_sections_v1(v1, &td.tx),
-                    _ => vec![LookupSection {
-                        title: "Transaction".into(),
-                        fields: vec![LookupField {
-                            key: "Note".into(),
-                            value: "Unsupported transaction effects version".into(),
-                            action: None,
-                        }],
+            let sections = match &td.effects {
+                iota_sdk::types::TransactionEffects::V1(v1) => build_tx_sections_v1(v1, &td.tx),
+                _ => vec![LookupSection {
+                    title: "Transaction".into(),
+                    fields: vec![LookupField {
+                        key: "Note".into(),
+                        value: "Unsupported transaction effects version".into(),
+                        action: None,
                     }],
-                };
+                }],
+            };
 
-                self.event_tx
-                    .send(WalletEvent::ExplorerLookupResult(
-                        LookupResult::Transaction { sections },
-                    ))
-                    .await?;
-                return Ok(());
-            }
+            self.event_tx
+                .send(WalletEvent::ExplorerLookupResult(
+                    LookupResult::Transaction { sections },
+                ))
+                .await?;
+            return Ok(());
         }
 
         // Try as address (look up owned objects + balance + transactions)
         if let Ok(addr) = iota_sdk::types::Address::from_hex(&hex_query) {
-            let filter = ObjectFilter {
-                owner: Some(addr),
-                type_: None,
-                object_ids: None,
-            };
-            let page = client.objects(filter, PaginationFilter::default()).await?;
-
-            // Also check if this is a valid address even with no objects
             let balance = client.balance(addr, None).await.unwrap_or(None);
-            let has_data = !page.data().is_empty() || balance.is_some();
+
+            let obj_page = client
+                .objects(
+                    ObjectFilter {
+                        owner: Some(addr),
+                        type_: None,
+                        object_ids: None,
+                    },
+                    PaginationFilter {
+                        direction: Direction::Backward,
+                        cursor: None,
+                        limit: Some(20),
+                    },
+                )
+                .await?;
+
+            let has_data = !obj_page.data().is_empty() || balance.is_some();
 
             if has_data {
-                // Overview section
-                let balance_str = balance.map(|b| format_gas(b)).unwrap_or_else(|| "0".into());
-                let overview = vec![
-                    LookupField {
-                        key: "Address".into(),
-                        value: hex_query.clone(),
-                        action: None,
-                    },
-                    LookupField {
-                        key: "IOTA Balance".into(),
-                        value: balance_str,
-                        action: None,
-                    },
-                    LookupField {
-                        key: "Owned Objects".into(),
-                        value: page.data().len().to_string(),
-                        action: None,
-                    },
-                ];
-
-                let mut sections = vec![LookupSection {
-                    title: "Address".into(),
-                    fields: overview,
-                }];
-
-                // Owned objects list
-                if !page.data().is_empty() {
-                    let obj_fields: Vec<LookupField> = page
-                        .data()
-                        .iter()
-                        .map(|obj| {
-                            let type_name = match obj.object_type() {
-                                ObjectType::Struct(s) => prettify_struct(&s),
-                                ObjectType::Package => "Package".into(),
-                            };
-                            let id_str = obj.object_id().to_string();
-                            LookupField {
-                                key: type_name,
-                                value: id_str.clone(),
-                                action: Some(LookupAction::Explore(id_str)),
-                            }
-                        })
-                        .collect();
-                    sections.push(LookupSection {
-                        title: format!("Objects ({})", obj_fields.len()),
-                        fields: obj_fields,
-                    });
-                }
-
-                // Recent transactions
-                {
-                    use iota_sdk::graphql_client::query_types::TransactionsFilter;
-                    let tx_filter = TransactionsFilter {
-                        sign_address: Some(addr),
-                        ..Default::default()
-                    };
-                    if let Ok(tx_page) = client
-                        .transactions_effects(
-                            tx_filter,
-                            PaginationFilter {
-                                direction: Direction::Backward,
-                                cursor: None,
-                                limit: Some(20),
-                            },
-                        )
-                        .await
-                    {
-                        if !tx_page.data().is_empty() {
-                            let tx_fields: Vec<LookupField> = tx_page
-                                .data()
-                                .iter()
-                                .map(|effects| match effects {
-                                    iota_sdk::types::TransactionEffects::V1(ev1) => {
-                                        let status = match &ev1.status {
-                                            iota_sdk::types::ExecutionStatus::Success => "OK",
-                                            _ => "FAIL",
-                                        };
-                                        let digest_str = ev1.transaction_digest.to_string();
-                                        LookupField {
-                                            key: status.into(),
-                                            value: digest_str.clone(),
-                                            action: Some(LookupAction::Explore(digest_str)),
-                                        }
-                                    }
-                                    _ => LookupField {
-                                        key: "?".into(),
-                                        value: "Unsupported effects version".into(),
-                                        action: None,
-                                    },
-                                })
-                                .collect();
-                            sections.push(LookupSection {
-                                title: format!("Transactions ({})", tx_fields.len()),
-                                fields: tx_fields,
-                            });
-                        }
-                    }
-                }
+                let (sections, obj_cursor, obj_has_next, tx_cursor, tx_has_next) =
+                    Self::build_address_sections(client, &hex_query, addr, balance, obj_page, None)
+                        .await;
 
                 self.event_tx
-                    .send(WalletEvent::ExplorerLookupResult(LookupResult::Address {
-                        sections,
-                    }))
+                    .send(WalletEvent::AddressLookupPage {
+                        result: LookupResult::Address { sections },
+                        obj_cursor,
+                        obj_has_next,
+                        tx_cursor,
+                        tx_has_next,
+                    })
                     .await?;
                 return Ok(());
             }
@@ -1262,6 +1213,173 @@ impl WalletBackend {
 
     pub fn stored_keys(&self) -> &[StoredKey] {
         &self.keys
+    }
+
+    async fn build_address_sections(
+        client: &Client,
+        hex_query: &str,
+        addr: iota_sdk::types::Address,
+        balance: Option<u64>,
+        obj_page: iota_sdk::graphql_client::Page<iota_sdk::types::Object>,
+        tx_cursor: Option<String>,
+    ) -> (
+        Vec<crate::app::LookupSection>,
+        Option<String>,
+        bool,
+        Option<String>,
+        bool,
+    ) {
+        use crate::app::{LookupAction, LookupField, LookupSection};
+
+        let balance_str = balance.map(format_gas).unwrap_or_else(|| "0".into());
+        let overview = vec![
+            LookupField {
+                key: "Address".into(),
+                value: hex_query.to_string(),
+                action: None,
+            },
+            LookupField {
+                key: "IOTA Balance".into(),
+                value: balance_str,
+                action: None,
+            },
+        ];
+        let mut sections = vec![LookupSection {
+            title: "Address".into(),
+            fields: overview,
+        }];
+
+        // Objects section
+        let obj_cursor_out = obj_page.page_info().start_cursor.clone();
+        let obj_has_next = obj_page.page_info().has_previous_page;
+        if !obj_page.data().is_empty() {
+            let obj_fields: Vec<LookupField> = obj_page
+                .data()
+                .iter()
+                .enumerate()
+                .map(|(i, obj)| {
+                    let id_str = obj.object_id().to_string();
+                    LookupField {
+                        key: format!("{}", i),
+                        value: id_str.clone(),
+                        action: Some(LookupAction::Explore(id_str)),
+                    }
+                })
+                .collect();
+            sections.push(LookupSection {
+                title: format!("Objects ({})", obj_fields.len()),
+                fields: obj_fields,
+            });
+        }
+
+        // Transactions section
+        let mut tx_cursor_out: Option<String> = None;
+        let mut tx_has_next = false;
+        {
+            use iota_sdk::graphql_client::query_types::TransactionsFilter;
+            let tx_filter = TransactionsFilter {
+                sign_address: Some(addr),
+                ..Default::default()
+            };
+            if let Ok(tx_page) = client
+                .transactions_effects(
+                    tx_filter,
+                    PaginationFilter {
+                        direction: Direction::Backward,
+                        cursor: tx_cursor,
+                        limit: Some(20),
+                    },
+                )
+                .await
+            {
+                tx_cursor_out = tx_page.page_info().start_cursor.clone();
+                tx_has_next = tx_page.page_info().has_previous_page;
+                if !tx_page.data().is_empty() {
+                    let tx_fields: Vec<LookupField> = tx_page
+                        .data()
+                        .iter()
+                        .map(|effects| match effects {
+                            iota_sdk::types::TransactionEffects::V1(ev1) => {
+                                let status = match &ev1.status {
+                                    iota_sdk::types::ExecutionStatus::Success => "OK",
+                                    _ => "FAIL",
+                                };
+                                let digest_str = ev1.transaction_digest.to_string();
+                                LookupField {
+                                    key: status.into(),
+                                    value: digest_str.clone(),
+                                    action: Some(LookupAction::Explore(digest_str)),
+                                }
+                            }
+                            _ => LookupField {
+                                key: "?".into(),
+                                value: "Unsupported effects version".into(),
+                                action: None,
+                            },
+                        })
+                        .collect();
+                    sections.push(LookupSection {
+                        title: format!("Transactions ({})", tx_fields.len()),
+                        fields: tx_fields,
+                    });
+                }
+            }
+        }
+
+        (
+            sections,
+            obj_cursor_out,
+            obj_has_next,
+            tx_cursor_out,
+            tx_has_next,
+        )
+    }
+
+    async fn handle_address_page(
+        &self,
+        address: &str,
+        obj_cursor: Option<String>,
+        tx_cursor: Option<String>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        use crate::app::LookupResult;
+        let client = self.client.as_ref().ok_or("Not connected")?;
+        let hex_addr = if address.starts_with("0x") {
+            address.to_string()
+        } else {
+            format!("0x{}", address)
+        };
+        let addr = iota_sdk::types::Address::from_hex(&hex_addr)?;
+
+        let balance = client.balance(addr, None).await.unwrap_or(None);
+        let obj_page = client
+            .objects(
+                ObjectFilter {
+                    owner: Some(addr),
+                    type_: None,
+                    object_ids: None,
+                },
+                PaginationFilter {
+                    direction: Direction::Backward,
+                    cursor: obj_cursor,
+                    limit: Some(20),
+                },
+            )
+            .await?;
+
+        let (sections, obj_cursor_out, obj_has_next, tx_cursor_out, tx_has_next) =
+            Self::build_address_sections(client, &hex_addr, addr, balance, obj_page, tx_cursor)
+                .await;
+
+        self.event_tx
+            .send(WalletEvent::AddressLookupPage {
+                result: LookupResult::Address { sections },
+                obj_cursor: obj_cursor_out,
+                obj_has_next,
+                tx_cursor: tx_cursor_out,
+                tx_has_next,
+            })
+            .await?;
+        Ok(())
     }
 }
 
@@ -1549,7 +1667,7 @@ fn build_tx_sections_v1(
         fields: overview,
     }];
 
-    // Gas section
+    // Gas section (display in NANOS)
     let total_gas =
         gas.computation_cost + gas.storage_cost - gas.storage_rebate.min(gas.storage_cost);
     sections.push(LookupSection {
@@ -1557,22 +1675,22 @@ fn build_tx_sections_v1(
         fields: vec![
             LookupField {
                 key: "Total".into(),
-                value: format_gas(total_gas),
+                value: format!("{} NANOS", total_gas),
                 action: None,
             },
             LookupField {
                 key: "Computation".into(),
-                value: format_gas(gas.computation_cost),
+                value: format!("{} NANOS", gas.computation_cost),
                 action: None,
             },
             LookupField {
                 key: "Storage".into(),
-                value: format_gas(gas.storage_cost),
+                value: format!("{} NANOS", gas.storage_cost),
                 action: None,
             },
             LookupField {
                 key: "Rebate".into(),
-                value: format_gas(gas.storage_rebate),
+                value: format!("{} NANOS", gas.storage_rebate),
                 action: None,
             },
         ],
@@ -1790,24 +1908,97 @@ fn format_input(input: &iota_sdk::types::Input) -> (String, Option<crate::app::L
     }
 }
 
+fn format_argument(arg: &iota_sdk::types::Argument) -> String {
+    match arg {
+        iota_sdk::types::Argument::Gas => "Gas".into(),
+        iota_sdk::types::Argument::Input(i) => format!("Input({})", i),
+        iota_sdk::types::Argument::Result(i) => format!("Result({})", i),
+        iota_sdk::types::Argument::NestedResult(i, j) => format!("Result({}).{}", i, j),
+        _ => "?".into(),
+    }
+}
+
+fn format_arguments(args: &[iota_sdk::types::Argument]) -> String {
+    args.iter()
+        .map(format_argument)
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 fn format_command(cmd: &iota_sdk::types::Command) -> (String, Option<crate::app::LookupAction>) {
     match cmd {
         iota_sdk::types::Command::MoveCall(mc) => {
             let pkg = mc.package.to_string();
-            let desc = format!(
-                "{}::{}::{}",
+            let mut desc = format!(
+                "MoveCall {}::{}::{}",
                 &pkg[..10.min(pkg.len())],
                 mc.module,
                 mc.function
             );
+            if !mc.type_arguments.is_empty() {
+                let types: Vec<String> = mc.type_arguments.iter().map(prettify_type).collect();
+                write!(desc, "<{}>", types.join(", ")).ok();
+            }
+            if !mc.arguments.is_empty() {
+                write!(desc, "({})", format_arguments(&mc.arguments)).ok();
+            }
             (desc, Some(crate::app::LookupAction::Explore(pkg)))
         }
-        iota_sdk::types::Command::TransferObjects(_) => ("TransferObjects".into(), None),
-        iota_sdk::types::Command::SplitCoins(_) => ("SplitCoins".into(), None),
-        iota_sdk::types::Command::MergeCoins(_) => ("MergeCoins".into(), None),
-        iota_sdk::types::Command::Publish(_) => ("Publish".into(), None),
-        iota_sdk::types::Command::MakeMoveVector(_) => ("MakeMoveVector".into(), None),
-        iota_sdk::types::Command::Upgrade(_) => ("Upgrade".into(), None),
+        iota_sdk::types::Command::TransferObjects(t) => {
+            let desc = format!(
+                "TransferObjects [{}] -> {}",
+                format_arguments(&t.objects),
+                format_argument(&t.address)
+            );
+            (desc, None)
+        }
+        iota_sdk::types::Command::SplitCoins(s) => {
+            let desc = format!(
+                "SplitCoins {} -> [{}]",
+                format_argument(&s.coin),
+                format_arguments(&s.amounts)
+            );
+            (desc, None)
+        }
+        iota_sdk::types::Command::MergeCoins(m) => {
+            let desc = format!(
+                "MergeCoins {} <- [{}]",
+                format_argument(&m.coin),
+                format_arguments(&m.coins_to_merge)
+            );
+            (desc, None)
+        }
+        iota_sdk::types::Command::Publish(p) => {
+            let desc = format!(
+                "Publish ({} modules, {} deps)",
+                p.modules.len(),
+                p.dependencies.len()
+            );
+            (desc, None)
+        }
+        iota_sdk::types::Command::MakeMoveVector(v) => {
+            let type_str = v
+                .type_
+                .as_ref()
+                .map(prettify_type)
+                .unwrap_or_else(|| "?".into());
+            let desc = format!(
+                "MakeMoveVector<{}> [{}]",
+                type_str,
+                format_arguments(&v.elements)
+            );
+            (desc, None)
+        }
+        iota_sdk::types::Command::Upgrade(u) => {
+            let pkg = u.package.to_string();
+            let desc = format!(
+                "Upgrade {} ({} modules, {} deps)",
+                &pkg[..10.min(pkg.len())],
+                u.modules.len(),
+                u.dependencies.len()
+            );
+            (desc, Some(crate::app::LookupAction::Explore(pkg)))
+        }
         _ => ("Unsupported command type".to_string(), None),
     }
 }

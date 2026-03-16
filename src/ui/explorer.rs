@@ -31,8 +31,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
 fn draw_sub_tabs(frame: &mut Frame, app: &App, area: Rect) {
     let tabs: Vec<Span> = ExplorerView::ALL
         .iter()
-        .enumerate()
-        .flat_map(|(_, view)| {
+        .flat_map(|view| {
             let label = format!(" {} ", view.title());
             let style = if *view == app.explorer_view {
                 Style::default().fg(Color::Black).bg(common::ACCENT).bold()
@@ -315,10 +314,25 @@ fn draw_lookup(frame: &mut Frame, app: &App, area: Rect) {
                 ))];
                 frame.render_widget(Paragraph::new(content).block(result_block), layout[1]);
             }
-            LookupResult::Object { sections }
-            | LookupResult::Address { sections }
-            | LookupResult::Transaction { sections } => {
-                draw_lookup_sections(frame, app, sections, layout[1]);
+            LookupResult::Object { sections } | LookupResult::Transaction { sections } => {
+                draw_lookup_sections(frame, app, sections, None, layout[1]);
+            }
+            LookupResult::Address { sections } => {
+                let page_num = app.explorer_lookup_obj_page + 1;
+                let has_prev = !app.explorer_lookup_obj_cursors.is_empty();
+                let has_next = app.explorer_lookup_obj_has_next || app.explorer_lookup_tx_has_next;
+                let page_hint = match (has_prev, has_next) {
+                    (true, true) => format!(" — page {} | [/]: prev/next", page_num),
+                    (true, false) => format!(" — page {} | [: prev", page_num),
+                    (false, true) => format!(" — page {} | ]: next", page_num),
+                    (false, false) => String::new(),
+                };
+                let title_override = if page_hint.is_empty() {
+                    None
+                } else {
+                    Some(format!(" Result{} ", page_hint))
+                };
+                draw_lookup_sections(frame, app, sections, title_override.as_deref(), layout[1]);
             }
         }
     } else {
@@ -330,9 +344,15 @@ fn draw_lookup(frame: &mut Frame, app: &App, area: Rect) {
     }
 }
 
-fn draw_lookup_sections(frame: &mut Frame, app: &App, sections: &[LookupSection], area: Rect) {
+fn draw_lookup_sections(
+    frame: &mut Frame,
+    app: &App,
+    sections: &[LookupSection],
+    title: Option<&str>,
+    area: Rect,
+) {
     let block = Block::default()
-        .title(" Result ")
+        .title(title.unwrap_or(" Result "))
         .title_style(common::header_style())
         .borders(Borders::ALL)
         .border_style(common::dim_style());
