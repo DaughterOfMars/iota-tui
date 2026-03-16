@@ -74,6 +74,8 @@ pub struct App {
     pub explorer_checkpoints: Vec<CheckpointDisplay>,
     pub explorer_checkpoints_selected: usize,
     pub explorer_checkpoints_offset: usize,
+    pub explorer_checkpoints_sort_asc: bool,
+    pub explorer_checkpoints_filter: Option<String>,
     pub explorer_validators: Vec<ValidatorDisplay>,
     pub explorer_validators_selected: usize,
     pub explorer_validators_offset: usize,
@@ -190,6 +192,8 @@ impl App {
             explorer_checkpoints: vec![],
             explorer_checkpoints_selected: 0,
             explorer_checkpoints_offset: 0,
+            explorer_checkpoints_sort_asc: false,
+            explorer_checkpoints_filter: None,
             explorer_validators: vec![],
             explorer_validators_selected: 0,
             explorer_validators_offset: 0,
@@ -463,6 +467,29 @@ impl App {
     /// Send a command to the wallet backend (non-blocking).
     pub fn send_cmd(&self, cmd: WalletCmd) {
         let _ = self.cmd_tx.try_send(cmd);
+    }
+
+    /// Return checkpoint indices matching the current filter and sort order.
+    pub fn filtered_checkpoints(&self) -> Vec<usize> {
+        let mut indices: Vec<usize> = if let Some(ref q) = self.explorer_checkpoints_filter {
+            self.explorer_checkpoints
+                .iter()
+                .enumerate()
+                .filter(|(_, cp)| cp.sequence.to_string().contains(q))
+                .map(|(i, _)| i)
+                .collect()
+        } else {
+            (0..self.explorer_checkpoints.len()).collect()
+        };
+        if self.explorer_checkpoints_sort_asc {
+            indices.sort_by(|a, b| {
+                self.explorer_checkpoints[*a]
+                    .sequence
+                    .cmp(&self.explorer_checkpoints[*b].sequence)
+            });
+        }
+        // Default (sort_asc=false) keeps original order which is already newest-first
+        indices
     }
 
     /// Number of keys with visibility enabled.
@@ -973,9 +1000,9 @@ impl App {
             }
             Screen::Explorer => match self.explorer_view {
                 ExplorerView::Checkpoints => {
-                    if let Some(cp) = self
-                        .explorer_checkpoints
-                        .get(self.explorer_checkpoints_selected)
+                    let filtered = self.filtered_checkpoints();
+                    if let Some(&ci) = filtered.get(self.explorer_checkpoints_selected)
+                        && let Some(cp) = self.explorer_checkpoints.get(ci)
                     {
                         (
                             "Checkpoint Details",

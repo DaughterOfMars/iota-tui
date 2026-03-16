@@ -437,7 +437,60 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
     match app.explorer_view {
         ExplorerView::Overview => {}
         ExplorerView::Checkpoints => {
-            let len = app.explorer_checkpoints.len();
+            // If filtering, handle text input
+            if app.explorer_checkpoints_filter.is_some() {
+                match key.code {
+                    KeyCode::Esc => {
+                        app.explorer_checkpoints_filter = None;
+                        app.explorer_checkpoints_selected = 0;
+                        app.explorer_checkpoints_offset = 0;
+                    }
+                    KeyCode::Enter => {
+                        // Keep filter active but stop editing — just deselect input
+                    }
+                    KeyCode::Backspace => {
+                        if let Some(ref mut q) = app.explorer_checkpoints_filter {
+                            q.pop();
+                            if q.is_empty() {
+                                app.explorer_checkpoints_filter = None;
+                            }
+                        }
+                        app.explorer_checkpoints_selected = 0;
+                        app.explorer_checkpoints_offset = 0;
+                    }
+                    KeyCode::Char(c) if c.is_ascii_digit() => {
+                        if let Some(ref mut q) = app.explorer_checkpoints_filter {
+                            q.push(c);
+                        }
+                        app.explorer_checkpoints_selected = 0;
+                        app.explorer_checkpoints_offset = 0;
+                    }
+                    KeyCode::Up => {
+                        if app.explorer_checkpoints_selected > 0 {
+                            app.explorer_checkpoints_selected -= 1;
+                        }
+                    }
+                    KeyCode::Down => {
+                        let len = app.filtered_checkpoints().len();
+                        if app.explorer_checkpoints_selected + 1 < len {
+                            app.explorer_checkpoints_selected += 1;
+                        }
+                    }
+                    _ => {}
+                }
+                let len = app.filtered_checkpoints().len();
+                if app.explorer_checkpoints_selected >= len {
+                    app.explorer_checkpoints_selected = len.saturating_sub(1);
+                }
+                App::scroll_into_view(
+                    app.explorer_checkpoints_selected,
+                    &mut app.explorer_checkpoints_offset,
+                    20,
+                );
+                return;
+            }
+
+            let len = app.filtered_checkpoints().len();
             match key.code {
                 KeyCode::Up => {
                     if app.explorer_checkpoints_selected > 0 {
@@ -459,6 +512,16 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                     if !app.explorer_checkpoints.is_empty() {
                         app.open_popup(Popup::Detail);
                     }
+                }
+                KeyCode::Char('s') => {
+                    app.explorer_checkpoints_sort_asc = !app.explorer_checkpoints_sort_asc;
+                    app.explorer_checkpoints_selected = 0;
+                    app.explorer_checkpoints_offset = 0;
+                }
+                KeyCode::Char('/') => {
+                    app.explorer_checkpoints_filter = Some(String::new());
+                    app.explorer_checkpoints_selected = 0;
+                    app.explorer_checkpoints_offset = 0;
                 }
                 _ => {}
             }

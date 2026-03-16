@@ -88,20 +88,50 @@ fn draw_checkpoints(frame: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
-    let visible_rows = area.height.saturating_sub(4) as usize;
+    let filtered = app.filtered_checkpoints();
 
-    let header = Row::new(vec!["Sequence", "Digest", "Timestamp", "TXs"])
-        .style(common::header_style())
-        .bottom_margin(1);
+    // If filtering, show a search bar row at the top
+    let (table_area, filter_area) = if app.explorer_checkpoints_filter.is_some() {
+        let chunks = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).split(area);
+        (chunks[1], Some(chunks[0]))
+    } else {
+        (area, None)
+    };
 
-    let rows: Vec<Row> = app
-        .explorer_checkpoints
+    if let Some(fa) = filter_area {
+        let q = app.explorer_checkpoints_filter.as_deref().unwrap_or("");
+        let line = Line::from(vec![
+            Span::styled(" Search: ", Style::default().fg(common::ACCENT).bold()),
+            Span::styled(q, Style::default().fg(Color::White)),
+            Span::styled("_", Style::default().fg(common::DIM)),
+        ]);
+        frame.render_widget(Paragraph::new(line), fa);
+    }
+
+    let visible_rows = table_area.height.saturating_sub(4) as usize;
+
+    let sort_indicator = if app.explorer_checkpoints_sort_asc {
+        " ^"
+    } else {
+        " v"
+    };
+    let header = Row::new(vec![
+        format!("Sequence{}", sort_indicator),
+        "Digest".to_string(),
+        "Timestamp".to_string(),
+        "TXs".to_string(),
+    ])
+    .style(common::header_style())
+    .bottom_margin(1);
+
+    let rows: Vec<Row> = filtered
         .iter()
         .enumerate()
         .skip(app.explorer_checkpoints_offset)
         .take(visible_rows)
-        .map(|(i, cp)| {
-            let style = if i == app.explorer_checkpoints_selected {
+        .map(|(vi, &ci)| {
+            let cp = &app.explorer_checkpoints[ci];
+            let style = if vi == app.explorer_checkpoints_selected {
                 common::selected_style()
             } else {
                 Style::default()
@@ -117,13 +147,21 @@ fn draw_checkpoints(frame: &mut Frame, app: &App, area: Rect) {
         .collect();
 
     let widths = [
-        Constraint::Length(12),
+        Constraint::Length(14),
         Constraint::Length(22),
         Constraint::Min(20),
         Constraint::Length(10),
     ];
 
-    let title = format!(" Checkpoints ({}) ", app.explorer_checkpoints.len());
+    let title = if app.explorer_checkpoints_filter.is_some() {
+        format!(
+            " Checkpoints ({}/{}) ",
+            filtered.len(),
+            app.explorer_checkpoints.len()
+        )
+    } else {
+        format!(" Checkpoints ({}) ", app.explorer_checkpoints.len())
+    };
     let table = Table::new(rows, widths).header(header).block(
         Block::default()
             .title(title)
@@ -132,7 +170,7 @@ fn draw_checkpoints(frame: &mut Frame, app: &App, area: Rect) {
             .border_style(common::dim_style()),
     );
 
-    frame.render_widget(table, area);
+    frame.render_widget(table, table_area);
 }
 
 fn draw_validators(frame: &mut Frame, app: &App, area: Rect) {
