@@ -200,35 +200,44 @@ fn draw_lookup(frame: &mut Frame, app: &App, area: Rect) {
     .split(area);
 
     // Search input
-    let mode_label = if app.explorer_search_mode {
-        "Type Search"
+    let editing = app.input_mode == InputMode::Editing;
+
+    let input_title = if editing {
+        if app.explorer_search_mode {
+            " Type Search (Enter:submit  Esc:cancel) "
+        } else {
+            " Lookup (Enter:submit  Esc:cancel) "
+        }
     } else {
-        "Lookup"
+        " Search "
     };
-    let input_title = format!(" {} ", mode_label);
 
     let input_block = Block::default()
         .title(input_title)
         .title_style(common::header_style())
         .borders(Borders::ALL)
-        .border_style(if app.input_mode == InputMode::Editing {
+        .border_style(if editing {
             Style::default().fg(Color::Green)
         } else {
             common::dim_style()
         });
 
-    let input_text = if app.input_mode == InputMode::Editing {
-        format!("  {}│", &app.input_buffer)
+    let input_line: Line = if editing {
+        let (before, after) = app.input_buffer.split_at(app.input_cursor);
+        Line::from(vec![
+            Span::raw("  "),
+            Span::raw(before.to_string()),
+            Span::styled("|", Style::default().fg(Color::Green).bold()),
+            Span::raw(after.to_string()),
+        ])
     } else {
-        let hint = if app.explorer_search_mode {
-            "  Press 's' to search by type, Enter to lookup address/object"
-        } else {
-            "  Press Enter to lookup, 's' to search by type"
-        };
-        hint.to_string()
+        Line::from(Span::styled(
+            "  Enter:lookup  s:type-search",
+            common::dim_style(),
+        ))
     };
 
-    frame.render_widget(Paragraph::new(input_text).block(input_block), layout[0]);
+    frame.render_widget(Paragraph::new(input_line).block(input_block), layout[0]);
 
     // Result area
     let result_block = Block::default()

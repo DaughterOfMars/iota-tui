@@ -31,8 +31,21 @@ fn handle_key(app: &mut App, key: KeyEvent) {
     }
 
     if app.input_mode == InputMode::Editing {
-        input::handle_input_key(app, key);
-        return;
+        // Screens that handle their own editing (Enter/Esc to submit/cancel)
+        match app.screen {
+            Screen::Explorer => {
+                screen::handle_explorer_key(app, key);
+                return;
+            }
+            Screen::TxBuilder => {
+                screen::handle_tx_key(app, key);
+                return;
+            }
+            _ => {
+                input::handle_input_key(app, key);
+                return;
+            }
+        }
     }
 
     match key.code {

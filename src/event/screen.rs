@@ -463,33 +463,40 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                 20,
             );
         }
-        ExplorerView::Lookup => match key.code {
-            KeyCode::Enter => {
-                app.explorer_search_mode = false;
-                app.start_input("");
-            }
-            KeyCode::Char('s') => {
-                app.explorer_search_mode = true;
-                app.start_input("");
-            }
-            KeyCode::Esc => {
-                app.explorer_lookup_result = None;
-                app.explorer_search_results.clear();
-                app.explorer_search_selected = 0;
-            }
-            KeyCode::Up => {
-                if app.explorer_search_mode && app.explorer_search_selected > 0 {
-                    app.explorer_search_selected -= 1;
+        ExplorerView::Lookup => {
+            match key.code {
+                KeyCode::Enter => {
+                    app.explorer_search_mode = false;
+                    app.start_input("");
                 }
-            }
-            KeyCode::Down => {
-                if app.explorer_search_mode
-                    && app.explorer_search_selected + 1 < app.explorer_search_results.len()
-                {
-                    app.explorer_search_selected += 1;
+                KeyCode::Char('s') => {
+                    app.explorer_search_mode = true;
+                    app.start_input("");
                 }
+                KeyCode::Esc => {
+                    app.explorer_lookup_result = None;
+                    app.explorer_search_results.clear();
+                    app.explorer_search_selected = 0;
+                }
+                KeyCode::Up => {
+                    if !app.explorer_search_results.is_empty() && app.explorer_search_selected > 0 {
+                        app.explorer_search_selected -= 1;
+                    }
+                }
+                KeyCode::Down => {
+                    if app.explorer_search_selected + 1 < app.explorer_search_results.len() {
+                        app.explorer_search_selected += 1;
+                    }
+                }
+                _ => {}
             }
-            _ => {}
-        },
+            if !app.explorer_search_results.is_empty() {
+                App::scroll_into_view(
+                    app.explorer_search_selected,
+                    &mut app.explorer_search_offset,
+                    20,
+                );
+            }
+        }
     }
 }
