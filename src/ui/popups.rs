@@ -679,14 +679,20 @@ fn draw_add_command_form(frame: &mut Frame, app: &mut App, area: Rect) {
 
     let fields: &[&str] = match ct {
         AddCommandType::TransferIota => &["Recipient (address or alias)", "Amount (IOTA)"],
-        AddCommandType::TransferObjects => {
-            &["Recipient (address or alias)", "Object IDs (comma-sep)"]
-        }
+        AddCommandType::TransferObjects => &["Recipient (address or alias)", "Object IDs"],
         AddCommandType::MoveCall => &["Package", "Module", "Function", "Type Args", "Arguments"],
         AddCommandType::SplitCoins => &["Coin Object ID", "Amounts (comma-sep)"],
-        AddCommandType::MergeCoins => &["Primary Coin ID", "Source Coin IDs (comma-sep)"],
+        AddCommandType::MergeCoins => &["Primary Coin ID", "Source Coin IDs"],
         AddCommandType::Stake => &["Amount (IOTA)", "Validator (address or alias)"],
         AddCommandType::Unstake => &["Staked IOTA Object ID"],
+    };
+
+    // Check which field indices are multi-value for this command type
+    let is_multi = |field_idx: usize| -> bool {
+        matches!(
+            (ct, field_idx),
+            (AddCommandType::TransferObjects, 1) | (AddCommandType::MergeCoins, 1)
+        )
     };
 
     let mut lines = vec![Line::from("")];
@@ -704,10 +710,28 @@ fn draw_add_command_form(frame: &mut Frame, app: &mut App, area: Rect) {
             Style::default().fg(Color::White)
         };
 
-        lines.push(Line::from(vec![Span::styled(
-            format!("  {}: ", field),
-            label_style,
-        )]));
+        // For multi-value fields, show the count in the label
+        if is_multi(i) && !app.tx_multi_values.is_empty() {
+            lines.push(Line::from(vec![Span::styled(
+                format!("  {} ({} selected): ", field, app.tx_multi_values.len()),
+                label_style,
+            )]));
+        } else {
+            lines.push(Line::from(vec![Span::styled(
+                format!("  {}: ", field),
+                label_style,
+            )]));
+        }
+
+        // For multi-value fields, show the accumulated items
+        if is_multi(i) && !app.tx_multi_values.is_empty() {
+            for mv in &app.tx_multi_values {
+                lines.push(Line::from(vec![Span::styled(
+                    format!("    • {}", truncate_address(mv, 36)),
+                    Style::default().fg(Color::Green),
+                )]));
+            }
+        }
 
         let input_style = if is_active {
             Style::default()
@@ -717,18 +741,33 @@ fn draw_add_command_form(frame: &mut Frame, app: &mut App, area: Rect) {
             Style::default().fg(DIM)
         };
 
-        let display = if value.is_empty() && !is_active {
-            "(empty)".to_string()
-        } else if is_active {
-            format!("{}|", value)
+        if is_multi(i) {
+            // Multi-value: show the input line for adding more
+            if is_active {
+                lines.push(Line::from(vec![Span::styled(
+                    format!("  {}|", value),
+                    input_style,
+                )]));
+            } else if app.tx_multi_values.is_empty() {
+                lines.push(Line::from(vec![Span::styled(
+                    "  (none)".to_string(),
+                    Style::default().fg(DIM),
+                )]));
+            }
         } else {
-            value.to_string()
-        };
+            let display = if value.is_empty() && !is_active {
+                "(empty)".to_string()
+            } else if is_active {
+                format!("{}|", value)
+            } else {
+                value.to_string()
+            };
 
-        lines.push(Line::from(vec![Span::styled(
-            format!("  {}", display),
-            input_style,
-        )]));
+            lines.push(Line::from(vec![Span::styled(
+                format!("  {}", display),
+                input_style,
+            )]));
+        }
 
         if is_active && !app.autocomplete.is_empty() {
             for (j, (alias, addr)) in app.autocomplete.iter().enumerate() {
@@ -750,8 +789,13 @@ fn draw_add_command_form(frame: &mut Frame, app: &mut App, area: Rect) {
         lines.push(Line::from(""));
     }
 
+    let hint = if app.is_multi_value_field() {
+        "  Tab/Enter: add item  Backspace: undo  Enter(empty): submit  Esc: cancel"
+    } else {
+        "  Tab: next field  Enter: add  Esc: cancel"
+    };
     lines.push(Line::from(vec![Span::styled(
-        "  Tab: next field  Enter: add  Esc: cancel",
+        hint,
         Style::default().fg(DIM),
     )]));
 

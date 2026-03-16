@@ -121,6 +121,7 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                 app.tx_adding_cmd = Some(ct);
                 app.tx_edit_field = 0;
                 app.tx_edit_buffers = vec![String::new(); field_count];
+                app.tx_multi_values.clear();
                 app.open_popup(Popup::AddCommandForm);
                 app.start_input("");
             }
@@ -135,6 +136,7 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                     app.input_mode = InputMode::Normal;
                     app.input_clear();
                     app.autocomplete.clear();
+                    app.tx_multi_values.clear();
                 }
             }
             KeyCode::Down if !app.autocomplete.is_empty() => {
@@ -151,24 +153,49 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                     None => None,
                 };
             }
+            KeyCode::Backspace
+                if app.input_buffer.is_empty()
+                    && app.is_multi_value_field()
+                    && !app.tx_multi_values.is_empty() =>
+            {
+                app.remove_last_multi_value();
+            }
             KeyCode::Tab => {
+                // Accept autocomplete or manual text for multi-value fields
                 if app.accept_autocomplete() {
                     // accepted highlighted suggestion
                 } else if !app.autocomplete.is_empty() {
                     app.autocomplete_idx = Some(0);
                     app.accept_autocomplete();
+                } else if app.is_multi_value_field() && !app.input_buffer.is_empty() {
+                    // Manual entry: add typed text as a value
+                    let val = app.input_buffer.clone();
+                    app.tx_multi_values.push(val);
+                    app.input_buffer.clear();
+                    app.input_cursor = 0;
                 }
-                let val = app.input_buffer.clone();
-                app.tx_edit_buffers[app.tx_edit_field] = val;
-                let count = app.tx_edit_buffers.len();
-                app.tx_edit_field = (app.tx_edit_field + 1) % count;
-                let next_val = app.tx_edit_buffers[app.tx_edit_field].clone();
-                app.start_input(&next_val);
+
+                if !app.is_multi_value_field() {
+                    // Advance to next field for single-value fields
+                    let val = app.input_buffer.clone();
+                    app.tx_edit_buffers[app.tx_edit_field] = val;
+                    let count = app.tx_edit_buffers.len();
+                    app.tx_edit_field = (app.tx_edit_field + 1) % count;
+                    let next_val = app.tx_edit_buffers[app.tx_edit_field].clone();
+                    app.start_input(&next_val);
+                }
                 app.update_autocomplete();
             }
             KeyCode::Enter => {
                 if app.autocomplete_idx.is_some() {
                     app.accept_autocomplete();
+                } else if app.is_multi_value_field() && !app.input_buffer.is_empty() {
+                    // Manual entry: add typed text as a value
+                    let val = app.input_buffer.clone();
+                    app.tx_multi_values.push(val);
+                    app.input_buffer.clear();
+                    app.input_cursor = 0;
+                    app.update_autocomplete();
                 } else {
                     app.tx_edit_buffers[app.tx_edit_field] = app.input_buffer.clone();
                     if let Some(cmd) = build_command_from_form(app) {
@@ -182,6 +209,7 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                     app.input_clear();
                     app.autocomplete.clear();
                     app.autocomplete_idx = None;
+                    app.tx_multi_values.clear();
                 }
             }
             _ => {
@@ -402,15 +430,12 @@ fn build_command_from_form(app: &App) -> Option<PtbCommand> {
         }
         AddCommandType::TransferObjects => {
             let recipient = app.resolve_address(bufs.first()?);
-            let ids_str = bufs.get(1)?.clone();
-            if recipient.is_empty() || ids_str.is_empty() {
+            if recipient.is_empty() || app.tx_multi_values.is_empty() {
                 return None;
             }
-            let object_ids: Vec<String> =
-                ids_str.split(',').map(|s| s.trim().to_string()).collect();
             Some(PtbCommand::TransferObjects {
                 recipient,
-                object_ids,
+                object_ids: app.tx_multi_values.clone(),
             })
         }
         AddCommandType::MoveCall => {
@@ -457,15 +482,13 @@ fn build_command_from_form(app: &App) -> Option<PtbCommand> {
         }
         AddCommandType::MergeCoins => {
             let primary = bufs.first()?.clone();
-            let sources_str = bufs.get(1)?.clone();
-            if primary.is_empty() || sources_str.is_empty() {
+            if primary.is_empty() || app.tx_multi_values.is_empty() {
                 return None;
             }
-            let sources: Vec<String> = sources_str
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .collect();
-            Some(PtbCommand::MergeCoins { primary, sources })
+            Some(PtbCommand::MergeCoins {
+                primary,
+                sources: app.tx_multi_values.clone(),
+            })
         }
         AddCommandType::Stake => {
             let amount = bufs.first()?.clone();

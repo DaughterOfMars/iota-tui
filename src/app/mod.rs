@@ -65,8 +65,11 @@ pub struct App {
     pub tx_dry_run_dirty: bool,
     pub tx_gas_edited: bool,
 
-    // Autocomplete state for address fields
-    pub autocomplete: Vec<(String, String)>, // (alias/label, address)
+    // Accumulated values for multi-value fields (e.g. multiple object IDs)
+    pub tx_multi_values: Vec<String>,
+
+    // Autocomplete state for address/object fields
+    pub autocomplete: Vec<(String, String)>, // (alias/label, address/object_id)
     pub autocomplete_idx: Option<usize>,
 
     // Error log content (loaded on demand)
@@ -147,6 +150,8 @@ impl App {
             tx_dry_running: false,
             tx_dry_run_dirty: true,
             tx_gas_edited: false,
+
+            tx_multi_values: vec![],
 
             autocomplete: vec![],
             autocomplete_idx: None,
@@ -438,6 +443,7 @@ impl App {
         self.tx_edit_field = 0;
         self.tx_edit_buffers = vec![];
         self.tx_adding_cmd = None;
+        self.tx_multi_values.clear();
         self.tx_dry_run = None;
         self.tx_dry_running = false;
         self.tx_dry_run_dirty = true;
@@ -534,6 +540,19 @@ impl App {
         )
     }
 
+    /// Returns true if the current field accepts multiple values (added one at a time).
+    pub fn is_multi_value_field(&self) -> bool {
+        let Some(ct) = self.tx_adding_cmd else {
+            return false;
+        };
+        matches!(
+            (ct, self.tx_edit_field),
+            (AddCommandType::TransferObjects, 1)
+                | (AddCommandType::SplitCoins, 1)
+                | (AddCommandType::MergeCoins, 1)
+        )
+    }
+
     /// Compute autocomplete suggestions based on current input.
     pub fn update_autocomplete(&mut self) {
         let is_addr = self.is_address_field();
@@ -566,8 +585,12 @@ impl App {
                 }
             }
         } else if is_obj {
+            let already = &self.tx_multi_values;
             if self.is_coin_field() {
                 for coin in &self.coins {
+                    if already.contains(&coin.object_id) {
+                        continue;
+                    }
                     let label = format!("{} ({})", coin.symbol, coin.balance_display);
                     if label.to_lowercase().contains(&query)
                         || coin.object_id.to_lowercase().contains(&query)
@@ -577,6 +600,9 @@ impl App {
                 }
             } else {
                 for obj in &self.objects {
+                    if already.contains(&obj.object_id) {
+                        continue;
+                    }
                     let short_type = obj.type_name.rsplit("::").next().unwrap_or(&obj.type_name);
                     let label = format!(
                         "{} {}",
@@ -609,6 +635,7 @@ impl App {
     /// Accept the currently highlighted autocomplete suggestion.
     /// Returns true if a suggestion was accepted.
     /// For address fields, inserts the alias (resolved later). For object fields, inserts the ID.
+    /// For multi-value fields, adds to `tx_multi_values` and clears the input for the next pick.
     pub fn accept_autocomplete(&mut self) -> bool {
         if self.autocomplete.is_empty() {
             return false;
@@ -616,13 +643,28 @@ impl App {
         let idx = self.autocomplete_idx.unwrap_or(0);
         let is_obj = self.is_object_field();
         if let Some((label, value)) = self.autocomplete.get(idx) {
-            self.input_buffer = if is_obj { value.clone() } else { label.clone() };
-            self.input_cursor = self.input_buffer.len();
+            let insertion = if is_obj { value.clone() } else { label.clone() };
+
+            if self.is_multi_value_field() {
+                // Add to the accumulated list and clear input for the next selection
+                self.tx_multi_values.push(insertion);
+                self.input_buffer.clear();
+                self.input_cursor = 0;
+            } else {
+                self.input_buffer = insertion;
+                self.input_cursor = self.input_buffer.len();
+            }
+
             self.autocomplete.clear();
             self.autocomplete_idx = None;
             return true;
         }
         false
+    }
+
+    /// Remove the last item from multi-value accumulator (undo last pick).
+    pub fn remove_last_multi_value(&mut self) {
+        self.tx_multi_values.pop();
     }
 
     /// Resolve an alias or label to an address.
