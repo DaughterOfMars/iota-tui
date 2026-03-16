@@ -487,8 +487,13 @@ impl App {
                     .sequence
                     .cmp(&self.explorer_checkpoints[*b].sequence)
             });
+        } else {
+            indices.sort_by(|a, b| {
+                self.explorer_checkpoints[*b]
+                    .sequence
+                    .cmp(&self.explorer_checkpoints[*a].sequence)
+            });
         }
-        // Default (sort_asc=false) keeps original order which is already newest-first
         indices
     }
 
