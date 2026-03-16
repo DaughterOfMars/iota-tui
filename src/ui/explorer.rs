@@ -282,7 +282,21 @@ fn draw_lookup(frame: &mut Frame, app: &App, area: Rect) {
             Constraint::Length(22),
         ];
 
-        let title = format!(" Search Results ({}) ", app.explorer_search_results.len());
+        let page_num = app.explorer_search_cursors.len() + 1;
+        let has_prev = !app.explorer_search_cursors.is_empty();
+        let has_next = app.explorer_search_has_next;
+        let page_hint = match (has_prev, has_next) {
+            (true, true) => " | p/n: prev/next page".to_string(),
+            (true, false) => " | p: prev page".to_string(),
+            (false, true) => " | n: next page".to_string(),
+            (false, false) => String::new(),
+        };
+        let title = format!(
+            " Search Results — page {}{}  ({} shown) ",
+            page_num,
+            page_hint,
+            app.explorer_search_results.len()
+        );
         let table = Table::new(rows, widths).header(header).block(
             Block::default()
                 .title(title)

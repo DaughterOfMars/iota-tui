@@ -158,7 +158,10 @@ pub enum WalletCmd {
     RefreshCheckpoints,
     RefreshValidators,
     LookupAddress(String),
-    SearchObjectsByType(String),
+    SearchObjectsByType {
+        type_filter: String,
+        cursor: Option<String>,
+    },
 }
 
 /// Events sent from the wallet backend back to the UI.
@@ -209,7 +212,11 @@ pub enum WalletEvent {
     Checkpoints(Vec<crate::app::CheckpointDisplay>),
     Validators(Vec<crate::app::ValidatorDisplay>),
     ExplorerLookupResult(crate::app::LookupResult),
-    ObjectSearchResults(Vec<crate::app::ObjectDisplay>),
+    ObjectSearchResults {
+        objects: Vec<crate::app::ObjectDisplay>,
+        has_next_page: bool,
+        end_cursor: Option<String>,
+    },
     Error(String),
 }
 
@@ -284,8 +291,12 @@ impl WalletBackend {
                 WalletCmd::RefreshCheckpoints => self.handle_checkpoints().await,
                 WalletCmd::RefreshValidators => self.handle_validators().await,
                 WalletCmd::LookupAddress(query) => self.handle_lookup(&query).await,
-                WalletCmd::SearchObjectsByType(type_filter) => {
-                    self.handle_search_objects_by_type(&type_filter).await
+                WalletCmd::SearchObjectsByType {
+                    type_filter,
+                    cursor,
+                } => {
+                    self.handle_search_objects_by_type(&type_filter, cursor)
+                        .await
                 }
             };
 
@@ -1180,6 +1191,7 @@ impl WalletBackend {
     async fn handle_search_objects_by_type(
         &self,
         type_filter: &str,
+        cursor: Option<String>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let client = self.client.as_ref().ok_or("Not connected")?;
 
@@ -1189,7 +1201,13 @@ impl WalletBackend {
             object_ids: None,
         };
 
-        let page = client.objects(filter, PaginationFilter::default()).await?;
+        let pagination = PaginationFilter {
+            cursor,
+            ..PaginationFilter::default()
+        };
+
+        let page = client.objects(filter, pagination).await?;
+        let page_info = page.page_info().clone();
 
         let objects: Vec<crate::app::ObjectDisplay> = page
             .data()
@@ -1211,7 +1229,11 @@ impl WalletBackend {
             .collect();
 
         self.event_tx
-            .send(WalletEvent::ObjectSearchResults(objects))
+            .send(WalletEvent::ObjectSearchResults {
+                objects,
+                has_next_page: page_info.has_next_page,
+                end_cursor: page_info.end_cursor,
+            })
             .await?;
         Ok(())
     }

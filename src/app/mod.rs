@@ -82,6 +82,10 @@ pub struct App {
     pub explorer_search_selected: usize,
     pub explorer_search_offset: usize,
     pub explorer_search_mode: bool,
+    pub explorer_search_type: String,
+    pub explorer_search_cursor: Option<String>,
+    pub explorer_search_has_next: bool,
+    pub explorer_search_cursors: Vec<Option<String>>,
     pub explorer_lookup_selected: usize,
     pub explorer_lookup_offset: usize,
 
@@ -183,6 +187,10 @@ impl App {
             explorer_search_selected: 0,
             explorer_search_offset: 0,
             explorer_search_mode: false,
+            explorer_search_type: String::new(),
+            explorer_search_cursor: None,
+            explorer_search_has_next: false,
+            explorer_search_cursors: vec![],
             explorer_lookup_selected: 0,
             explorer_lookup_offset: 0,
 
@@ -383,10 +391,16 @@ impl App {
                 self.explorer_lookup_offset = 0;
                 self.explorer_lookup_result = Some(result);
             }
-            WalletEvent::ObjectSearchResults(objects) => {
+            WalletEvent::ObjectSearchResults {
+                objects,
+                has_next_page,
+                end_cursor,
+            } => {
                 self.explorer_search_results = objects;
                 self.explorer_search_selected = 0;
                 self.explorer_search_offset = 0;
+                self.explorer_search_has_next = has_next_page;
+                self.explorer_search_cursor = end_cursor;
             }
             WalletEvent::Error(e) => {
                 self.set_status(format!("Error: {}", e));
@@ -497,6 +511,9 @@ impl App {
         self.explorer_lookup_selected = 0;
         self.explorer_lookup_offset = 0;
         self.explorer_search_results.clear();
+        self.explorer_search_has_next = false;
+        self.explorer_search_cursor = None;
+        self.explorer_search_cursors.clear();
         self.send_cmd(WalletCmd::LookupAddress(query));
         self.set_status("Looking up...");
     }
@@ -513,7 +530,14 @@ impl App {
         self.explorer_search_results.clear();
         self.explorer_search_selected = 0;
         self.explorer_search_offset = 0;
-        self.send_cmd(WalletCmd::SearchObjectsByType(type_filter));
+        self.explorer_search_has_next = false;
+        self.explorer_search_cursor = None;
+        self.explorer_search_cursors.clear();
+        self.explorer_search_type = type_filter.clone();
+        self.send_cmd(WalletCmd::SearchObjectsByType {
+            type_filter,
+            cursor: None,
+        });
         self.set_status("Searching objects by type...");
     }
 

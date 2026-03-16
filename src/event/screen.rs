@@ -390,7 +390,14 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                 let query = app.stop_input();
                 if !query.is_empty() {
                     if app.explorer_search_mode {
-                        app.send_cmd(WalletCmd::SearchObjectsByType(query));
+                        app.explorer_search_type = query.clone();
+                        app.explorer_search_cursors.clear();
+                        app.explorer_search_has_next = false;
+                        app.explorer_search_cursor = None;
+                        app.send_cmd(WalletCmd::SearchObjectsByType {
+                            type_filter: query,
+                            cursor: None,
+                        });
                         app.set_status("Searching objects by type...");
                     } else {
                         app.send_cmd(WalletCmd::LookupAddress(query));
@@ -545,6 +552,9 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                     app.explorer_search_selected = 0;
                     app.explorer_lookup_selected = 0;
                     app.explorer_lookup_offset = 0;
+                    app.explorer_search_has_next = false;
+                    app.explorer_search_cursor = None;
+                    app.explorer_search_cursors.clear();
                 }
                 KeyCode::Up => {
                     if !app.explorer_search_results.is_empty() {
@@ -580,6 +590,34 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                     } else if let Some(ref result) = app.explorer_lookup_result {
                         app.explorer_lookup_selected = result.total_fields().saturating_sub(1);
                     }
+                }
+                KeyCode::Char('n')
+                    if !app.explorer_search_results.is_empty() && app.explorer_search_has_next =>
+                {
+                    // Save current cursor for going back
+                    app.explorer_search_cursors
+                        .push(app.explorer_search_cursor.clone());
+                    // Fetch next page using end_cursor from last response
+                    let cursor = app.explorer_search_cursor.clone();
+                    let type_filter = app.explorer_search_type.clone();
+                    app.send_cmd(WalletCmd::SearchObjectsByType {
+                        type_filter,
+                        cursor,
+                    });
+                    app.set_status("Loading next page...");
+                }
+                KeyCode::Char('p')
+                    if !app.explorer_search_results.is_empty()
+                        && !app.explorer_search_cursors.is_empty() =>
+                {
+                    // Pop the previous cursor to go back
+                    let prev_cursor = app.explorer_search_cursors.pop().flatten();
+                    let type_filter = app.explorer_search_type.clone();
+                    app.send_cmd(WalletCmd::SearchObjectsByType {
+                        type_filter,
+                        cursor: prev_cursor,
+                    });
+                    app.set_status("Loading previous page...");
                 }
                 _ => {}
             }
