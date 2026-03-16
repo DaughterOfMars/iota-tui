@@ -45,7 +45,11 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             return;
         }
         KeyCode::Char('r') => {
-            app.request_refresh();
+            if app.screen == Screen::Explorer {
+                app.refresh_explorer();
+            } else {
+                app.request_refresh();
+            }
             app.set_status("Refreshing...");
             return;
         }
@@ -86,6 +90,10 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             app.navigate(Screen::TxBuilder);
             return;
         }
+        KeyCode::Char('8') => {
+            app.navigate(Screen::Explorer);
+            return;
+        }
         KeyCode::Tab => {
             let idx = app.screen.index();
             let next = (idx + 1) % Screen::ALL.len();
@@ -113,6 +121,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         Screen::AddressBook => screen::handle_address_key(app, key),
         Screen::Keys => screen::handle_keys_key(app, key),
         Screen::TxBuilder => screen::handle_tx_key(app, key),
+        Screen::Explorer => screen::handle_explorer_key(app, key),
     }
 }
 

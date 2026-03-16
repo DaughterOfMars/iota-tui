@@ -9,7 +9,7 @@ use iota_sdk::crypto::{
     secp256r1::Secp256r1PrivateKey, simple::SimpleKeypair,
 };
 use iota_sdk::graphql_client::{
-    Client, PaginationFilter, faucet::FaucetClient, query_types::ObjectFilter,
+    Client, Direction, PaginationFilter, faucet::FaucetClient, query_types::ObjectFilter,
 };
 use iota_sdk::transaction_builder::TransactionBuilder;
 use iota_sdk::types::{Address, ObjectType, StructTag, TypeTag};
@@ -153,6 +153,12 @@ pub enum WalletCmd {
         label: String,
         notes: String,
     },
+    // Explorer commands
+    RefreshNetworkOverview,
+    RefreshCheckpoints,
+    RefreshValidators,
+    LookupAddress(String),
+    SearchObjectsByType(String),
 }
 
 /// Events sent from the wallet backend back to the UI.
@@ -192,6 +198,18 @@ pub enum WalletEvent {
         notes: String,
         address: Option<String>,
     },
+    // Explorer events
+    NetworkOverview {
+        chain_id: String,
+        epoch: String,
+        gas_price: String,
+        latest_checkpoint: String,
+        total_transactions: String,
+    },
+    Checkpoints(Vec<crate::app::CheckpointDisplay>),
+    Validators(Vec<crate::app::ValidatorDisplay>),
+    ExplorerLookupResult(crate::app::LookupResult),
+    ObjectSearchResults(Vec<crate::app::ObjectDisplay>),
     Error(String),
 }
 
@@ -261,6 +279,13 @@ impl WalletBackend {
                 WalletCmd::RequestFaucet(addr) => self.handle_faucet(addr).await,
                 WalletCmd::LookupIotaName { name, label, notes } => {
                     self.handle_iota_name_lookup(&name, &label, &notes).await
+                }
+                WalletCmd::RefreshNetworkOverview => self.handle_network_overview().await,
+                WalletCmd::RefreshCheckpoints => self.handle_checkpoints().await,
+                WalletCmd::RefreshValidators => self.handle_validators().await,
+                WalletCmd::LookupAddress(query) => self.handle_lookup(&query).await,
+                WalletCmd::SearchObjectsByType(type_filter) => {
+                    self.handle_search_objects_by_type(&type_filter).await
                 }
             };
 
@@ -762,6 +787,251 @@ impl WalletBackend {
         Ok(())
     }
 
+    // ── Explorer handlers ──────────────────────────────────────────
+
+    async fn handle_network_overview(
+        &self,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let client = self.client.as_ref().ok_or("Not connected")?;
+
+        let chain_id = client.chain_id().await.unwrap_or_else(|_| "?".into());
+
+        let epoch_str = match client.epoch(None).await {
+            Ok(Some(e)) => e.epoch_id.to_string(),
+            _ => "?".into(),
+        };
+
+        let gas_price = match client.reference_gas_price(None).await {
+            Ok(Some(g)) => format!("{} NANOS", g),
+            _ => "?".into(),
+        };
+
+        let latest_cp = match client.latest_checkpoint_sequence_number().await {
+            Ok(Some(seq)) => seq.to_string(),
+            _ => "?".into(),
+        };
+
+        let total_txs = match client.total_transaction_blocks().await {
+            Ok(Some(n)) => n.to_string(),
+            _ => "?".into(),
+        };
+
+        self.event_tx
+            .send(WalletEvent::NetworkOverview {
+                chain_id,
+                epoch: epoch_str,
+                gas_price,
+                latest_checkpoint: latest_cp,
+                total_transactions: total_txs,
+            })
+            .await?;
+        Ok(())
+    }
+
+    async fn handle_checkpoints(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let client = self.client.as_ref().ok_or("Not connected")?;
+
+        let page = client
+            .checkpoints(PaginationFilter {
+                direction: Direction::Backward,
+                cursor: None,
+                limit: Some(50),
+            })
+            .await?;
+
+        let checkpoints: Vec<crate::app::CheckpointDisplay> = page
+            .data()
+            .iter()
+            .map(|cp| {
+                let ts = format_timestamp_ms(cp.timestamp_ms);
+                crate::app::CheckpointDisplay {
+                    sequence: cp.sequence_number,
+                    digest: cp.content_digest.to_string(),
+                    timestamp: ts,
+                    tx_count: cp.network_total_transactions,
+                }
+            })
+            .collect();
+
+        self.event_tx
+            .send(WalletEvent::Checkpoints(checkpoints))
+            .await?;
+        Ok(())
+    }
+
+    async fn handle_validators(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let client = self.client.as_ref().ok_or("Not connected")?;
+
+        let page = client
+            .active_validators(None, PaginationFilter::default())
+            .await?;
+
+        let validators: Vec<crate::app::ValidatorDisplay> = page
+            .data()
+            .iter()
+            .map(|v| {
+                let name = v.name.clone().unwrap_or_else(|| "Unknown".into());
+                let address = v.address.address.to_string();
+                let stake = v
+                    .voting_power
+                    .map(|p| format!("{}%", p as f64 / 100.0))
+                    .unwrap_or_else(|| "?".into());
+                crate::app::ValidatorDisplay {
+                    name,
+                    address,
+                    stake,
+                }
+            })
+            .collect();
+
+        self.event_tx
+            .send(WalletEvent::Validators(validators))
+            .await?;
+        Ok(())
+    }
+
+    async fn handle_lookup(
+        &self,
+        query: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        use crate::app::LookupResult;
+        let client = self.client.as_ref().ok_or("Not connected")?;
+
+        let hex_query = if query.starts_with("0x") {
+            query.to_string()
+        } else {
+            format!("0x{}", query)
+        };
+
+        // Try as object first
+        if let Ok(addr) = iota_sdk::types::Address::from_hex(&hex_query) {
+            let obj_id: iota_sdk::types::ObjectId = addr.into();
+            if let Ok(Some(obj)) = client.object(obj_id, None).await {
+                let type_name = match obj.object_type() {
+                    ObjectType::Struct(s) => prettify_struct(&s),
+                    ObjectType::Package => "Package".into(),
+                };
+                let fields = vec![
+                    ("Kind".into(), "Object".into()),
+                    ("Object ID".into(), obj.object_id().to_string()),
+                    ("Version".into(), format!("v{}", obj.version())),
+                    ("Type".into(), type_name),
+                    ("Owner".into(), format!("{:?}", obj.owner)),
+                    ("Previous Tx".into(), obj.previous_transaction.to_string()),
+                ];
+                self.event_tx
+                    .send(WalletEvent::ExplorerLookupResult(LookupResult::Object {
+                        fields,
+                    }))
+                    .await?;
+                return Ok(());
+            }
+        }
+
+        // Try as transaction digest
+        if let Ok(digest) = hex_query
+            .parse::<iota_sdk::types::Digest>()
+            .or_else(|_| query.parse::<iota_sdk::types::Digest>())
+        {
+            if let Ok(Some(effects)) = client.transaction_effects(digest).await {
+                let v1 = effects.as_v1();
+                let status = match &v1.status {
+                    iota_sdk::types::ExecutionStatus::Success => "Success".to_string(),
+                    iota_sdk::types::ExecutionStatus::Failure { error, .. } => {
+                        format!("Failed: {:?}", error)
+                    }
+                    _ => "Unknown".to_string(),
+                };
+                let gas = &v1.gas_used;
+                let total_gas = gas.computation_cost + gas.storage_cost
+                    - gas.storage_rebate.min(gas.storage_cost);
+                let fields = vec![
+                    ("Kind".into(), "Transaction".into()),
+                    ("Digest".into(), v1.transaction_digest.to_string()),
+                    ("Status".into(), status),
+                    ("Epoch".into(), format!("{}", v1.epoch)),
+                    ("Gas Used".into(), format_gas(total_gas)),
+                ];
+                self.event_tx
+                    .send(WalletEvent::ExplorerLookupResult(
+                        LookupResult::Transaction { fields },
+                    ))
+                    .await?;
+                return Ok(());
+            }
+        }
+
+        // Try as address (look up owned objects)
+        if let Ok(addr) = iota_sdk::types::Address::from_hex(&hex_query) {
+            let filter = ObjectFilter {
+                owner: Some(addr),
+                type_: None,
+                object_ids: None,
+            };
+            let page = client.objects(filter, PaginationFilter::default()).await?;
+            if !page.data().is_empty() {
+                let obj_count = page.data().len();
+                let fields = vec![
+                    ("Kind".into(), "Address".into()),
+                    ("Address".into(), hex_query.clone()),
+                    ("Owned Objects".into(), obj_count.to_string()),
+                ];
+                self.event_tx
+                    .send(WalletEvent::ExplorerLookupResult(LookupResult::Address {
+                        fields,
+                    }))
+                    .await?;
+                return Ok(());
+            }
+        }
+
+        self.event_tx
+            .send(WalletEvent::ExplorerLookupResult(LookupResult::NotFound(
+                format!("Nothing found for '{}'", query),
+            )))
+            .await?;
+        Ok(())
+    }
+
+    async fn handle_search_objects_by_type(
+        &self,
+        type_filter: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let client = self.client.as_ref().ok_or("Not connected")?;
+
+        let filter = ObjectFilter {
+            type_: Some(type_filter.to_string()),
+            owner: None,
+            object_ids: None,
+        };
+
+        let page = client.objects(filter, PaginationFilter::default()).await?;
+
+        let objects: Vec<crate::app::ObjectDisplay> = page
+            .data()
+            .iter()
+            .map(|obj| {
+                let type_name = match obj.object_type() {
+                    ObjectType::Struct(s) => prettify_struct(&s),
+                    ObjectType::Package => "Package".into(),
+                };
+                crate::app::ObjectDisplay {
+                    object_id: obj.object_id().to_string(),
+                    type_name,
+                    version: format!("v{}", obj.version()),
+                    digest: obj.previous_transaction.to_string(),
+                    owner: format!("{:?}", obj.owner),
+                    owner_alias: String::new(),
+                }
+            })
+            .collect();
+
+        self.event_tx
+            .send(WalletEvent::ObjectSearchResults(objects))
+            .await?;
+        Ok(())
+    }
+
     fn load_keys(&mut self) {
         if let Ok(data) = std::fs::read_to_string(&self.keystore_path)
             && let Ok(keys) = serde_json::from_str::<Vec<StoredKey>>(&data)
@@ -858,6 +1128,34 @@ fn parse_iota_amount(s: &str) -> Result<u64, Box<dyn std::error::Error + Send + 
         return Ok(n);
     }
     Err(format!("Invalid amount: {}", s).into())
+}
+
+fn format_timestamp_ms(ms: u64) -> String {
+    // Simple UTC timestamp formatting without chrono dependency
+    let secs = ms / 1000;
+    let days = secs / 86400;
+    let time_secs = secs % 86400;
+    let hours = time_secs / 3600;
+    let minutes = (time_secs % 3600) / 60;
+
+    // Convert days since epoch to Y-M-D
+    let (year, month, day) = days_to_ymd(days);
+    format!("{year}-{month:02}-{day:02} {hours:02}:{minutes:02}")
+}
+
+fn days_to_ymd(days_since_epoch: u64) -> (u64, u64, u64) {
+    // Algorithm from https://howardhinnant.github.io/date_algorithms.html
+    let z = days_since_epoch + 719468;
+    let era = z / 146097;
+    let doe = z - era * 146097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    (y, m, d)
 }
 
 fn format_gas(nanos: u64) -> String {

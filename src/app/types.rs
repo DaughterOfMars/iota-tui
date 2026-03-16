@@ -10,10 +10,11 @@ pub enum Screen {
     AddressBook,
     Keys,
     TxBuilder,
+    Explorer,
 }
 
 impl Screen {
-    pub const ALL: [Screen; 7] = [
+    pub const ALL: [Screen; 8] = [
         Screen::Coins,
         Screen::Objects,
         Screen::Transactions,
@@ -21,6 +22,7 @@ impl Screen {
         Screen::AddressBook,
         Screen::Keys,
         Screen::TxBuilder,
+        Screen::Explorer,
     ];
 
     pub fn title(self) -> &'static str {
@@ -32,6 +34,7 @@ impl Screen {
             Screen::AddressBook => "Address Book",
             Screen::Keys => "Keys",
             Screen::TxBuilder => "Tx Builder",
+            Screen::Explorer => "Explorer",
         }
     }
 
@@ -272,6 +275,75 @@ pub enum Popup {
     ConfirmQuit,
     LookupIotaName,
     ErrorLog,
+}
+
+// ── Explorer types ─────────────────────────────────────────────────
+
+/// Which sub-view of the Explorer screen is active.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExplorerView {
+    Overview,
+    Checkpoints,
+    Validators,
+    Lookup,
+}
+
+impl ExplorerView {
+    pub const ALL: [ExplorerView; 4] = [
+        ExplorerView::Overview,
+        ExplorerView::Checkpoints,
+        ExplorerView::Validators,
+        ExplorerView::Lookup,
+    ];
+
+    pub fn title(self) -> &'static str {
+        match self {
+            ExplorerView::Overview => "Overview",
+            ExplorerView::Checkpoints => "Checkpoints",
+            ExplorerView::Validators => "Validators",
+            ExplorerView::Lookup => "Lookup",
+        }
+    }
+
+    pub fn index(self) -> usize {
+        Self::ALL.iter().position(|&v| v == self).unwrap_or(0)
+    }
+}
+
+/// Network overview stats displayed in the Explorer Overview sub-view.
+#[derive(Debug, Clone, Default)]
+pub struct NetworkOverview {
+    pub chain_id: String,
+    pub epoch: String,
+    pub gas_price: String,
+    pub latest_checkpoint: String,
+    pub total_txs: String,
+}
+
+/// A checkpoint row in the Explorer Checkpoints sub-view.
+#[derive(Debug, Clone)]
+pub struct CheckpointDisplay {
+    pub sequence: u64,
+    pub digest: String,
+    pub timestamp: String,
+    pub tx_count: u64,
+}
+
+/// A validator row in the Explorer Validators sub-view.
+#[derive(Debug, Clone)]
+pub struct ValidatorDisplay {
+    pub name: String,
+    pub address: String,
+    pub stake: String,
+}
+
+/// Result of a lookup query in the Explorer Lookup sub-view.
+#[derive(Debug, Clone)]
+pub enum LookupResult {
+    Object { fields: Vec<(String, String)> },
+    Address { fields: Vec<(String, String)> },
+    Transaction { fields: Vec<(String, String)> },
+    NotFound(String),
 }
 
 // ── Serde impls for AddressEntry (persistence) ────────────────────

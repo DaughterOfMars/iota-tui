@@ -3,7 +3,7 @@
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 
-use crate::app::{App, InputMode, Popup, TxBuilderStep};
+use crate::app::{App, ExplorerView, InputMode, Popup, TxBuilderStep};
 use crate::wallet::WalletCmd;
 
 use super::input::handle_input_key;
@@ -346,6 +346,148 @@ pub fn handle_tx_key(app: &mut App, key: KeyEvent) {
             }
             KeyCode::Enter => {
                 super::submit_transaction(app);
+            }
+            _ => {}
+        },
+    }
+}
+
+pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
+    // When editing (lookup input), handle text input
+    if app.input_mode == InputMode::Editing {
+        match key.code {
+            KeyCode::Enter => {
+                let query = app.stop_input();
+                if !query.is_empty() {
+                    if app.explorer_search_mode {
+                        app.send_cmd(WalletCmd::SearchObjectsByType(query));
+                        app.set_status("Searching objects by type...");
+                    } else {
+                        app.send_cmd(WalletCmd::LookupAddress(query));
+                        app.set_status("Looking up...");
+                    }
+                }
+            }
+            KeyCode::Esc => {
+                app.stop_input();
+            }
+            _ => handle_input_key(app, key),
+        }
+        return;
+    }
+
+    // Sub-view navigation with Left/Right
+    match key.code {
+        KeyCode::Left => {
+            let idx = app.explorer_view.index();
+            if idx > 0 {
+                app.explorer_view = ExplorerView::ALL[idx - 1];
+                app.refresh_explorer();
+            }
+            return;
+        }
+        KeyCode::Right => {
+            let idx = app.explorer_view.index();
+            if idx + 1 < ExplorerView::ALL.len() {
+                app.explorer_view = ExplorerView::ALL[idx + 1];
+                app.refresh_explorer();
+            }
+            return;
+        }
+        _ => {}
+    }
+
+    match app.explorer_view {
+        ExplorerView::Overview => {}
+        ExplorerView::Checkpoints => {
+            let len = app.explorer_checkpoints.len();
+            match key.code {
+                KeyCode::Up => {
+                    if app.explorer_checkpoints_selected > 0 {
+                        app.explorer_checkpoints_selected -= 1;
+                    }
+                }
+                KeyCode::Down => {
+                    if app.explorer_checkpoints_selected + 1 < len {
+                        app.explorer_checkpoints_selected += 1;
+                    }
+                }
+                KeyCode::Home => app.explorer_checkpoints_selected = 0,
+                KeyCode::End => {
+                    if len > 0 {
+                        app.explorer_checkpoints_selected = len - 1;
+                    }
+                }
+                KeyCode::Enter => {
+                    if !app.explorer_checkpoints.is_empty() {
+                        app.open_popup(Popup::Detail);
+                    }
+                }
+                _ => {}
+            }
+            App::scroll_into_view(
+                app.explorer_checkpoints_selected,
+                &mut app.explorer_checkpoints_offset,
+                20,
+            );
+        }
+        ExplorerView::Validators => {
+            let len = app.explorer_validators.len();
+            match key.code {
+                KeyCode::Up => {
+                    if app.explorer_validators_selected > 0 {
+                        app.explorer_validators_selected -= 1;
+                    }
+                }
+                KeyCode::Down => {
+                    if app.explorer_validators_selected + 1 < len {
+                        app.explorer_validators_selected += 1;
+                    }
+                }
+                KeyCode::Home => app.explorer_validators_selected = 0,
+                KeyCode::End => {
+                    if len > 0 {
+                        app.explorer_validators_selected = len - 1;
+                    }
+                }
+                KeyCode::Enter => {
+                    if !app.explorer_validators.is_empty() {
+                        app.open_popup(Popup::Detail);
+                    }
+                }
+                _ => {}
+            }
+            App::scroll_into_view(
+                app.explorer_validators_selected,
+                &mut app.explorer_validators_offset,
+                20,
+            );
+        }
+        ExplorerView::Lookup => match key.code {
+            KeyCode::Enter => {
+                app.explorer_search_mode = false;
+                app.start_input("");
+            }
+            KeyCode::Char('s') => {
+                app.explorer_search_mode = true;
+                app.start_input("");
+            }
+            KeyCode::Esc => {
+                app.explorer_lookup_result = None;
+                app.explorer_search_results.clear();
+                app.explorer_search_selected = 0;
+            }
+            KeyCode::Up => {
+                if app.explorer_search_mode && app.explorer_search_selected > 0 {
+                    app.explorer_search_selected -= 1;
+                }
+            }
+            KeyCode::Down => {
+                if app.explorer_search_mode
+                    && app.explorer_search_selected + 1 < app.explorer_search_results.len()
+                {
+                    app.explorer_search_selected += 1;
+                }
             }
             _ => {}
         },

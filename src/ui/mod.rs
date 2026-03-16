@@ -3,6 +3,7 @@
 mod address_book;
 mod coins;
 pub(crate) mod common;
+mod explorer;
 mod keys;
 mod objects;
 mod packages;
@@ -35,6 +36,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         Screen::AddressBook => address_book::draw(frame, app, layout[2]),
         Screen::Keys => keys::draw(frame, app, layout[2]),
         Screen::TxBuilder => tx_builder::draw(frame, app, layout[2]),
+        Screen::Explorer => explorer::draw(frame, app, layout[2]),
     }
 
     common::draw_status_bar(frame, app, layout[3]);

@@ -68,6 +68,21 @@ pub struct App {
     // Accumulated values for multi-value fields (e.g. multiple object IDs)
     pub tx_multi_values: Vec<String>,
 
+    // Explorer state
+    pub explorer_view: ExplorerView,
+    pub explorer_overview: Option<NetworkOverview>,
+    pub explorer_checkpoints: Vec<CheckpointDisplay>,
+    pub explorer_checkpoints_selected: usize,
+    pub explorer_checkpoints_offset: usize,
+    pub explorer_validators: Vec<ValidatorDisplay>,
+    pub explorer_validators_selected: usize,
+    pub explorer_validators_offset: usize,
+    pub explorer_lookup_result: Option<LookupResult>,
+    pub explorer_search_results: Vec<ObjectDisplay>,
+    pub explorer_search_selected: usize,
+    pub explorer_search_offset: usize,
+    pub explorer_search_mode: bool,
+
     // Autocomplete state for address/object fields
     pub autocomplete: Vec<(String, String)>, // (alias/label, address/object_id)
     pub autocomplete_idx: Option<usize>,
@@ -152,6 +167,20 @@ impl App {
             tx_gas_edited: false,
 
             tx_multi_values: vec![],
+
+            explorer_view: ExplorerView::Overview,
+            explorer_overview: None,
+            explorer_checkpoints: vec![],
+            explorer_checkpoints_selected: 0,
+            explorer_checkpoints_offset: 0,
+            explorer_validators: vec![],
+            explorer_validators_selected: 0,
+            explorer_validators_offset: 0,
+            explorer_lookup_result: None,
+            explorer_search_results: vec![],
+            explorer_search_selected: 0,
+            explorer_search_offset: 0,
+            explorer_search_mode: false,
 
             autocomplete: vec![],
             autocomplete_idx: None,
@@ -316,6 +345,43 @@ impl App {
                 self.set_status(msg);
                 self.request_refresh();
             }
+            WalletEvent::NetworkOverview {
+                chain_id,
+                epoch,
+                gas_price,
+                latest_checkpoint,
+                total_transactions,
+            } => {
+                self.explorer_overview = Some(NetworkOverview {
+                    chain_id,
+                    epoch,
+                    gas_price,
+                    latest_checkpoint,
+                    total_txs: total_transactions,
+                });
+            }
+            WalletEvent::Checkpoints(checkpoints) => {
+                self.explorer_checkpoints = checkpoints;
+                if self.explorer_checkpoints_selected >= self.explorer_checkpoints.len() {
+                    self.explorer_checkpoints_selected =
+                        self.explorer_checkpoints.len().saturating_sub(1);
+                }
+            }
+            WalletEvent::Validators(validators) => {
+                self.explorer_validators = validators;
+                if self.explorer_validators_selected >= self.explorer_validators.len() {
+                    self.explorer_validators_selected =
+                        self.explorer_validators.len().saturating_sub(1);
+                }
+            }
+            WalletEvent::ExplorerLookupResult(result) => {
+                self.explorer_lookup_result = Some(result);
+            }
+            WalletEvent::ObjectSearchResults(objects) => {
+                self.explorer_search_results = objects;
+                self.explorer_search_selected = 0;
+                self.explorer_search_offset = 0;
+            }
             WalletEvent::Error(e) => {
                 self.set_status(format!("Error: {}", e));
             }
@@ -381,6 +447,16 @@ impl App {
         }
     }
 
+    /// Refresh explorer data for the current sub-view.
+    pub fn refresh_explorer(&mut self) {
+        match self.explorer_view {
+            ExplorerView::Overview => self.send_cmd(WalletCmd::RefreshNetworkOverview),
+            ExplorerView::Checkpoints => self.send_cmd(WalletCmd::RefreshCheckpoints),
+            ExplorerView::Validators => self.send_cmd(WalletCmd::RefreshValidators),
+            ExplorerView::Lookup => {}
+        }
+    }
+
     pub fn set_status(&mut self, msg: impl Into<String>) {
         self.status_message = Some((msg.into(), std::time::Instant::now()));
     }
@@ -398,6 +474,9 @@ impl App {
         self.input_mode = InputMode::Normal;
         self.popup = None;
         self.popup_scroll = 0;
+        if screen == Screen::Explorer {
+            self.refresh_explorer();
+        }
     }
 
     pub fn open_popup(&mut self, popup: Popup) {
@@ -768,6 +847,44 @@ impl App {
                     ("Address Details", vec![])
                 }
             }
+            Screen::Explorer => match self.explorer_view {
+                ExplorerView::Checkpoints => {
+                    if let Some(cp) = self
+                        .explorer_checkpoints
+                        .get(self.explorer_checkpoints_selected)
+                    {
+                        (
+                            "Checkpoint Details",
+                            vec![
+                                ("Sequence", cp.sequence.to_string()),
+                                ("Digest", cp.digest.clone()),
+                                ("Timestamp", cp.timestamp.clone()),
+                                ("Total Transactions", cp.tx_count.to_string()),
+                            ],
+                        )
+                    } else {
+                        ("Checkpoint Details", vec![])
+                    }
+                }
+                ExplorerView::Validators => {
+                    if let Some(v) = self
+                        .explorer_validators
+                        .get(self.explorer_validators_selected)
+                    {
+                        (
+                            "Validator Details",
+                            vec![
+                                ("Name", v.name.clone()),
+                                ("Address", v.address.clone()),
+                                ("Voting Power", v.stake.clone()),
+                            ],
+                        )
+                    } else {
+                        ("Validator Details", vec![])
+                    }
+                }
+                _ => ("Details", vec![]),
+            },
             _ => ("Details", vec![]),
         }
     }

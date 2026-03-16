@@ -70,13 +70,16 @@ Build and execute programmable transactions
 
 ![Tx Builder Page](/screenshots/tx_builder_page.png)
 
+### Explorer
+Browse network state: overview, checkpoints, validators, and lookup
+
 ## Keybindings
 
 ### Navigation
 
 | Key          | Action                          |
 |--------------|---------------------------------|
-| `1`–`7`      | Switch to screen                |
+| `1`–`8`      | Switch to screen                |
 | `Tab`/`S-Tab`| Cycle screens forward/backward  |
 | `Up`/`Down`  | Navigate lists                  |
 | `Left`/`Right`| Switch Tx Builder steps        |

@@ -1,0 +1,319 @@
+//! Explorer screen — browse network state: overview, checkpoints, validators, and lookup.
+
+use ratatui::{
+    Frame,
+    layout::{Constraint, Layout, Rect},
+    style::{Color, Style, Stylize},
+    text::{Line, Span},
+    widgets::{Block, Borders, Paragraph, Row, Table},
+};
+
+use super::common;
+use crate::app::{App, ExplorerView, InputMode, LookupResult};
+
+pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
+    let layout = Layout::vertical([
+        Constraint::Length(3), // sub-view tabs
+        Constraint::Min(5),    // content
+    ])
+    .split(area);
+
+    draw_sub_tabs(frame, app, layout[0]);
+
+    match app.explorer_view {
+        ExplorerView::Overview => draw_overview(frame, app, layout[1]),
+        ExplorerView::Checkpoints => draw_checkpoints(frame, app, layout[1]),
+        ExplorerView::Validators => draw_validators(frame, app, layout[1]),
+        ExplorerView::Lookup => draw_lookup(frame, app, layout[1]),
+    }
+}
+
+fn draw_sub_tabs(frame: &mut Frame, app: &App, area: Rect) {
+    let tabs: Vec<Span> = ExplorerView::ALL
+        .iter()
+        .enumerate()
+        .flat_map(|(_, view)| {
+            let label = format!(" {} ", view.title());
+            let style = if *view == app.explorer_view {
+                Style::default().fg(Color::Black).bg(common::ACCENT).bold()
+            } else {
+                Style::default().fg(Color::White).dim()
+            };
+            vec![Span::styled(label, style), Span::raw(" ")]
+        })
+        .collect();
+
+    let block = Block::default()
+        .title(" Explorer ")
+        .title_style(common::header_style())
+        .borders(Borders::ALL)
+        .border_style(common::dim_style());
+
+    let line = Line::from(tabs);
+    frame.render_widget(Paragraph::new(line).block(block), area);
+}
+
+fn draw_overview(frame: &mut Frame, app: &App, area: Rect) {
+    let block = Block::default()
+        .title(" Network Overview ")
+        .title_style(common::header_style())
+        .borders(Borders::ALL)
+        .border_style(common::dim_style());
+
+    let content = if let Some(ref overview) = app.explorer_overview {
+        vec![
+            kv_line("  Chain ID", &overview.chain_id),
+            kv_line("  Current Epoch", &overview.epoch),
+            kv_line("  Gas Price", &overview.gas_price),
+            kv_line("  Latest Checkpoint", &overview.latest_checkpoint),
+            kv_line("  Total Transactions", &overview.total_txs),
+        ]
+    } else {
+        vec![Line::from("  Loading...")]
+    };
+
+    frame.render_widget(Paragraph::new(content).block(block), area);
+}
+
+fn draw_checkpoints(frame: &mut Frame, app: &App, area: Rect) {
+    if app.explorer_checkpoints.is_empty() {
+        let block = Block::default()
+            .title(" Checkpoints ")
+            .title_style(common::header_style())
+            .borders(Borders::ALL)
+            .border_style(common::dim_style());
+        frame.render_widget(
+            Paragraph::new("  Loading checkpoints...").block(block),
+            area,
+        );
+        return;
+    }
+
+    let visible_rows = area.height.saturating_sub(4) as usize;
+
+    let header = Row::new(vec!["Sequence", "Digest", "Timestamp", "TXs"])
+        .style(common::header_style())
+        .bottom_margin(1);
+
+    let rows: Vec<Row> = app
+        .explorer_checkpoints
+        .iter()
+        .enumerate()
+        .skip(app.explorer_checkpoints_offset)
+        .take(visible_rows)
+        .map(|(i, cp)| {
+            let style = if i == app.explorer_checkpoints_selected {
+                common::selected_style()
+            } else {
+                Style::default()
+            };
+            Row::new(vec![
+                cp.sequence.to_string(),
+                common::truncate_address(&cp.digest, 20),
+                cp.timestamp.clone(),
+                cp.tx_count.to_string(),
+            ])
+            .style(style)
+        })
+        .collect();
+
+    let widths = [
+        Constraint::Length(12),
+        Constraint::Length(22),
+        Constraint::Min(20),
+        Constraint::Length(10),
+    ];
+
+    let title = format!(" Checkpoints ({}) ", app.explorer_checkpoints.len());
+    let table = Table::new(rows, widths).header(header).block(
+        Block::default()
+            .title(title)
+            .title_style(common::header_style())
+            .borders(Borders::ALL)
+            .border_style(common::dim_style()),
+    );
+
+    frame.render_widget(table, area);
+}
+
+fn draw_validators(frame: &mut Frame, app: &App, area: Rect) {
+    if app.explorer_validators.is_empty() {
+        let block = Block::default()
+            .title(" Validators ")
+            .title_style(common::header_style())
+            .borders(Borders::ALL)
+            .border_style(common::dim_style());
+        frame.render_widget(Paragraph::new("  Loading validators...").block(block), area);
+        return;
+    }
+
+    let visible_rows = area.height.saturating_sub(4) as usize;
+
+    let header = Row::new(vec!["Name", "Address", "Voting Power"])
+        .style(common::header_style())
+        .bottom_margin(1);
+
+    let rows: Vec<Row> = app
+        .explorer_validators
+        .iter()
+        .enumerate()
+        .skip(app.explorer_validators_offset)
+        .take(visible_rows)
+        .map(|(i, v)| {
+            let style = if i == app.explorer_validators_selected {
+                common::selected_style()
+            } else {
+                Style::default()
+            };
+            Row::new(vec![
+                v.name.clone(),
+                common::truncate_address(&v.address, 24),
+                v.stake.clone(),
+            ])
+            .style(style)
+        })
+        .collect();
+
+    let widths = [
+        Constraint::Min(20),
+        Constraint::Length(26),
+        Constraint::Length(14),
+    ];
+
+    let title = format!(" Validators ({}) ", app.explorer_validators.len());
+    let table = Table::new(rows, widths).header(header).block(
+        Block::default()
+            .title(title)
+            .title_style(common::header_style())
+            .borders(Borders::ALL)
+            .border_style(common::dim_style()),
+    );
+
+    frame.render_widget(table, area);
+}
+
+fn draw_lookup(frame: &mut Frame, app: &App, area: Rect) {
+    let layout = Layout::vertical([
+        Constraint::Length(3), // search input
+        Constraint::Min(5),    // result
+    ])
+    .split(area);
+
+    // Search input
+    let mode_label = if app.explorer_search_mode {
+        "Type Search"
+    } else {
+        "Lookup"
+    };
+    let input_title = format!(" {} ", mode_label);
+
+    let input_block = Block::default()
+        .title(input_title)
+        .title_style(common::header_style())
+        .borders(Borders::ALL)
+        .border_style(if app.input_mode == InputMode::Editing {
+            Style::default().fg(Color::Green)
+        } else {
+            common::dim_style()
+        });
+
+    let input_text = if app.input_mode == InputMode::Editing {
+        format!("  {}│", &app.input_buffer)
+    } else {
+        let hint = if app.explorer_search_mode {
+            "  Press 's' to search by type, Enter to lookup address/object"
+        } else {
+            "  Press Enter to lookup, 's' to search by type"
+        };
+        hint.to_string()
+    };
+
+    frame.render_widget(Paragraph::new(input_text).block(input_block), layout[0]);
+
+    // Result area
+    let result_block = Block::default()
+        .title(" Result ")
+        .title_style(common::header_style())
+        .borders(Borders::ALL)
+        .border_style(common::dim_style());
+
+    if !app.explorer_search_results.is_empty() {
+        // Show type-search results as a table
+        let visible_rows = layout[1].height.saturating_sub(4) as usize;
+        let header = Row::new(vec!["Object ID", "Type", "Version", "Owner"])
+            .style(common::header_style())
+            .bottom_margin(1);
+
+        let rows: Vec<Row> = app
+            .explorer_search_results
+            .iter()
+            .enumerate()
+            .skip(app.explorer_search_offset)
+            .take(visible_rows)
+            .map(|(i, obj)| {
+                let style = if i == app.explorer_search_selected {
+                    common::selected_style()
+                } else {
+                    Style::default()
+                };
+                Row::new(vec![
+                    common::truncate_address(&obj.object_id, 24),
+                    common::truncate_type(&obj.type_name, 30),
+                    obj.version.clone(),
+                    common::truncate_address(&obj.owner, 20),
+                ])
+                .style(style)
+            })
+            .collect();
+
+        let widths = [
+            Constraint::Length(26),
+            Constraint::Min(20),
+            Constraint::Length(10),
+            Constraint::Length(22),
+        ];
+
+        let title = format!(" Search Results ({}) ", app.explorer_search_results.len());
+        let table = Table::new(rows, widths).header(header).block(
+            Block::default()
+                .title(title)
+                .title_style(common::header_style())
+                .borders(Borders::ALL)
+                .border_style(common::dim_style()),
+        );
+
+        frame.render_widget(table, layout[1]);
+    } else if let Some(ref result) = app.explorer_lookup_result {
+        let content: Vec<Line> = match result {
+            LookupResult::Object { fields }
+            | LookupResult::Address { fields }
+            | LookupResult::Transaction { fields } => fields
+                .iter()
+                .map(|(k, v)| kv_line(&format!("  {}", k), v))
+                .collect(),
+            LookupResult::NotFound(msg) => {
+                vec![Line::from(Span::styled(
+                    format!("  {}", msg),
+                    Style::default().fg(Color::Yellow),
+                ))]
+            }
+        };
+        frame.render_widget(Paragraph::new(content).block(result_block), layout[1]);
+    } else {
+        frame.render_widget(
+            Paragraph::new("  Enter a hex address, object ID, or transaction digest")
+                .block(result_block),
+            layout[1],
+        );
+    }
+}
+
+fn kv_line(key: &str, value: &str) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(
+            format!("{:<24}", key),
+            Style::default().fg(Color::White).bold(),
+        ),
+        Span::styled(value.to_string(), common::accent_style()),
+    ])
+}

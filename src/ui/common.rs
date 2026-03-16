@@ -131,6 +131,9 @@ fn screen_hint(screen: Screen) -> &'static str {
         Screen::TxBuilder => {
             " Left/Right:step  Up/Down:navigate  a:add  c:clear  Enter:confirm  ?:help"
         }
+        Screen::Explorer => {
+            " Left/Right:sub-view  Up/Down:navigate  Enter:lookup  s:type-search  r:refresh  ?:help"
+        }
     }
 }
 

@@ -93,6 +93,7 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                             }
                         }
                     }
+                    Screen::Explorer => {}
                 }
             }
         }
@@ -153,6 +154,49 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
             _ => {}
         },
         Screen::Packages => {}
+        Screen::Explorer => {
+            // Explorer sub-view scroll: checkpoints, validators, search results
+            use crate::app::ExplorerView;
+            match app.explorer_view {
+                ExplorerView::Checkpoints => {
+                    app.explorer_checkpoints_selected = apply_delta(
+                        app.explorer_checkpoints_selected,
+                        delta,
+                        app.explorer_checkpoints.len(),
+                    );
+                    App::scroll_into_view(
+                        app.explorer_checkpoints_selected,
+                        &mut app.explorer_checkpoints_offset,
+                        20,
+                    );
+                }
+                ExplorerView::Validators => {
+                    app.explorer_validators_selected = apply_delta(
+                        app.explorer_validators_selected,
+                        delta,
+                        app.explorer_validators.len(),
+                    );
+                    App::scroll_into_view(
+                        app.explorer_validators_selected,
+                        &mut app.explorer_validators_offset,
+                        20,
+                    );
+                }
+                ExplorerView::Lookup if app.explorer_search_mode => {
+                    app.explorer_search_selected = apply_delta(
+                        app.explorer_search_selected,
+                        delta,
+                        app.explorer_search_results.len(),
+                    );
+                    App::scroll_into_view(
+                        app.explorer_search_selected,
+                        &mut app.explorer_search_offset,
+                        20,
+                    );
+                }
+                _ => {}
+            }
+        }
     }
 }
 
