@@ -57,7 +57,6 @@ pub struct StoredKey {
 
 /// IOTA network to connect to.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub enum Network {
     Mainnet,
     Testnet,

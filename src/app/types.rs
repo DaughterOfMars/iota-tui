@@ -44,7 +44,6 @@ impl Screen {
 
 /// A coin balance row displayed in the Coins screen.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct CoinDisplay {
     pub coin_type: String,
     pub symbol: String,
@@ -56,7 +55,6 @@ pub struct CoinDisplay {
 
 /// An object row displayed in the Objects screen.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct ObjectDisplay {
     pub object_id: String,
     pub type_name: String,
