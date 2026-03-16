@@ -88,6 +88,7 @@ pub struct App {
     pub explorer_search_cursors: Vec<Option<String>>,
     pub explorer_lookup_selected: usize,
     pub explorer_lookup_offset: usize,
+    pub explorer_lookup_query: Option<String>,
     // Address lookup pagination state
     pub explorer_lookup_address: Option<String>,
     pub explorer_lookup_obj_cursor: Option<String>,
@@ -203,6 +204,7 @@ impl App {
             explorer_search_cursors: vec![],
             explorer_lookup_selected: 0,
             explorer_lookup_offset: 0,
+            explorer_lookup_query: None,
             explorer_lookup_address: None,
             explorer_lookup_obj_cursor: None,
             explorer_lookup_obj_cursors: vec![],
@@ -233,6 +235,21 @@ impl App {
                 self.network_name = network;
                 self.set_status("Connected");
                 self.request_refresh();
+                // Re-run explorer lookup/search if one was active
+                if let Some(query) = self.explorer_lookup_query.clone() {
+                    self.send_cmd(WalletCmd::LookupAddress(query));
+                }
+                if self.explorer_search_mode {
+                    let type_filter = self.explorer_search_type.clone();
+                    if !type_filter.is_empty() {
+                        self.explorer_search_cursors.clear();
+                        self.explorer_search_cursor = None;
+                        self.send_cmd(WalletCmd::SearchObjectsByType {
+                            type_filter,
+                            cursor: None,
+                        });
+                    }
+                }
             }
             WalletEvent::Balances(balances) => {
                 for b in &balances {
@@ -545,6 +562,7 @@ impl App {
         self.explorer_lookup_result = None;
         self.explorer_lookup_selected = 0;
         self.explorer_lookup_offset = 0;
+        self.explorer_lookup_query = Some(query.clone());
         self.explorer_lookup_address = Some(query.clone());
         self.explorer_lookup_obj_cursor = None;
         self.explorer_lookup_obj_cursors.clear();
