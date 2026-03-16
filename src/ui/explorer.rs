@@ -9,7 +9,7 @@ use ratatui::{
 };
 
 use super::common;
-use crate::app::{App, ExplorerView, InputMode, LookupResult};
+use crate::app::{App, ExplorerView, InputMode, LookupResult, LookupSection};
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let layout = Layout::vertical([
@@ -293,21 +293,20 @@ fn draw_lookup(frame: &mut Frame, app: &App, area: Rect) {
 
         frame.render_widget(table, layout[1]);
     } else if let Some(ref result) = app.explorer_lookup_result {
-        let content: Vec<Line> = match result {
-            LookupResult::Object { fields }
-            | LookupResult::Address { fields }
-            | LookupResult::Transaction { fields } => fields
-                .iter()
-                .map(|(k, v)| kv_line(&format!("  {}", k), v))
-                .collect(),
+        match result {
             LookupResult::NotFound(msg) => {
-                vec![Line::from(Span::styled(
+                let content = vec![Line::from(Span::styled(
                     format!("  {}", msg),
                     Style::default().fg(Color::Yellow),
-                ))]
+                ))];
+                frame.render_widget(Paragraph::new(content).block(result_block), layout[1]);
             }
-        };
-        frame.render_widget(Paragraph::new(content).block(result_block), layout[1]);
+            LookupResult::Object { sections }
+            | LookupResult::Address { sections }
+            | LookupResult::Transaction { sections } => {
+                draw_lookup_sections(frame, app, sections, layout[1]);
+            }
+        }
     } else {
         frame.render_widget(
             Paragraph::new("  Enter a hex address, object ID, or transaction digest")
@@ -315,6 +314,73 @@ fn draw_lookup(frame: &mut Frame, app: &App, area: Rect) {
             layout[1],
         );
     }
+}
+
+fn draw_lookup_sections(frame: &mut Frame, app: &App, sections: &[LookupSection], area: Rect) {
+    let block = Block::default()
+        .title(" Result ")
+        .title_style(common::header_style())
+        .borders(Borders::ALL)
+        .border_style(common::dim_style());
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let visible_rows = inner.height as usize;
+    let mut flat_idx: usize = 0;
+    let mut lines: Vec<Line> = Vec::new();
+
+    for section in sections {
+        // Section header
+        lines.push(Line::from(Span::styled(
+            format!("── {} ──", section.title),
+            Style::default().fg(Color::Cyan).bold(),
+        )));
+
+        for field in &section.fields {
+            let is_selected = flat_idx == app.explorer_lookup_selected;
+            let has_action = field.action.is_some();
+
+            let key_style = if is_selected {
+                common::selected_style()
+            } else {
+                Style::default().fg(Color::White).bold()
+            };
+            let val_style = if is_selected {
+                common::selected_style()
+            } else if has_action {
+                common::accent_style()
+            } else {
+                Style::default().fg(Color::Gray)
+            };
+
+            let nav_hint = if is_selected && has_action {
+                " ⏎"
+            } else {
+                ""
+            };
+
+            lines.push(Line::from(vec![
+                Span::styled(format!("  {:<20}", field.key), key_style),
+                Span::styled(
+                    common::truncate_address(&field.value, inner.width.saturating_sub(24) as usize),
+                    val_style,
+                ),
+                Span::styled(nav_hint.to_string(), Style::default().fg(Color::Green)),
+            ]));
+
+            flat_idx += 1;
+        }
+    }
+
+    // Apply scroll offset
+    let display_lines: Vec<Line> = lines
+        .into_iter()
+        .skip(app.explorer_lookup_offset)
+        .take(visible_rows)
+        .collect();
+
+    frame.render_widget(Paragraph::new(display_lines), inner);
 }
 
 fn kv_line(key: &str, value: &str) -> Line<'static> {

@@ -3,7 +3,7 @@
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 
-use crate::app::{App, ExplorerView, InputMode, Popup, TxBuilderStep};
+use crate::app::{App, ExplorerView, InputMode, LookupAction, Popup, TxBuilderStep};
 use crate::wallet::WalletCmd;
 
 use super::input::handle_input_key;
@@ -511,7 +511,27 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                         app.explore_item(id);
                         return;
                     }
-                    // Otherwise open lookup input
+                    // If lookup result is showing, follow the selected field's action
+                    if let Some(ref result) = app.explorer_lookup_result {
+                        if let Some(field) = result.field_at(app.explorer_lookup_selected) {
+                            match &field.action {
+                                Some(LookupAction::Explore(val)) => {
+                                    let val = val.clone();
+                                    app.explore_item(val);
+                                    return;
+                                }
+                                Some(LookupAction::TypeSearch(val)) => {
+                                    let val = val.clone();
+                                    app.explore_type(val);
+                                    return;
+                                }
+                                None => {}
+                            }
+                        }
+                        // No action on this field — do nothing (don't open input)
+                        return;
+                    }
+                    // No results at all — open lookup input
                     app.explorer_search_mode = false;
                     app.start_input("");
                 }
@@ -523,15 +543,42 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                     app.explorer_lookup_result = None;
                     app.explorer_search_results.clear();
                     app.explorer_search_selected = 0;
+                    app.explorer_lookup_selected = 0;
+                    app.explorer_lookup_offset = 0;
                 }
                 KeyCode::Up => {
-                    if !app.explorer_search_results.is_empty() && app.explorer_search_selected > 0 {
-                        app.explorer_search_selected -= 1;
+                    if !app.explorer_search_results.is_empty() {
+                        if app.explorer_search_selected > 0 {
+                            app.explorer_search_selected -= 1;
+                        }
+                    } else if app.explorer_lookup_result.is_some() {
+                        if app.explorer_lookup_selected > 0 {
+                            app.explorer_lookup_selected -= 1;
+                        }
                     }
                 }
                 KeyCode::Down => {
-                    if app.explorer_search_selected + 1 < app.explorer_search_results.len() {
-                        app.explorer_search_selected += 1;
+                    if !app.explorer_search_results.is_empty() {
+                        if app.explorer_search_selected + 1 < app.explorer_search_results.len() {
+                            app.explorer_search_selected += 1;
+                        }
+                    } else if let Some(ref result) = app.explorer_lookup_result {
+                        let total = result.total_fields();
+                        if app.explorer_lookup_selected + 1 < total {
+                            app.explorer_lookup_selected += 1;
+                        }
+                    }
+                }
+                KeyCode::Home => {
+                    app.explorer_search_selected = 0;
+                    app.explorer_lookup_selected = 0;
+                }
+                KeyCode::End => {
+                    if !app.explorer_search_results.is_empty() {
+                        app.explorer_search_selected =
+                            app.explorer_search_results.len().saturating_sub(1);
+                    } else if let Some(ref result) = app.explorer_lookup_result {
+                        app.explorer_lookup_selected = result.total_fields().saturating_sub(1);
                     }
                 }
                 _ => {}
@@ -540,6 +587,12 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                 App::scroll_into_view(
                     app.explorer_search_selected,
                     &mut app.explorer_search_offset,
+                    20,
+                );
+            } else if app.explorer_lookup_result.is_some() {
+                App::scroll_into_view(
+                    app.explorer_lookup_selected,
+                    &mut app.explorer_lookup_offset,
                     20,
                 );
             }

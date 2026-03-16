@@ -82,6 +82,8 @@ pub struct App {
     pub explorer_search_selected: usize,
     pub explorer_search_offset: usize,
     pub explorer_search_mode: bool,
+    pub explorer_lookup_selected: usize,
+    pub explorer_lookup_offset: usize,
 
     // Autocomplete state for address/object fields
     pub autocomplete: Vec<(String, String)>, // (alias/label, address/object_id)
@@ -181,6 +183,8 @@ impl App {
             explorer_search_selected: 0,
             explorer_search_offset: 0,
             explorer_search_mode: false,
+            explorer_lookup_selected: 0,
+            explorer_lookup_offset: 0,
 
             autocomplete: vec![],
             autocomplete_idx: None,
@@ -375,6 +379,8 @@ impl App {
                 }
             }
             WalletEvent::ExplorerLookupResult(result) => {
+                self.explorer_lookup_selected = 0;
+                self.explorer_lookup_offset = 0;
                 self.explorer_lookup_result = Some(result);
             }
             WalletEvent::ObjectSearchResults(objects) => {
@@ -488,6 +494,8 @@ impl App {
         self.popup_scroll = 0;
         self.explorer_search_mode = false;
         self.explorer_lookup_result = None;
+        self.explorer_lookup_selected = 0;
+        self.explorer_lookup_offset = 0;
         self.explorer_search_results.clear();
         self.send_cmd(WalletCmd::LookupAddress(query));
         self.set_status("Looking up...");

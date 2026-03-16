@@ -337,13 +337,69 @@ pub struct ValidatorDisplay {
     pub stake: String,
 }
 
+/// What happens when a user presses Enter on a lookup field.
+#[derive(Debug, Clone)]
+pub enum LookupAction {
+    /// Navigate to explorer lookup for this value.
+    Explore(String),
+    /// Search objects by type.
+    TypeSearch(String),
+}
+
+/// A single key-value field in a lookup result, optionally navigable.
+#[derive(Debug, Clone)]
+pub struct LookupField {
+    pub key: String,
+    pub value: String,
+    pub action: Option<LookupAction>,
+}
+
+/// A titled section in the lookup result.
+#[derive(Debug, Clone)]
+pub struct LookupSection {
+    pub title: String,
+    pub fields: Vec<LookupField>,
+}
+
 /// Result of a lookup query in the Explorer Lookup sub-view.
 #[derive(Debug, Clone)]
 pub enum LookupResult {
-    Object { fields: Vec<(String, String)> },
-    Address { fields: Vec<(String, String)> },
-    Transaction { fields: Vec<(String, String)> },
+    Object { sections: Vec<LookupSection> },
+    Address { sections: Vec<LookupSection> },
+    Transaction { sections: Vec<LookupSection> },
     NotFound(String),
+}
+
+impl LookupResult {
+    /// Total number of fields across all sections (for scroll bounds).
+    pub fn total_fields(&self) -> usize {
+        match self {
+            LookupResult::Object { sections }
+            | LookupResult::Address { sections }
+            | LookupResult::Transaction { sections } => {
+                sections.iter().map(|s| s.fields.len()).sum()
+            }
+            LookupResult::NotFound(_) => 0,
+        }
+    }
+
+    /// Get the field at a flat index across all sections.
+    pub fn field_at(&self, idx: usize) -> Option<&LookupField> {
+        let sections = match self {
+            LookupResult::Object { sections }
+            | LookupResult::Address { sections }
+            | LookupResult::Transaction { sections } => sections,
+            LookupResult::NotFound(_) => return None,
+        };
+        let mut remaining = idx;
+        for section in sections {
+            if remaining < section.fields.len() {
+                return Some(&section.fields[remaining]);
+            }
+            remaining -= section.fields.len();
+        }
+        None
+    }
 }
 
 // ── Serde impls for AddressEntry (persistence) ────────────────────

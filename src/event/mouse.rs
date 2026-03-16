@@ -182,7 +182,7 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
                         20,
                     );
                 }
-                ExplorerView::Lookup if app.explorer_search_mode => {
+                ExplorerView::Lookup if !app.explorer_search_results.is_empty() => {
                     app.explorer_search_selected = apply_delta(
                         app.explorer_search_selected,
                         delta,
@@ -191,6 +191,20 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
                     App::scroll_into_view(
                         app.explorer_search_selected,
                         &mut app.explorer_search_offset,
+                        20,
+                    );
+                }
+                ExplorerView::Lookup if app.explorer_lookup_result.is_some() => {
+                    let total = app
+                        .explorer_lookup_result
+                        .as_ref()
+                        .map(|r| r.total_fields())
+                        .unwrap_or(0);
+                    app.explorer_lookup_selected =
+                        apply_delta(app.explorer_lookup_selected, delta, total);
+                    App::scroll_into_view(
+                        app.explorer_lookup_selected,
+                        &mut app.explorer_lookup_offset,
                         20,
                     );
                 }
