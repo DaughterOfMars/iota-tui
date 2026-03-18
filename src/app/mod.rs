@@ -124,6 +124,8 @@ pub struct App {
 
     // Visible rows in the content area (updated each frame)
     pub content_visible_rows: usize,
+    // Visible rows in the Explorer sub-view data area (updated each frame)
+    pub explorer_visible_rows: usize,
     // Absolute Y position of the content area (updated each frame)
     pub content_area_y: u16,
 }
@@ -248,6 +250,7 @@ impl App {
             tab_areas: vec![],
 
             content_visible_rows: 20,
+            explorer_visible_rows: 15,
             content_area_y: 2,
         }
     }

@@ -11,7 +11,7 @@ use ratatui::{
 use super::common;
 use crate::app::{App, ExplorerView, InputMode, LookupResult, LookupSection};
 
-pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
+pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let layout = Layout::vertical([
         Constraint::Length(3), // sub-view tabs
         Constraint::Min(5),    // content
@@ -74,7 +74,7 @@ fn draw_overview(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(Paragraph::new(content).block(block), area);
 }
 
-fn draw_checkpoints(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_checkpoints(frame: &mut Frame, app: &mut App, area: Rect) {
     if app.explorer_checkpoints.is_empty() {
         let block = Block::default()
             .title(" Checkpoints ")
@@ -109,6 +109,12 @@ fn draw_checkpoints(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     let visible_rows = table_area.height.saturating_sub(4) as usize;
+    app.explorer_visible_rows = visible_rows;
+    App::scroll_into_view(
+        app.explorer_checkpoints_selected,
+        &mut app.explorer_checkpoints_offset,
+        visible_rows,
+    );
 
     let sort_indicator = if app.explorer_checkpoints_sort_asc {
         " ^"
@@ -197,7 +203,7 @@ fn draw_checkpoints(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(table, table_area);
 }
 
-fn draw_validators(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_validators(frame: &mut Frame, app: &mut App, area: Rect) {
     if app.explorer_validators.is_empty() {
         let block = Block::default()
             .title(" Validators ")
@@ -209,6 +215,12 @@ fn draw_validators(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     let visible_rows = area.height.saturating_sub(4) as usize;
+    app.explorer_visible_rows = visible_rows;
+    App::scroll_into_view(
+        app.explorer_validators_selected,
+        &mut app.explorer_validators_offset,
+        visible_rows,
+    );
 
     let header = Row::new(vec!["Name", "Address", "Voting Power"])
         .style(common::header_style())
@@ -253,7 +265,7 @@ fn draw_validators(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(table, area);
 }
 
-fn draw_lookup(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
     let layout = Layout::vertical([
         Constraint::Length(3), // search input
         Constraint::Min(5),    // result
@@ -310,6 +322,12 @@ fn draw_lookup(frame: &mut Frame, app: &App, area: Rect) {
     if !app.explorer_search_results.is_empty() {
         // Show type-search results as a table
         let visible_rows = layout[1].height.saturating_sub(4) as usize;
+        app.explorer_visible_rows = visible_rows;
+        App::scroll_into_view(
+            app.explorer_search_selected,
+            &mut app.explorer_search_offset,
+            visible_rows,
+        );
         let header = Row::new(vec!["Object ID", "Type", "Version", "Owner"])
             .style(common::header_style())
             .bottom_margin(1);
@@ -366,17 +384,19 @@ fn draw_lookup(frame: &mut Frame, app: &App, area: Rect) {
         );
 
         frame.render_widget(table, layout[1]);
-    } else if let Some(ref result) = app.explorer_lookup_result {
-        match result {
+    } else if app.explorer_lookup_result.is_some() {
+        // Extract data needed from the result before passing &mut app
+        let (sections, title_override) = match app.explorer_lookup_result.as_ref().unwrap() {
             LookupResult::NotFound(msg) => {
                 let content = vec![Line::from(Span::styled(
                     format!("  {}", msg),
                     Style::default().fg(Color::Yellow),
                 ))];
                 frame.render_widget(Paragraph::new(content).block(result_block), layout[1]);
+                return;
             }
             LookupResult::Object { sections } | LookupResult::Transaction { sections } => {
-                draw_lookup_sections(frame, app, sections, None, layout[1]);
+                (sections.clone(), None)
             }
             LookupResult::Address { sections } => {
                 let page_num = app.explorer_lookup_obj_page + 1;
@@ -388,13 +408,25 @@ fn draw_lookup(frame: &mut Frame, app: &App, area: Rect) {
                     (false, true) => " | ]:next".to_string(),
                     (false, false) => String::new(),
                 };
-                let title_override = if page_hint.is_empty() {
+                let title = if page_hint.is_empty() {
                     None
                 } else {
                     Some(format!(" Result{} ", page_hint))
                 };
-                draw_lookup_sections(frame, app, sections, title_override.as_deref(), layout[1]);
+                (sections.clone(), title)
             }
+        };
+        let visible =
+            draw_lookup_sections(frame, app, &sections, title_override.as_deref(), layout[1]);
+        app.explorer_visible_rows = visible;
+        // Re-run scroll with the actual visible rows from this frame to fix
+        // any stale-value drift from the event handler.
+        if let Some(ref result) = app.explorer_lookup_result {
+            result.scroll_into_view(
+                app.explorer_lookup_selected,
+                &mut app.explorer_lookup_offset,
+                visible,
+            );
         }
     } else {
         frame.render_widget(
@@ -411,7 +443,7 @@ fn draw_lookup_sections(
     sections: &[LookupSection],
     title: Option<&str>,
     area: Rect,
-) {
+) -> usize {
     let block = Block::default()
         .title(title.unwrap_or(" Result "))
         .title_style(common::header_style())
@@ -495,6 +527,8 @@ fn draw_lookup_sections(
         .collect();
 
     frame.render_widget(Paragraph::new(display_lines), inner);
+
+    visible_rows
 }
 
 fn kv_line(key: &str, value: &str) -> Line<'static> {

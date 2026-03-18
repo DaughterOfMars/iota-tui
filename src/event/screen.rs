@@ -427,7 +427,7 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                 App::scroll_into_view(
                     app.explorer_checkpoints_selected,
                     &mut app.explorer_checkpoints_offset,
-                    app.content_visible_rows,
+                    app.explorer_visible_rows,
                 );
                 return;
             }
@@ -437,7 +437,7 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                 selected: &mut app.explorer_checkpoints_selected,
                 offset: &mut app.explorer_checkpoints_offset,
                 len,
-                visible_rows: app.content_visible_rows,
+                visible_rows: app.explorer_visible_rows,
             };
             if nav.handle_key(key.code) {
                 return;
@@ -480,7 +480,7 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                 selected: &mut app.explorer_validators_selected,
                 offset: &mut app.explorer_validators_offset,
                 len: app.explorer_validators.len(),
-                visible_rows: app.content_visible_rows,
+                visible_rows: app.explorer_visible_rows,
             };
             if nav.handle_key(key.code) {
                 return;
@@ -663,14 +663,13 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                 App::scroll_into_view(
                     app.explorer_search_selected,
                     &mut app.explorer_search_offset,
-                    app.content_visible_rows,
+                    app.explorer_visible_rows,
                 );
             } else if let Some(ref result) = app.explorer_lookup_result {
-                let headers = result.section_count();
-                App::scroll_into_view(
+                result.scroll_into_view(
                     app.explorer_lookup_selected,
                     &mut app.explorer_lookup_offset,
-                    app.content_visible_rows.saturating_sub(headers),
+                    app.explorer_visible_rows,
                 );
             }
         }

@@ -332,7 +332,7 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
                     App::scroll_into_view(
                         app.explorer_checkpoints_selected,
                         &mut app.explorer_checkpoints_offset,
-                        app.content_visible_rows,
+                        app.explorer_visible_rows,
                     );
                 }
                 ExplorerView::Validators => {
@@ -344,7 +344,7 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
                     App::scroll_into_view(
                         app.explorer_validators_selected,
                         &mut app.explorer_validators_offset,
-                        app.content_visible_rows,
+                        app.explorer_visible_rows,
                     );
                 }
                 ExplorerView::Lookup if !app.explorer_search_results.is_empty() => {
@@ -356,20 +356,23 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
                     App::scroll_into_view(
                         app.explorer_search_selected,
                         &mut app.explorer_search_offset,
-                        app.content_visible_rows,
+                        app.explorer_visible_rows,
                     );
                 }
                 ExplorerView::Lookup if app.explorer_lookup_result.is_some() => {
                     let result = app.explorer_lookup_result.as_ref().unwrap();
                     let total = result.total_fields();
-                    let headers = result.section_count();
                     app.explorer_lookup_selected =
                         apply_delta(app.explorer_lookup_selected, delta, total);
-                    App::scroll_into_view(
-                        app.explorer_lookup_selected,
-                        &mut app.explorer_lookup_offset,
-                        app.content_visible_rows.saturating_sub(headers),
-                    );
+                    let visible = app.explorer_visible_rows;
+                    app.explorer_lookup_result
+                        .as_ref()
+                        .unwrap()
+                        .scroll_into_view(
+                            app.explorer_lookup_selected,
+                            &mut app.explorer_lookup_offset,
+                            visible,
+                        );
                 }
                 _ => {}
             }
