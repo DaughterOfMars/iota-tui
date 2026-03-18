@@ -272,6 +272,7 @@ pub enum Popup {
     Detail,
     ConfirmDeleteAddress,
     ConfirmDeleteKey,
+    ConfirmClearTx,
     ConfirmQuit,
     LookupIotaName,
     ErrorLog,

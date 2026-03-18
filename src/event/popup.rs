@@ -403,6 +403,17 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
             }
             _ => {}
         },
+        Some(Popup::ConfirmClearTx) => match key.code {
+            KeyCode::Enter | KeyCode::Char('y') => {
+                app.reset_tx_builder();
+                app.set_status("Transaction cleared");
+                app.popup = None;
+            }
+            KeyCode::Esc | KeyCode::Char('n') => {
+                app.popup = None;
+            }
+            _ => {}
+        },
         Some(Popup::ConfirmQuit) => match key.code {
             KeyCode::Enter | KeyCode::Char('y') => {
                 app.running = false;

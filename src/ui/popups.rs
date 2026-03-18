@@ -87,6 +87,11 @@ pub fn draw_popup(frame: &mut Frame, app: &mut App) {
             frame.render_widget(Clear, popup_area);
             draw_confirm_delete_key(frame, app, popup_area);
         }
+        Some(Popup::ConfirmClearTx) => {
+            let popup_area = centered_rect_min(55, 40, 44, 10, area);
+            frame.render_widget(Clear, popup_area);
+            draw_confirm_clear_tx(frame, popup_area);
+        }
         Some(Popup::LookupIotaName) => {
             let popup_area = centered_rect_min(60, 30, 48, 10, area);
             frame.render_widget(Clear, popup_area);
@@ -525,6 +530,31 @@ fn draw_confirm_delete_key(frame: &mut Frame, app: &App, area: Rect) {
         .title_style(Style::default().fg(Color::Red).bold())
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Red));
+
+    frame.render_widget(Paragraph::new(text).block(block), area);
+}
+
+fn draw_confirm_clear_tx(frame: &mut Frame, area: Rect) {
+    let text = vec![
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Clear all transaction commands?",
+            Style::default().fg(Color::Yellow).bold(),
+        )]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Enter/y", Style::default().fg(ACCENT).bold()),
+            Span::raw(" confirm   "),
+            Span::styled("Esc/n", Style::default().fg(ACCENT).bold()),
+            Span::raw(" cancel"),
+        ]),
+    ];
+
+    let block = Block::default()
+        .title(" Confirm Clear ")
+        .title_style(Style::default().fg(Color::Yellow).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
 }
