@@ -261,6 +261,13 @@ impl App {
                 self.network_name = network;
                 self.set_status("Connected");
                 self.request_refresh();
+                // Refresh explorer data for the new network
+                self.explorer_overview = None;
+                self.explorer_checkpoints.clear();
+                self.explorer_validators.clear();
+                self.send_cmd(WalletCmd::RefreshNetworkOverview);
+                self.send_cmd(WalletCmd::RefreshCheckpoints { cursor: None });
+                self.send_cmd(WalletCmd::RefreshValidators);
                 // Re-run explorer lookup/search if one was active
                 if let Some(query) = self.explorer_lookup_query.clone() {
                     self.send_cmd(WalletCmd::LookupAddress(query));
