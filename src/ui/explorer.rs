@@ -157,23 +157,33 @@ fn draw_checkpoints(frame: &mut Frame, app: &App, area: Rect) {
     let has_prev = !app.explorer_checkpoints_cursors.is_empty();
     let has_next = app.explorer_checkpoints_has_next;
     let page_hint = match (has_prev, has_next) {
-        (true, true) => format!(" | [/]: prev/next page {}", page_num),
-        (true, false) => format!(" | [: prev page {}", page_num),
-        (false, true) => format!(" | ]: next page {}", page_num),
+        (true, true) => format!(" | pg {} [:prev ]:next", page_num),
+        (true, false) => format!(" | pg {} [:prev", page_num),
+        (false, true) => " | ]:next".to_string(),
         (false, false) => String::new(),
+    };
+    let sort_hint = " s:sort";
+    let search_hint = if app.explorer_checkpoints_filter.is_some() {
+        " Esc:clear"
+    } else {
+        " /:search"
     };
     let title = if app.explorer_checkpoints_filter.is_some() {
         format!(
-            " Checkpoints ({}/{}){} ",
+            " Checkpoints ({}/{}){}{}{} ",
             filtered.len(),
             app.explorer_checkpoints.len(),
-            page_hint
+            page_hint,
+            sort_hint,
+            search_hint,
         )
     } else {
         format!(
-            " Checkpoints ({}){} ",
+            " Checkpoints ({}){}{}{} ",
             app.explorer_checkpoints.len(),
-            page_hint
+            page_hint,
+            sort_hint,
+            search_hint,
         )
     };
     let table = Table::new(rows, widths).header(header).block(
@@ -337,16 +347,15 @@ fn draw_lookup(frame: &mut Frame, app: &App, area: Rect) {
         let has_prev = !app.explorer_search_cursors.is_empty();
         let has_next = app.explorer_search_has_next;
         let page_hint = match (has_prev, has_next) {
-            (true, true) => " | [/]: prev/next page".to_string(),
-            (true, false) => " | [: prev page".to_string(),
-            (false, true) => " | ]: next page".to_string(),
+            (true, true) => format!(" | pg {} [:prev ]:next", page_num),
+            (true, false) => format!(" | pg {} [:prev", page_num),
+            (false, true) => " | ]:next".to_string(),
             (false, false) => String::new(),
         };
         let title = format!(
-            " Search Results — page {}{}  ({} shown) ",
-            page_num,
+            " Search Results ({}){}",
+            app.explorer_search_results.len(),
             page_hint,
-            app.explorer_search_results.len()
         );
         let table = Table::new(rows, widths).header(header).block(
             Block::default()
@@ -374,9 +383,9 @@ fn draw_lookup(frame: &mut Frame, app: &App, area: Rect) {
                 let has_prev = !app.explorer_lookup_obj_cursors.is_empty();
                 let has_next = app.explorer_lookup_obj_has_next || app.explorer_lookup_tx_has_next;
                 let page_hint = match (has_prev, has_next) {
-                    (true, true) => format!(" — page {} | [/]: prev/next", page_num),
-                    (true, false) => format!(" — page {} | [: prev", page_num),
-                    (false, true) => format!(" — page {} | ]: next", page_num),
+                    (true, true) => format!(" | pg {} [:prev ]:next", page_num),
+                    (true, false) => format!(" | pg {} [:prev", page_num),
+                    (false, true) => " | ]:next".to_string(),
                     (false, false) => String::new(),
                 };
                 let title_override = if page_hint.is_empty() {
