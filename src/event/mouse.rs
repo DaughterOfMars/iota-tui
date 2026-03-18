@@ -158,7 +158,10 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                             for &view in ExplorerView::ALL.iter() {
                                 let w = view.title().len() as u16 + 3;
                                 if col >= x && col < x + w {
-                                    app.explorer_view = view;
+                                    if app.explorer_view != view {
+                                        app.explorer_view = view;
+                                        app.refresh_explorer();
+                                    }
                                     break;
                                 }
                                 x += w;

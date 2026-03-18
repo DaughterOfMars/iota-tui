@@ -613,7 +613,14 @@ impl App {
         self.popup = None;
         self.popup_scroll = 0;
         if screen == Screen::Explorer {
-            self.refresh_explorer();
+            // Load all explorer data upfront so sub-views aren't empty
+            self.send_cmd(WalletCmd::RefreshNetworkOverview);
+            if self.explorer_checkpoints.is_empty() {
+                self.send_cmd(WalletCmd::RefreshCheckpoints { cursor: None });
+            }
+            if self.explorer_validators.is_empty() {
+                self.send_cmd(WalletCmd::RefreshValidators);
+            }
         }
     }
 
