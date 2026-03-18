@@ -7,46 +7,29 @@ use crate::app::{App, ExplorerView, InputMode, LookupAction, Popup, TxBuilderSte
 use crate::wallet::WalletCmd;
 
 use super::input::handle_input_key;
+use super::nav::ListNav;
 
 pub fn handle_coins_key(app: &mut App, key: KeyEvent) {
-    let len = app.coins.len();
+    let mut nav = ListNav {
+        selected: &mut app.coins_selected,
+        offset: &mut app.coins_offset,
+        len: app.coins.len(),
+        visible_rows: app.content_visible_rows,
+    };
+    if nav.handle_key(key.code) {
+        return;
+    }
     match key.code {
-        KeyCode::Up => {
-            if app.coins_selected > 0 {
-                app.coins_selected -= 1;
-            }
-        }
-        KeyCode::Down => {
-            if app.coins_selected + 1 < len {
-                app.coins_selected += 1;
-            }
-        }
-        KeyCode::Home => {
-            app.coins_selected = 0;
-        }
-        KeyCode::End => {
-            if len > 0 {
-                app.coins_selected = len - 1;
-            }
-        }
-        KeyCode::PageUp => {
-            app.coins_selected = app.coins_selected.saturating_sub(10);
-        }
-        KeyCode::PageDown => {
-            app.coins_selected = (app.coins_selected + 10).min(len.saturating_sub(1));
-        }
         KeyCode::Enter => {
             if let Some(coin) = app.coins.get(app.coins_selected) {
                 let id = coin.object_id.clone();
                 app.explore_item(id);
-                return;
             }
         }
         KeyCode::Char('t') => {
             if let Some(coin) = app.coins.get(app.coins_selected) {
                 let ct = coin.coin_type.clone();
                 app.explore_type(ct);
-                return;
             }
         }
         KeyCode::Char('f') => {
@@ -59,165 +42,89 @@ pub fn handle_coins_key(app: &mut App, key: KeyEvent) {
         }
         _ => {}
     }
-    App::scroll_into_view(app.coins_selected, &mut app.coins_offset, app.content_visible_rows);
 }
 
 pub fn handle_objects_key(app: &mut App, key: KeyEvent) {
-    let len = app.objects.len();
+    let mut nav = ListNav {
+        selected: &mut app.objects_selected,
+        offset: &mut app.objects_offset,
+        len: app.objects.len(),
+        visible_rows: app.content_visible_rows,
+    };
+    if nav.handle_key(key.code) {
+        return;
+    }
     match key.code {
-        KeyCode::Up => {
-            if app.objects_selected > 0 {
-                app.objects_selected -= 1;
-            }
-        }
-        KeyCode::Down => {
-            if app.objects_selected + 1 < len {
-                app.objects_selected += 1;
-            }
-        }
-        KeyCode::Home => {
-            app.objects_selected = 0;
-        }
-        KeyCode::End => {
-            if len > 0 {
-                app.objects_selected = len - 1;
-            }
-        }
-        KeyCode::PageUp => {
-            app.objects_selected = app.objects_selected.saturating_sub(10);
-        }
-        KeyCode::PageDown => {
-            app.objects_selected = (app.objects_selected + 10).min(len.saturating_sub(1));
-        }
         KeyCode::Enter => {
             if let Some(obj) = app.objects.get(app.objects_selected) {
                 let id = obj.object_id.clone();
                 app.explore_item(id);
-                return;
             }
         }
         KeyCode::Char('t') => {
             if let Some(obj) = app.objects.get(app.objects_selected) {
                 let tn = obj.type_name.clone();
                 app.explore_type(tn);
-                return;
             }
         }
         _ => {}
     }
-    App::scroll_into_view(app.objects_selected, &mut app.objects_offset, app.content_visible_rows);
 }
 
 pub fn handle_transactions_key(app: &mut App, key: KeyEvent) {
-    let len = app.transactions.len();
-    match key.code {
-        KeyCode::Up => {
-            if app.transactions_selected > 0 {
-                app.transactions_selected -= 1;
-            }
-        }
-        KeyCode::Down => {
-            if app.transactions_selected + 1 < len {
-                app.transactions_selected += 1;
-            }
-        }
-        KeyCode::Home => {
-            app.transactions_selected = 0;
-        }
-        KeyCode::End => {
-            if len > 0 {
-                app.transactions_selected = len - 1;
-            }
-        }
-        KeyCode::PageUp => {
-            app.transactions_selected = app.transactions_selected.saturating_sub(10);
-        }
-        KeyCode::PageDown => {
-            app.transactions_selected = (app.transactions_selected + 10).min(len.saturating_sub(1));
-        }
-        KeyCode::Enter => {
-            if let Some(tx) = app.transactions.get(app.transactions_selected) {
-                let digest = tx.digest.clone();
-                app.explore_item(digest);
-                return;
-            }
-        }
-        _ => {}
+    let mut nav = ListNav {
+        selected: &mut app.transactions_selected,
+        offset: &mut app.transactions_offset,
+        len: app.transactions.len(),
+        visible_rows: app.content_visible_rows,
+    };
+    if nav.handle_key(key.code) {
+        return;
     }
-    App::scroll_into_view(app.transactions_selected, &mut app.transactions_offset, app.content_visible_rows);
+    if key.code == KeyCode::Enter
+        && let Some(tx) = app.transactions.get(app.transactions_selected)
+    {
+        let digest = tx.digest.clone();
+        app.explore_item(digest);
+    }
 }
 
 pub fn handle_packages_key(app: &mut App, key: KeyEvent) {
     let packages = app.package_indices();
-    let len = packages.len();
-    match key.code {
-        KeyCode::Up => {
-            if app.packages_selected > 0 {
-                app.packages_selected -= 1;
-            }
-        }
-        KeyCode::Down => {
-            if app.packages_selected + 1 < len {
-                app.packages_selected += 1;
-            }
-        }
-        KeyCode::Home => {
-            app.packages_selected = 0;
-        }
-        KeyCode::End => {
-            if len > 0 {
-                app.packages_selected = len - 1;
-            }
-        }
-        KeyCode::PageUp => {
-            app.packages_selected = app.packages_selected.saturating_sub(10);
-        }
-        KeyCode::PageDown => {
-            app.packages_selected = (app.packages_selected + 10).min(len.saturating_sub(1));
-        }
-        KeyCode::Enter => {
-            if let Some(&obj_idx) = packages.get(app.packages_selected) {
-                let id = app.objects[obj_idx].object_id.clone();
-                app.explore_item(id);
-                return;
-            }
-        }
-        _ => {}
+    let mut nav = ListNav {
+        selected: &mut app.packages_selected,
+        offset: &mut app.packages_offset,
+        len: packages.len(),
+        visible_rows: app.content_visible_rows,
+    };
+    if nav.handle_key(key.code) {
+        return;
     }
-    App::scroll_into_view(
-        app.packages_selected,
-        &mut app.packages_offset,
-        app.content_visible_rows,
-    );
+    if key.code == KeyCode::Enter
+        && let Some(&obj_idx) = packages.get(app.packages_selected)
+    {
+        let id = app.objects[obj_idx].object_id.clone();
+        app.explore_item(id);
+    }
 }
 
 pub fn handle_address_key(app: &mut App, key: KeyEvent) {
     let combined_len = app.key_entry_count() + app.address_book.len();
+    let mut nav = ListNav {
+        selected: &mut app.address_selected,
+        offset: &mut app.address_offset,
+        len: combined_len,
+        visible_rows: app.content_visible_rows,
+    };
+    if nav.handle_key(key.code) {
+        return;
+    }
     match key.code {
-        KeyCode::Up => {
-            if app.address_selected > 0 {
-                app.address_selected -= 1;
-            }
-        }
-        KeyCode::Down => {
-            if app.address_selected + 1 < combined_len {
-                app.address_selected += 1;
-            }
-        }
-        KeyCode::Home => {
-            app.address_selected = 0;
-        }
-        KeyCode::End => {
-            if combined_len > 0 {
-                app.address_selected = combined_len - 1;
-            }
-        }
         KeyCode::Enter => {
             let combined = app.combined_address_book();
             if let Some(entry) = combined.get(app.address_selected) {
                 let addr = entry.address.clone();
                 app.explore_item(addr);
-                return;
             }
         }
         KeyCode::Char('a') => {
@@ -256,30 +163,19 @@ pub fn handle_address_key(app: &mut App, key: KeyEvent) {
         }
         _ => {}
     }
-    App::scroll_into_view(app.address_selected, &mut app.address_offset, app.content_visible_rows);
 }
 
 pub fn handle_keys_key(app: &mut App, key: KeyEvent) {
-    let len = app.keys.len();
+    let mut nav = ListNav {
+        selected: &mut app.keys_selected,
+        offset: &mut app.keys_offset,
+        len: app.keys.len(),
+        visible_rows: app.content_visible_rows,
+    };
+    if nav.handle_key(key.code) {
+        return;
+    }
     match key.code {
-        KeyCode::Up => {
-            if app.keys_selected > 0 {
-                app.keys_selected -= 1;
-            }
-        }
-        KeyCode::Down => {
-            if app.keys_selected + 1 < len {
-                app.keys_selected += 1;
-            }
-        }
-        KeyCode::Home => {
-            app.keys_selected = 0;
-        }
-        KeyCode::End => {
-            if len > 0 {
-                app.keys_selected = len - 1;
-            }
-        }
         KeyCode::Enter => {
             let idx = app.keys_selected;
             for (i, k) in app.keys.iter_mut().enumerate() {
@@ -293,7 +189,6 @@ pub fn handle_keys_key(app: &mut App, key: KeyEvent) {
             if let Some(key) = app.keys.get(app.keys_selected) {
                 let addr = key.address.clone();
                 app.explore_item(addr);
-                return;
             }
         }
         KeyCode::Char('g') => {
@@ -326,7 +221,6 @@ pub fn handle_keys_key(app: &mut App, key: KeyEvent) {
         }
         _ => {}
     }
-    App::scroll_into_view(app.keys_selected, &mut app.keys_offset, app.content_visible_rows);
 }
 
 pub fn handle_tx_key(app: &mut App, key: KeyEvent) {
@@ -539,23 +433,16 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
             }
 
             let len = app.filtered_checkpoints().len();
+            let mut nav = ListNav {
+                selected: &mut app.explorer_checkpoints_selected,
+                offset: &mut app.explorer_checkpoints_offset,
+                len,
+                visible_rows: app.content_visible_rows,
+            };
+            if nav.handle_key(key.code) {
+                return;
+            }
             match key.code {
-                KeyCode::Up => {
-                    if app.explorer_checkpoints_selected > 0 {
-                        app.explorer_checkpoints_selected -= 1;
-                    }
-                }
-                KeyCode::Down => {
-                    if app.explorer_checkpoints_selected + 1 < len {
-                        app.explorer_checkpoints_selected += 1;
-                    }
-                }
-                KeyCode::Home => app.explorer_checkpoints_selected = 0,
-                KeyCode::End => {
-                    if len > 0 {
-                        app.explorer_checkpoints_selected = len - 1;
-                    }
-                }
                 KeyCode::Enter => {
                     if !app.explorer_checkpoints.is_empty() {
                         app.open_popup(Popup::Detail);
@@ -587,48 +474,25 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                 }
                 _ => {}
             }
-            App::scroll_into_view(
-                app.explorer_checkpoints_selected,
-                &mut app.explorer_checkpoints_offset,
-                app.content_visible_rows,
-            );
         }
         ExplorerView::Validators => {
-            let len = app.explorer_validators.len();
-            match key.code {
-                KeyCode::Up => {
-                    if app.explorer_validators_selected > 0 {
-                        app.explorer_validators_selected -= 1;
-                    }
-                }
-                KeyCode::Down => {
-                    if app.explorer_validators_selected + 1 < len {
-                        app.explorer_validators_selected += 1;
-                    }
-                }
-                KeyCode::Home => app.explorer_validators_selected = 0,
-                KeyCode::End => {
-                    if len > 0 {
-                        app.explorer_validators_selected = len - 1;
-                    }
-                }
-                KeyCode::Enter => {
-                    if let Some(v) = app
-                        .explorer_validators
-                        .get(app.explorer_validators_selected)
-                    {
-                        let addr = v.address.clone();
-                        app.explore_item(addr);
-                        return;
-                    }
-                }
-                _ => {}
+            let mut nav = ListNav {
+                selected: &mut app.explorer_validators_selected,
+                offset: &mut app.explorer_validators_offset,
+                len: app.explorer_validators.len(),
+                visible_rows: app.content_visible_rows,
+            };
+            if nav.handle_key(key.code) {
+                return;
             }
-            App::scroll_into_view(
-                app.explorer_validators_selected,
-                &mut app.explorer_validators_offset,
-                app.content_visible_rows,
-            );
+            if key.code == KeyCode::Enter
+                && let Some(v) = app
+                    .explorer_validators
+                    .get(app.explorer_validators_selected)
+            {
+                let addr = v.address.clone();
+                app.explore_item(addr);
+            }
         }
         ExplorerView::Lookup => {
             match key.code {

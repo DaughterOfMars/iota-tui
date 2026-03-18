@@ -116,36 +116,29 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                             }
                         } else if row >= content_start + 3 {
                             // Content data rows (after sub-tab bar + border + header + margin)
-                            let data_index =
-                                (row - content_start - 3) as usize;
+                            let data_index = (row - content_start - 3) as usize;
                             match app.explorer_view {
                                 ExplorerView::Checkpoints => {
-                                    let idx =
-                                        app.explorer_checkpoints_offset + data_index;
+                                    let idx = app.explorer_checkpoints_offset + data_index;
                                     if idx < app.explorer_checkpoints.len() {
                                         app.explorer_checkpoints_selected = idx;
                                     }
                                 }
                                 ExplorerView::Validators => {
-                                    let idx =
-                                        app.explorer_validators_offset + data_index;
+                                    let idx = app.explorer_validators_offset + data_index;
                                     if idx < app.explorer_validators.len() {
                                         app.explorer_validators_selected = idx;
                                     }
                                 }
                                 ExplorerView::Lookup => {
                                     if !app.explorer_search_results.is_empty() {
-                                        let idx =
-                                            app.explorer_search_offset + data_index;
+                                        let idx = app.explorer_search_offset + data_index;
                                         if idx < app.explorer_search_results.len() {
                                             app.explorer_search_selected = idx;
                                         }
-                                    } else if let Some(ref result) =
-                                        app.explorer_lookup_result
-                                    {
+                                    } else if let Some(ref result) = app.explorer_lookup_result {
                                         let total = result.total_fields();
-                                        let idx =
-                                            app.explorer_lookup_offset + data_index;
+                                        let idx = app.explorer_lookup_offset + data_index;
                                         if idx < total {
                                             app.explorer_lookup_selected = idx;
                                         }
@@ -180,25 +173,45 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
     match app.screen {
         Screen::Coins => {
             app.coins_selected = apply_delta(app.coins_selected, delta, app.coins.len());
-            App::scroll_into_view(app.coins_selected, &mut app.coins_offset, app.content_visible_rows);
+            App::scroll_into_view(
+                app.coins_selected,
+                &mut app.coins_offset,
+                app.content_visible_rows,
+            );
         }
         Screen::Objects => {
             app.objects_selected = apply_delta(app.objects_selected, delta, app.objects.len());
-            App::scroll_into_view(app.objects_selected, &mut app.objects_offset, app.content_visible_rows);
+            App::scroll_into_view(
+                app.objects_selected,
+                &mut app.objects_offset,
+                app.content_visible_rows,
+            );
         }
         Screen::Transactions => {
             app.transactions_selected =
                 apply_delta(app.transactions_selected, delta, app.transactions.len());
-            App::scroll_into_view(app.transactions_selected, &mut app.transactions_offset, app.content_visible_rows);
+            App::scroll_into_view(
+                app.transactions_selected,
+                &mut app.transactions_offset,
+                app.content_visible_rows,
+            );
         }
         Screen::AddressBook => {
             let combined_len = app.key_entry_count() + app.address_book.len();
             app.address_selected = apply_delta(app.address_selected, delta, combined_len);
-            App::scroll_into_view(app.address_selected, &mut app.address_offset, app.content_visible_rows);
+            App::scroll_into_view(
+                app.address_selected,
+                &mut app.address_offset,
+                app.content_visible_rows,
+            );
         }
         Screen::Keys => {
             app.keys_selected = apply_delta(app.keys_selected, delta, app.keys.len());
-            App::scroll_into_view(app.keys_selected, &mut app.keys_offset, app.content_visible_rows);
+            App::scroll_into_view(
+                app.keys_selected,
+                &mut app.keys_offset,
+                app.content_visible_rows,
+            );
         }
         Screen::TxBuilder => match app.tx_step {
             TxBuilderStep::SelectSender => {
@@ -216,8 +229,7 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
         },
         Screen::Packages => {
             let packages = app.package_indices();
-            app.packages_selected =
-                apply_delta(app.packages_selected, delta, packages.len());
+            app.packages_selected = apply_delta(app.packages_selected, delta, packages.len());
             App::scroll_into_view(
                 app.packages_selected,
                 &mut app.packages_offset,

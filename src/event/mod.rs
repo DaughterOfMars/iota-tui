@@ -2,6 +2,7 @@
 
 mod input;
 mod mouse;
+pub(crate) mod nav;
 mod popup;
 mod screen;
 
