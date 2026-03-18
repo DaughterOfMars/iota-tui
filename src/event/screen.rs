@@ -147,6 +147,50 @@ pub fn handle_transactions_key(app: &mut App, key: KeyEvent) {
     App::scroll_into_view(app.transactions_selected, &mut app.transactions_offset, app.content_visible_rows);
 }
 
+pub fn handle_packages_key(app: &mut App, key: KeyEvent) {
+    let packages = app.package_indices();
+    let len = packages.len();
+    match key.code {
+        KeyCode::Up => {
+            if app.packages_selected > 0 {
+                app.packages_selected -= 1;
+            }
+        }
+        KeyCode::Down => {
+            if app.packages_selected + 1 < len {
+                app.packages_selected += 1;
+            }
+        }
+        KeyCode::Home => {
+            app.packages_selected = 0;
+        }
+        KeyCode::End => {
+            if len > 0 {
+                app.packages_selected = len - 1;
+            }
+        }
+        KeyCode::PageUp => {
+            app.packages_selected = app.packages_selected.saturating_sub(10);
+        }
+        KeyCode::PageDown => {
+            app.packages_selected = (app.packages_selected + 10).min(len.saturating_sub(1));
+        }
+        KeyCode::Enter => {
+            if let Some(&obj_idx) = packages.get(app.packages_selected) {
+                let id = app.objects[obj_idx].object_id.clone();
+                app.explore_item(id);
+                return;
+            }
+        }
+        _ => {}
+    }
+    App::scroll_into_view(
+        app.packages_selected,
+        &mut app.packages_offset,
+        app.content_visible_rows,
+    );
+}
+
 pub fn handle_address_key(app: &mut App, key: KeyEvent) {
     let combined_len = app.key_entry_count() + app.address_book.len();
     match key.code {

@@ -40,6 +40,9 @@ pub struct App {
     pub transactions_selected: usize,
     pub transactions_offset: usize,
 
+    pub packages_selected: usize,
+    pub packages_offset: usize,
+
     pub address_book: Vec<AddressEntry>,
     pub address_selected: usize,
     pub address_offset: usize,
@@ -166,6 +169,9 @@ impl App {
             transactions: vec![],
             transactions_selected: 0,
             transactions_offset: 0,
+
+            packages_selected: 0,
+            packages_offset: 0,
 
             address_book,
             address_selected: 0,
@@ -729,6 +735,20 @@ impl App {
     }
 
     /// Number of key-derived entries shown at the top of the address book.
+    /// Returns indices into `self.objects` for objects that look like packages.
+    pub fn package_indices(&self) -> Vec<usize> {
+        self.objects
+            .iter()
+            .enumerate()
+            .filter(|(_, o)| {
+                o.type_name.contains("package")
+                    || o.type_name == "Package"
+                    || o.type_name.is_empty()
+            })
+            .map(|(i, _)| i)
+            .collect()
+    }
+
     pub fn key_entry_count(&self) -> usize {
         self.keys.len()
     }

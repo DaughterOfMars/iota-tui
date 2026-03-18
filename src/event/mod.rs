@@ -130,7 +130,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         Screen::Coins => screen::handle_coins_key(app, key),
         Screen::Objects => screen::handle_objects_key(app, key),
         Screen::Transactions => screen::handle_transactions_key(app, key),
-        Screen::Packages => {}
+        Screen::Packages => screen::handle_packages_key(app, key),
         Screen::AddressBook => screen::handle_address_key(app, key),
         Screen::Keys => screen::handle_keys_key(app, key),
         Screen::TxBuilder => screen::handle_tx_key(app, key),

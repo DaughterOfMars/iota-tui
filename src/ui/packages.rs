@@ -1,32 +1,26 @@
-//! Packages screen — placeholder for the package explorer.
+//! Packages screen — browse published Move packages.
 
 use ratatui::{
     Frame,
-    layout::Rect,
+    layout::{Constraint, Rect},
+    style::Style,
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph, Row, Table},
 };
 
 use super::common;
 use crate::app::App;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
-    let block = Block::default()
-        .title(" Packages ")
-        .title_style(common::header_style())
-        .borders(Borders::ALL)
-        .border_style(common::dim_style());
+    let packages = app.package_indices();
 
-    // Filter objects that look like packages
-    let package_objects: Vec<_> = app
-        .objects
-        .iter()
-        .filter(|o| {
-            o.type_name.contains("package") || o.type_name == "Package" || o.type_name.is_empty()
-        })
-        .collect();
+    if packages.is_empty() {
+        let block = Block::default()
+            .title(" Packages ")
+            .title_style(common::header_style())
+            .borders(Borders::ALL)
+            .border_style(common::dim_style());
 
-    if package_objects.is_empty() {
         let text = vec![
             Line::from(""),
             Line::from(vec![Span::styled(
@@ -44,21 +38,56 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
             )]),
         ];
         frame.render_widget(Paragraph::new(text).block(block), area);
-    } else {
-        let lines: Vec<Line> = package_objects
-            .iter()
-            .enumerate()
-            .map(|(i, obj)| {
-                Line::from(vec![
-                    Span::styled(format!("  {}. ", i + 1), common::dim_style()),
-                    Span::styled(
-                        common::truncate_address(&obj.object_id, 40),
-                        common::accent_style(),
-                    ),
-                    Span::styled(format!("  {}", obj.version), common::dim_style()),
-                ])
-            })
-            .collect();
-        frame.render_widget(Paragraph::new(lines).block(block), area);
+        return;
     }
+
+    let visible_rows = area.height.saturating_sub(4) as usize;
+
+    let header = Row::new(vec!["Object ID", "Version"])
+        .style(common::header_style())
+        .bottom_margin(1);
+
+    let rows: Vec<Row> = packages
+        .iter()
+        .enumerate()
+        .skip(app.packages_offset)
+        .take(visible_rows)
+        .map(|(i, &obj_idx)| {
+            let obj = &app.objects[obj_idx];
+            let style = if i == app.packages_selected {
+                common::selected_style()
+            } else {
+                Style::default()
+            };
+            Row::new(vec![
+                common::truncate_address(&obj.object_id, 40),
+                obj.version.clone(),
+            ])
+            .style(style)
+        })
+        .collect();
+
+    let widths = [Constraint::Min(42), Constraint::Length(10)];
+
+    let title = if packages.len() > visible_rows {
+        format!(
+            " Packages ({}) [{}-{}/{}] ",
+            packages.len(),
+            app.packages_offset + 1,
+            (app.packages_offset + visible_rows).min(packages.len()),
+            packages.len()
+        )
+    } else {
+        format!(" Packages ({}) ", packages.len())
+    };
+
+    let table = Table::new(rows, widths).header(header).block(
+        Block::default()
+            .title(title)
+            .title_style(common::header_style())
+            .borders(Borders::ALL)
+            .border_style(common::dim_style()),
+    );
+
+    frame.render_widget(table, area);
 }

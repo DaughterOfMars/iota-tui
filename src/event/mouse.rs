@@ -53,7 +53,13 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                             app.transactions_selected = idx;
                         }
                     }
-                    Screen::Packages => {}
+                    Screen::Packages => {
+                        let packages = app.package_indices();
+                        let idx = app.packages_offset + visual_index;
+                        if idx < packages.len() {
+                            app.packages_selected = idx;
+                        }
+                    }
                     Screen::AddressBook => {
                         let idx = app.address_offset + visual_index;
                         let combined_len = app.key_entry_count() + app.address_book.len();
@@ -208,7 +214,16 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
             }
             _ => {}
         },
-        Screen::Packages => {}
+        Screen::Packages => {
+            let packages = app.package_indices();
+            app.packages_selected =
+                apply_delta(app.packages_selected, delta, packages.len());
+            App::scroll_into_view(
+                app.packages_selected,
+                &mut app.packages_offset,
+                app.content_visible_rows,
+            );
+        }
         Screen::Explorer => {
             // Explorer sub-view scroll: checkpoints, validators, search results
             use crate::app::ExplorerView;
