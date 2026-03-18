@@ -104,9 +104,14 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                     let step_end = cy + 3;
                     if row >= cy && row < step_end {
                         // Click on step indicator — determine which step from column
-                        let mut x = 2u16;
+                        // Rendered: border(1) then per step: " N " (3) + " Title " (len+2) + " > " (3)
+                        // Last step has no " > " separator
+                        let mut x = 1u16; // inside left border
+                        let last = TxBuilderStep::ALL.len() - 1;
                         for (si, step) in TxBuilderStep::ALL.iter().enumerate() {
-                            let w = step.title().len() as u16 + 5; // " N  title  > "
+                            // " N " = 3, " Title " = title.len() + 2
+                            let w =
+                                3 + step.title().len() as u16 + 2 + if si < last { 3 } else { 0 };
                             if col >= x && col < x + w {
                                 app.tx_step = TxBuilderStep::ALL[si];
                                 break;
