@@ -118,6 +118,9 @@ pub struct App {
 
     // Layout state for mouse hit-testing
     pub tab_areas: Vec<ratatui::layout::Rect>,
+
+    // Visible rows in the content area (updated each frame)
+    pub content_visible_rows: usize,
 }
 
 impl App {
@@ -235,6 +238,8 @@ impl App {
             popup_scroll: 0,
 
             tab_areas: vec![],
+
+            content_visible_rows: 20,
         }
     }
 
@@ -1180,8 +1185,9 @@ fn format_balance(raw: u128, decimals: u32) -> String {
     }
     let frac_str = format!("{:0>width$}", frac, width = decimals as usize);
     let trimmed = frac_str.trim_end_matches('0');
-    let display_frac = if trimmed.len() < 2 {
-        &frac_str[..2]
+    let min_width = 2.min(frac_str.len());
+    let display_frac = if trimmed.len() < min_width {
+        &frac_str[..min_width]
     } else {
         trimmed
     };
