@@ -468,10 +468,29 @@ fn draw_lookup_sections(
         }
     }
 
-    // Apply scroll offset
+    // Convert field-based offset to line-based offset (accounts for section headers)
+    let line_offset = if app.explorer_lookup_offset > 0 {
+        // Find which line corresponds to the field at explorer_lookup_offset
+        let mut field_count = 0;
+        let mut line_idx = 0;
+        'outer: for section in sections {
+            line_idx += 1; // section header
+            for _ in &section.fields {
+                if field_count == app.explorer_lookup_offset {
+                    break 'outer;
+                }
+                field_count += 1;
+                line_idx += 1;
+            }
+        }
+        line_idx
+    } else {
+        0
+    };
+
     let display_lines: Vec<Line> = lines
         .into_iter()
-        .skip(app.explorer_lookup_offset)
+        .skip(line_offset)
         .take(visible_rows)
         .collect();
 

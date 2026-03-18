@@ -386,18 +386,55 @@ impl LookupResult {
 
     /// Get the field at a flat index across all sections.
     pub fn field_at(&self, idx: usize) -> Option<&LookupField> {
-        let sections = match self {
-            LookupResult::Object { sections }
-            | LookupResult::Address { sections }
-            | LookupResult::Transaction { sections } => sections,
-            LookupResult::NotFound(_) => return None,
-        };
         let mut remaining = idx;
-        for section in sections {
+        for section in self.sections() {
             if remaining < section.fields.len() {
                 return Some(&section.fields[remaining]);
             }
             remaining -= section.fields.len();
+        }
+        None
+    }
+
+    pub fn sections(&self) -> &[LookupSection] {
+        match self {
+            LookupResult::Object { sections }
+            | LookupResult::Address { sections }
+            | LookupResult::Transaction { sections } => sections,
+            LookupResult::NotFound(_) => &[],
+        }
+    }
+
+    /// Convert a field index to a line index (accounting for section header lines).
+    pub fn field_to_line(&self, field_idx: usize) -> usize {
+        let mut field_count = 0;
+        let mut headers_before = 0;
+        for section in self.sections() {
+            headers_before += 1;
+            if field_count + section.fields.len() > field_idx {
+                return field_idx + headers_before;
+            }
+            field_count += section.fields.len();
+        }
+        field_idx + headers_before
+    }
+
+    /// Convert a line index to a field index, or `None` if the line is a section header.
+    pub fn line_to_field(&self, line_idx: usize) -> Option<usize> {
+        let mut current_line = 0;
+        let mut field_count = 0;
+        for section in self.sections() {
+            if line_idx == current_line {
+                return None; // section header
+            }
+            current_line += 1;
+            for i in 0..section.fields.len() {
+                if line_idx == current_line {
+                    return Some(field_count + i);
+                }
+                current_line += 1;
+            }
+            field_count += section.fields.len();
         }
         None
     }
