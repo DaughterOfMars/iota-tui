@@ -59,7 +59,7 @@ pub fn handle_coins_key(app: &mut App, key: KeyEvent) {
         }
         _ => {}
     }
-    App::scroll_into_view(app.coins_selected, &mut app.coins_offset, 20);
+    App::scroll_into_view(app.coins_selected, &mut app.coins_offset, app.content_visible_rows);
 }
 
 pub fn handle_objects_key(app: &mut App, key: KeyEvent) {
@@ -105,7 +105,7 @@ pub fn handle_objects_key(app: &mut App, key: KeyEvent) {
         }
         _ => {}
     }
-    App::scroll_into_view(app.objects_selected, &mut app.objects_offset, 20);
+    App::scroll_into_view(app.objects_selected, &mut app.objects_offset, app.content_visible_rows);
 }
 
 pub fn handle_transactions_key(app: &mut App, key: KeyEvent) {
@@ -144,7 +144,7 @@ pub fn handle_transactions_key(app: &mut App, key: KeyEvent) {
         }
         _ => {}
     }
-    App::scroll_into_view(app.transactions_selected, &mut app.transactions_offset, 20);
+    App::scroll_into_view(app.transactions_selected, &mut app.transactions_offset, app.content_visible_rows);
 }
 
 pub fn handle_address_key(app: &mut App, key: KeyEvent) {
@@ -212,7 +212,7 @@ pub fn handle_address_key(app: &mut App, key: KeyEvent) {
         }
         _ => {}
     }
-    App::scroll_into_view(app.address_selected, &mut app.address_offset, 20);
+    App::scroll_into_view(app.address_selected, &mut app.address_offset, app.content_visible_rows);
 }
 
 pub fn handle_keys_key(app: &mut App, key: KeyEvent) {
@@ -282,7 +282,7 @@ pub fn handle_keys_key(app: &mut App, key: KeyEvent) {
         }
         _ => {}
     }
-    App::scroll_into_view(app.keys_selected, &mut app.keys_offset, 20);
+    App::scroll_into_view(app.keys_selected, &mut app.keys_offset, app.content_visible_rows);
 }
 
 pub fn handle_tx_key(app: &mut App, key: KeyEvent) {
@@ -485,7 +485,7 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                 App::scroll_into_view(
                     app.explorer_checkpoints_selected,
                     &mut app.explorer_checkpoints_offset,
-                    20,
+                    app.content_visible_rows,
                 );
                 return;
             }
@@ -542,7 +542,7 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
             App::scroll_into_view(
                 app.explorer_checkpoints_selected,
                 &mut app.explorer_checkpoints_offset,
-                20,
+                app.content_visible_rows,
             );
         }
         ExplorerView::Validators => {
@@ -579,7 +579,7 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
             App::scroll_into_view(
                 app.explorer_validators_selected,
                 &mut app.explorer_validators_offset,
-                20,
+                app.content_visible_rows,
             );
         }
         ExplorerView::Lookup => {
@@ -751,13 +751,13 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                 App::scroll_into_view(
                     app.explorer_search_selected,
                     &mut app.explorer_search_offset,
-                    20,
+                    app.content_visible_rows,
                 );
             } else if app.explorer_lookup_result.is_some() {
                 App::scroll_into_view(
                     app.explorer_lookup_selected,
                     &mut app.explorer_lookup_offset,
-                    20,
+                    app.content_visible_rows,
                 );
             }
         }

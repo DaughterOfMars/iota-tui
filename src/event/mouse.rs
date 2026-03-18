@@ -119,25 +119,25 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
     match app.screen {
         Screen::Coins => {
             app.coins_selected = apply_delta(app.coins_selected, delta, app.coins.len());
-            App::scroll_into_view(app.coins_selected, &mut app.coins_offset, 20);
+            App::scroll_into_view(app.coins_selected, &mut app.coins_offset, app.content_visible_rows);
         }
         Screen::Objects => {
             app.objects_selected = apply_delta(app.objects_selected, delta, app.objects.len());
-            App::scroll_into_view(app.objects_selected, &mut app.objects_offset, 20);
+            App::scroll_into_view(app.objects_selected, &mut app.objects_offset, app.content_visible_rows);
         }
         Screen::Transactions => {
             app.transactions_selected =
                 apply_delta(app.transactions_selected, delta, app.transactions.len());
-            App::scroll_into_view(app.transactions_selected, &mut app.transactions_offset, 20);
+            App::scroll_into_view(app.transactions_selected, &mut app.transactions_offset, app.content_visible_rows);
         }
         Screen::AddressBook => {
             let combined_len = app.key_entry_count() + app.address_book.len();
             app.address_selected = apply_delta(app.address_selected, delta, combined_len);
-            App::scroll_into_view(app.address_selected, &mut app.address_offset, 20);
+            App::scroll_into_view(app.address_selected, &mut app.address_offset, app.content_visible_rows);
         }
         Screen::Keys => {
             app.keys_selected = apply_delta(app.keys_selected, delta, app.keys.len());
-            App::scroll_into_view(app.keys_selected, &mut app.keys_offset, 20);
+            App::scroll_into_view(app.keys_selected, &mut app.keys_offset, app.content_visible_rows);
         }
         Screen::TxBuilder => match app.tx_step {
             TxBuilderStep::SelectSender => {
@@ -167,7 +167,7 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
                     App::scroll_into_view(
                         app.explorer_checkpoints_selected,
                         &mut app.explorer_checkpoints_offset,
-                        20,
+                        app.content_visible_rows,
                     );
                 }
                 ExplorerView::Validators => {
@@ -179,7 +179,7 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
                     App::scroll_into_view(
                         app.explorer_validators_selected,
                         &mut app.explorer_validators_offset,
-                        20,
+                        app.content_visible_rows,
                     );
                 }
                 ExplorerView::Lookup if !app.explorer_search_results.is_empty() => {
@@ -191,7 +191,7 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
                     App::scroll_into_view(
                         app.explorer_search_selected,
                         &mut app.explorer_search_offset,
-                        20,
+                        app.content_visible_rows,
                     );
                 }
                 ExplorerView::Lookup if app.explorer_lookup_result.is_some() => {
@@ -205,7 +205,7 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
                     App::scroll_into_view(
                         app.explorer_lookup_selected,
                         &mut app.explorer_lookup_offset,
-                        20,
+                        app.content_visible_rows,
                     );
                 }
                 _ => {}
