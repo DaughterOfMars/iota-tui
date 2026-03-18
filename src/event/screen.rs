@@ -665,11 +665,12 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                     &mut app.explorer_search_offset,
                     app.content_visible_rows,
                 );
-            } else if app.explorer_lookup_result.is_some() {
+            } else if let Some(ref result) = app.explorer_lookup_result {
+                let headers = result.section_count();
                 App::scroll_into_view(
                     app.explorer_lookup_selected,
                     &mut app.explorer_lookup_offset,
-                    app.content_visible_rows,
+                    app.content_visible_rows.saturating_sub(headers),
                 );
             }
         }

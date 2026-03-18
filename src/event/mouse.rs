@@ -360,17 +360,15 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
                     );
                 }
                 ExplorerView::Lookup if app.explorer_lookup_result.is_some() => {
-                    let total = app
-                        .explorer_lookup_result
-                        .as_ref()
-                        .map(|r| r.total_fields())
-                        .unwrap_or(0);
+                    let result = app.explorer_lookup_result.as_ref().unwrap();
+                    let total = result.total_fields();
+                    let headers = result.section_count();
                     app.explorer_lookup_selected =
                         apply_delta(app.explorer_lookup_selected, delta, total);
                     App::scroll_into_view(
                         app.explorer_lookup_selected,
                         &mut app.explorer_lookup_offset,
-                        app.content_visible_rows,
+                        app.content_visible_rows.saturating_sub(headers),
                     );
                 }
                 _ => {}

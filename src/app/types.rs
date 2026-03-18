@@ -396,6 +396,11 @@ impl LookupResult {
         None
     }
 
+    /// Number of section headers (used to adjust visible row count for scrolling).
+    pub fn section_count(&self) -> usize {
+        self.sections().len()
+    }
+
     pub fn sections(&self) -> &[LookupSection] {
         match self {
             LookupResult::Object { sections }
