@@ -2,7 +2,7 @@
 
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
-use crate::app::{App, InputMode, Screen, TxBuilderStep};
+use crate::app::{App, ExplorerView, InputMode, Screen, TxBuilderStep};
 
 pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
     match mouse.kind {
@@ -93,7 +93,62 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                             }
                         }
                     }
-                    Screen::Explorer => {}
+                    Screen::Explorer => {
+                        // Explorer has a sub-tab bar (3 rows) before its content.
+                        // Row content_start-2 is the text row inside the sub-tab block.
+                        let sub_tab_row = content_start.saturating_sub(2);
+                        if row == sub_tab_row {
+                            // Determine which sub-tab was clicked from column position
+                            let mut x = 2u16; // inside border
+                            for &view in ExplorerView::ALL.iter() {
+                                let w = view.title().len() as u16 + 3; // " title " + space
+                                if col >= x && col < x + w {
+                                    app.explorer_view = view;
+                                    break;
+                                }
+                                x += w;
+                            }
+                        } else if row >= content_start + 3 {
+                            // Content data rows (after sub-tab bar + border + header + margin)
+                            let data_index =
+                                (row - content_start - 3) as usize;
+                            match app.explorer_view {
+                                ExplorerView::Checkpoints => {
+                                    let idx =
+                                        app.explorer_checkpoints_offset + data_index;
+                                    if idx < app.explorer_checkpoints.len() {
+                                        app.explorer_checkpoints_selected = idx;
+                                    }
+                                }
+                                ExplorerView::Validators => {
+                                    let idx =
+                                        app.explorer_validators_offset + data_index;
+                                    if idx < app.explorer_validators.len() {
+                                        app.explorer_validators_selected = idx;
+                                    }
+                                }
+                                ExplorerView::Lookup => {
+                                    if !app.explorer_search_results.is_empty() {
+                                        let idx =
+                                            app.explorer_search_offset + data_index;
+                                        if idx < app.explorer_search_results.len() {
+                                            app.explorer_search_selected = idx;
+                                        }
+                                    } else if let Some(ref result) =
+                                        app.explorer_lookup_result
+                                    {
+                                        let total = result.total_fields();
+                                        let idx =
+                                            app.explorer_lookup_offset + data_index;
+                                        if idx < total {
+                                            app.explorer_lookup_selected = idx;
+                                        }
+                                    }
+                                }
+                                ExplorerView::Overview => {}
+                            }
+                        }
+                    }
                 }
             }
         }
