@@ -124,6 +124,8 @@ pub struct App {
 
     // Visible rows in the content area (updated each frame)
     pub content_visible_rows: usize,
+    // Absolute Y position of the content area (updated each frame)
+    pub content_area_y: u16,
 }
 
 impl App {
@@ -246,6 +248,7 @@ impl App {
             tab_areas: vec![],
 
             content_visible_rows: 20,
+            content_area_y: 2,
         }
     }
 

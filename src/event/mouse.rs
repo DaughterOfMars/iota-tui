@@ -30,122 +30,193 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                 }
             }
 
-            // Content area starts after tab bar (1) + status bar (1) + border (1) + header row (1)
-            let content_start = 5u16;
-            if row >= content_start {
-                let visual_index = (row - content_start) as usize;
-                match app.screen {
-                    Screen::Coins => {
-                        let idx = app.coins_offset + visual_index;
+            // Content area Y position (set each frame by the UI draw function)
+            let cy = app.content_area_y;
+            if row < cy {
+                return;
+            }
+
+            match app.screen {
+                // Coins: summary(3) + table with border(1)+header(1)+margin(1) = data at cy+6
+                Screen::Coins => {
+                    let data_start = cy + 3 + 1 + 1 + 1;
+                    if row >= data_start {
+                        let idx = app.coins_offset + (row - data_start) as usize;
                         if idx < app.coins.len() {
                             app.coins_selected = idx;
                         }
                     }
-                    Screen::Objects => {
-                        let idx = app.objects_offset + visual_index;
+                }
+                // Objects: border(1)+header(1)+margin(1) = data at cy+3
+                Screen::Objects => {
+                    let data_start = cy + 1 + 1 + 1;
+                    if row >= data_start {
+                        let idx = app.objects_offset + (row - data_start) as usize;
                         if idx < app.objects.len() {
                             app.objects_selected = idx;
                         }
                     }
-                    Screen::Transactions => {
-                        let idx = app.transactions_offset + visual_index;
+                }
+                // Transactions: border(1)+header(1), NO margin = data at cy+2
+                Screen::Transactions => {
+                    let data_start = cy + 1 + 1;
+                    if row >= data_start {
+                        let idx = app.transactions_offset + (row - data_start) as usize;
                         if idx < app.transactions.len() {
                             app.transactions_selected = idx;
                         }
                     }
-                    Screen::Packages => {
+                }
+                // Packages: border(1)+header(1)+margin(1) = data at cy+3
+                Screen::Packages => {
+                    let data_start = cy + 1 + 1 + 1;
+                    if row >= data_start {
                         let packages = app.package_indices();
-                        let idx = app.packages_offset + visual_index;
+                        let idx = app.packages_offset + (row - data_start) as usize;
                         if idx < packages.len() {
                             app.packages_selected = idx;
                         }
                     }
-                    Screen::AddressBook => {
-                        let idx = app.address_offset + visual_index;
+                }
+                // AddressBook: border(1)+header(1)+margin(1) = data at cy+3
+                Screen::AddressBook => {
+                    let data_start = cy + 1 + 1 + 1;
+                    if row >= data_start {
+                        let idx = app.address_offset + (row - data_start) as usize;
                         let combined_len = app.key_entry_count() + app.address_book.len();
                         if idx < combined_len {
                             app.address_selected = idx;
                         }
                     }
-                    Screen::Keys => {
-                        let idx = app.keys_offset + visual_index;
+                }
+                // Keys: border(1)+header(1)+margin(1) = data at cy+3
+                Screen::Keys => {
+                    let data_start = cy + 1 + 1 + 1;
+                    if row >= data_start {
+                        let idx = app.keys_offset + (row - data_start) as usize;
                         if idx < app.keys.len() {
                             app.keys_selected = idx;
                         }
                     }
-                    Screen::TxBuilder => {
-                        if row <= 4 {
-                            let step_width = col as usize / 20;
-                            if let Some(&step) = TxBuilderStep::ALL.get(step_width) {
-                                app.tx_step = step;
+                }
+                Screen::TxBuilder => {
+                    // Step indicator: 3-row block at cy..cy+3, text on row cy+1
+                    let step_end = cy + 3;
+                    if row >= cy && row < step_end {
+                        // Click on step indicator — determine which step from column
+                        let mut x = 2u16;
+                        for (si, step) in TxBuilderStep::ALL.iter().enumerate() {
+                            let w = step.title().len() as u16 + 5; // " N  title  > "
+                            if col >= x && col < x + w {
+                                app.tx_step = TxBuilderStep::ALL[si];
+                                break;
                             }
-                        } else {
-                            let step_row = (row.saturating_sub(5)) as usize;
-                            match app.tx_step {
-                                TxBuilderStep::SelectSender => {
-                                    if step_row < app.keys.len() {
-                                        if app.tx_sender != step_row {
+                            x += w;
+                        }
+                    } else if row >= step_end {
+                        // Content area below step indicator
+                        match app.tx_step {
+                            // SelectSender uses List: border(1) then items
+                            TxBuilderStep::SelectSender => {
+                                let data_start = step_end + 1;
+                                if row >= data_start {
+                                    let idx = (row - data_start) as usize;
+                                    if idx < app.keys.len() {
+                                        if app.tx_sender != idx {
                                             app.tx_dry_run_dirty = true;
                                         }
-                                        app.tx_sender = step_row;
+                                        app.tx_sender = idx;
                                     }
                                 }
-                                TxBuilderStep::EditCommands => {
-                                    if step_row >= 2 && step_row - 2 < app.tx_commands.len() {
-                                        app.tx_cmd_selected = step_row - 2;
-                                    }
-                                }
-                                _ => {}
                             }
+                            // EditCommands uses Table: border(1)+header(1)+margin(1)
+                            TxBuilderStep::EditCommands => {
+                                let data_start = step_end + 1 + 1 + 1;
+                                if row >= data_start {
+                                    let idx = (row - data_start) as usize;
+                                    if idx < app.tx_commands.len() {
+                                        app.tx_cmd_selected = idx;
+                                    }
+                                }
+                            }
+                            _ => {}
                         }
                     }
-                    Screen::Explorer => {
-                        // Explorer has a sub-tab bar (3 rows) before its content.
-                        // Row content_start-2 is the text row inside the sub-tab block.
-                        let sub_tab_row = content_start.saturating_sub(2);
-                        if row == sub_tab_row {
-                            // Determine which sub-tab was clicked from column position
-                            let mut x = 2u16; // inside border
+                }
+                Screen::Explorer => {
+                    // Sub-tab bar: 3-row block at cy..cy+3, text on row cy+1
+                    let sub_tab_end = cy + 3;
+                    if row >= cy && row < sub_tab_end {
+                        // Click on sub-tab text row
+                        if row == cy + 1 {
+                            let mut x = 2u16;
                             for &view in ExplorerView::ALL.iter() {
-                                let w = view.title().len() as u16 + 3; // " title " + space
+                                let w = view.title().len() as u16 + 3;
                                 if col >= x && col < x + w {
                                     app.explorer_view = view;
                                     break;
                                 }
                                 x += w;
                             }
-                        } else if row >= content_start + 3 {
-                            // Content data rows (after sub-tab bar + border + header + margin)
-                            let data_index = (row - content_start - 3) as usize;
-                            match app.explorer_view {
-                                ExplorerView::Checkpoints => {
-                                    let idx = app.explorer_checkpoints_offset + data_index;
+                        }
+                    } else if row >= sub_tab_end {
+                        // Content below sub-tabs; each sub-view has its own layout
+                        match app.explorer_view {
+                            // Checkpoints table: border(1)+header(1)+margin(1) = +3
+                            // (may have a filter row +1 before the table)
+                            ExplorerView::Checkpoints => {
+                                let filter_rows = if app.explorer_checkpoints_filter.is_some() {
+                                    1u16
+                                } else {
+                                    0
+                                };
+                                let data_start = sub_tab_end + filter_rows + 1 + 1 + 1;
+                                if row >= data_start {
+                                    let idx = app.explorer_checkpoints_offset
+                                        + (row - data_start) as usize;
                                     if idx < app.explorer_checkpoints.len() {
                                         app.explorer_checkpoints_selected = idx;
                                     }
                                 }
-                                ExplorerView::Validators => {
-                                    let idx = app.explorer_validators_offset + data_index;
+                            }
+                            // Validators table: border(1)+header(1)+margin(1) = +3
+                            ExplorerView::Validators => {
+                                let data_start = sub_tab_end + 1 + 1 + 1;
+                                if row >= data_start {
+                                    let idx = app.explorer_validators_offset
+                                        + (row - data_start) as usize;
                                     if idx < app.explorer_validators.len() {
                                         app.explorer_validators_selected = idx;
                                     }
                                 }
-                                ExplorerView::Lookup => {
-                                    if !app.explorer_search_results.is_empty() {
-                                        let idx = app.explorer_search_offset + data_index;
+                            }
+                            // Lookup: search input(3) + result block
+                            ExplorerView::Lookup => {
+                                let result_start = sub_tab_end + 3;
+                                if !app.explorer_search_results.is_empty() {
+                                    // Search results table: border(1)+header(1)+margin(1)
+                                    let data_start = result_start + 1 + 1 + 1;
+                                    if row >= data_start {
+                                        let idx = app.explorer_search_offset
+                                            + (row - data_start) as usize;
                                         if idx < app.explorer_search_results.len() {
                                             app.explorer_search_selected = idx;
                                         }
-                                    } else if let Some(ref result) = app.explorer_lookup_result {
+                                    }
+                                } else if let Some(ref result) = app.explorer_lookup_result {
+                                    // Lookup result: border(1) then content
+                                    let data_start = result_start + 1;
+                                    if row >= data_start {
                                         let total = result.total_fields();
-                                        let idx = app.explorer_lookup_offset + data_index;
+                                        let idx = app.explorer_lookup_offset
+                                            + (row - data_start) as usize;
                                         if idx < total {
                                             app.explorer_lookup_selected = idx;
                                         }
                                     }
                                 }
-                                ExplorerView::Overview => {}
                             }
+                            ExplorerView::Overview => {}
                         }
                     }
                 }

@@ -30,8 +30,9 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     common::draw_tabs(frame, app, layout[0]);
     common::draw_separator(frame, layout[1]);
 
-    // Update visible rows for scroll calculations in event handlers
+    // Update layout info for scroll calculations and mouse hit-testing
     app.content_visible_rows = layout[2].height.saturating_sub(4) as usize;
+    app.content_area_y = layout[2].y;
 
     match app.screen {
         Screen::Coins => coins::draw(frame, app, layout[2]),
