@@ -8,7 +8,7 @@ use ratatui::{
     widgets::{Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
 };
 
-use crate::app::{App, InputMode, Screen};
+use crate::app::{App, Screen};
 
 pub const ACCENT: Color = Color::Cyan;
 pub const DIM: Color = Color::DarkGray;
@@ -61,18 +61,6 @@ pub fn draw_status_bar(frame: &mut Frame, app: &mut App, area: Rect) {
         .map(|k| format!("{}..{}", &k.address[..8], &k.address[k.address.len() - 6..]))
         .unwrap_or_else(|| "No active key".into());
 
-    let mode_indicator = if app.input_mode == InputMode::Editing {
-        Span::styled(
-            " EDIT ",
-            Style::default().fg(Color::Black).bg(Color::Green).bold(),
-        )
-    } else {
-        Span::styled(
-            " NORMAL ",
-            Style::default().fg(Color::Black).bg(Color::Blue).bold(),
-        )
-    };
-
     let net_indicator = if app.loading {
         Span::styled(
             format!(" {} ... ", app.network_name),
@@ -93,22 +81,18 @@ pub fn draw_status_bar(frame: &mut Frame, app: &mut App, area: Rect) {
     let right_text = format!("  {} ", active_addr);
     let right = Span::styled(&right_text, Style::default().fg(ACCENT));
 
-    let fixed_right =
-        mode_indicator.width() as u16 + net_indicator.width() as u16 + right_text.len() as u16;
+    let fixed_right = net_indicator.width() as u16 + right_text.len() as u16;
     let left_width = area.width.saturating_sub(fixed_right);
 
     let cols = Layout::horizontal([
-        Constraint::Length(mode_indicator.width() as u16),
         Constraint::Length(left_width),
         Constraint::Length(net_indicator.width() as u16),
         Constraint::Min(0),
     ])
     .split(area);
 
-    frame.render_widget(Paragraph::new(Line::from(vec![mode_indicator])), cols[0]);
-
     // Render clickable [. Actions] button
-    let hint_area = cols[1];
+    let hint_area = cols[0];
     let button_text = " [. Actions] ";
     let button_width = button_text.len() as u16;
     let button_x = hint_area.x + 1;
@@ -122,10 +106,10 @@ pub fn draw_status_bar(frame: &mut Frame, app: &mut App, area: Rect) {
         Paragraph::new(Line::from(vec![Span::raw(" "), button_span])),
         hint_area,
     );
-    frame.render_widget(Paragraph::new(Line::from(vec![net_indicator])), cols[2]);
+    frame.render_widget(Paragraph::new(Line::from(vec![net_indicator])), cols[1]);
     frame.render_widget(
         Paragraph::new(Line::from(vec![right])).alignment(Alignment::Right),
-        cols[3],
+        cols[2],
     );
 }
 
