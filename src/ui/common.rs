@@ -52,7 +52,7 @@ pub fn draw_separator(frame: &mut Frame, area: Rect) {
     frame.render_widget(sep, area);
 }
 
-/// Draw the bottom status bar with mode, clickable action hints, network, and active address.
+/// Draw the bottom status bar: network (left), actions button + active address (right).
 pub fn draw_status_bar(frame: &mut Frame, app: &mut App, area: Rect) {
     app.hint_areas.clear();
 
@@ -78,38 +78,42 @@ pub fn draw_status_bar(frame: &mut Frame, app: &mut App, area: Rect) {
         )
     };
 
-    let right_text = format!("  {} ", active_addr);
-    let right = Span::styled(&right_text, Style::default().fg(ACCENT));
-
-    let fixed_right = net_indicator.width() as u16 + right_text.len() as u16;
-    let left_width = area.width.saturating_sub(fixed_right);
+    let button_text = " [. Actions] ";
+    let addr_tag = " addr ";
+    let addr_text = format!(" {} ", active_addr);
+    let right_width = button_text.len() as u16 + addr_tag.len() as u16 + addr_text.len() as u16 + 1;
 
     let cols = Layout::horizontal([
-        Constraint::Length(left_width),
         Constraint::Length(net_indicator.width() as u16),
         Constraint::Min(0),
+        Constraint::Length(right_width),
     ])
     .split(area);
 
-    // Render clickable [. Actions] button
-    let hint_area = cols[0];
-    let button_text = " [. Actions] ";
+    // Network indicator (left)
+    frame.render_widget(Paragraph::new(Line::from(vec![net_indicator])), cols[0]);
+
+    // Actions button + active address (right)
+    let right_area = cols[2];
+    let button_x = right_area.x;
     let button_width = button_text.len() as u16;
-    let button_x = hint_area.x + 1;
     app.hint_areas.push((
-        Rect::new(button_x, hint_area.y, button_width, 1),
+        Rect::new(button_x, right_area.y, button_width, 1),
         "open_menu",
     ));
 
-    let button_span = Span::styled(button_text, Style::default().fg(ACCENT).bold());
+    let right_line = Line::from(vec![
+        Span::styled(button_text, Style::default().fg(ACCENT).bold()),
+        Span::raw(" "),
+        Span::styled(
+            " addr ",
+            Style::default().fg(Color::Black).bg(ACCENT).bold(),
+        ),
+        Span::styled(addr_text, Style::default().fg(ACCENT)),
+    ]);
     frame.render_widget(
-        Paragraph::new(Line::from(vec![Span::raw(" "), button_span])),
-        hint_area,
-    );
-    frame.render_widget(Paragraph::new(Line::from(vec![net_indicator])), cols[1]);
-    frame.render_widget(
-        Paragraph::new(Line::from(vec![right])).alignment(Alignment::Right),
-        cols[2],
+        Paragraph::new(right_line).alignment(Alignment::Right),
+        right_area,
     );
 }
 
