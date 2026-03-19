@@ -1,9 +1,11 @@
 //! Application state and logic for the TUI.
 
 mod explorer;
+mod tx_builder;
 mod types;
 
 pub use explorer::ExplorerState;
+pub use tx_builder::TxBuilderState;
 pub use types::*;
 
 use tokio::sync::mpsc;
@@ -56,21 +58,7 @@ pub struct App {
     pub keys_show_private: bool,
     pub keys_gen_scheme: Option<String>,
 
-    pub tx_step: TxBuilderStep,
-    pub tx_sender: usize,
-    pub tx_commands: Vec<PtbCommand>,
-    pub tx_cmd_selected: usize,
-    pub tx_gas_budget: String,
-    pub tx_edit_field: usize,
-    pub tx_edit_buffers: Vec<String>,
-    pub tx_adding_cmd: Option<AddCommandType>,
-    pub tx_dry_run: Option<DryRunInfo>,
-    pub tx_dry_running: bool,
-    pub tx_dry_run_dirty: bool,
-    pub tx_gas_edited: bool,
-
-    // Accumulated values for multi-value fields (e.g. multiple object IDs)
-    pub tx_multi_values: Vec<String>,
+    pub tx: TxBuilderState,
 
     // Explorer state
     pub explorer: ExplorerState,
@@ -152,20 +140,7 @@ impl App {
             keys_show_private: false,
             keys_gen_scheme: None,
 
-            tx_step: TxBuilderStep::SelectSender,
-            tx_sender: 0,
-            tx_commands: vec![],
-            tx_cmd_selected: 0,
-            tx_gas_budget: "10000000".into(),
-            tx_edit_field: 0,
-            tx_edit_buffers: vec![],
-            tx_adding_cmd: None,
-            tx_dry_run: None,
-            tx_dry_running: false,
-            tx_dry_run_dirty: true,
-            tx_gas_edited: false,
-
-            tx_multi_values: vec![],
+            tx: TxBuilderState::default(),
 
             explorer: ExplorerState::default(),
 
@@ -305,16 +280,16 @@ impl App {
                 }
             }
             WalletEvent::DryRunResult(info) => {
-                self.tx_dry_running = false;
-                if !self.tx_gas_edited
+                self.tx.dry_running = false;
+                if !self.tx.gas_edited
                     && let Some(gas) = info.estimated_gas
                 {
-                    self.tx_gas_budget = gas.to_string();
+                    self.tx.gas_budget = gas.to_string();
                 }
-                self.tx_dry_run = Some(info);
+                self.tx.dry_run = Some(info);
             }
             WalletEvent::TxSubmitted => {
-                self.reset_tx_builder();
+                self.tx.reset();
                 self.navigate(Screen::Transactions);
                 self.request_refresh();
             }
@@ -553,24 +528,10 @@ impl App {
         self.popup_scroll = 0;
     }
 
-    /// Calculate total IOTA nanos being transferred by all TransferIota commands.
-    pub fn total_transfer_nanos(&self) -> u64 {
-        self.tx_commands
-            .iter()
-            .filter_map(|cmd| {
-                if let PtbCommand::TransferIota { amount, .. } = cmd {
-                    parse_iota_amount(amount)
-                } else {
-                    None
-                }
-            })
-            .sum()
-    }
-
     /// Validate that available balance covers transfers + gas.
     pub fn validate_balance(&self) -> Result<(), String> {
-        let gas_budget: u64 = self.tx_gas_budget.parse().unwrap_or(10_000_000);
-        let transfer_total = self.total_transfer_nanos();
+        let gas_budget: u64 = self.tx.gas_budget.parse().unwrap_or(10_000_000);
+        let transfer_total = self.tx.total_transfer_nanos();
         let required = transfer_total as u128 + gas_budget as u128;
         if required > self.total_balance_iota {
             Err(format!(
@@ -581,21 +542,6 @@ impl App {
         } else {
             Ok(())
         }
-    }
-
-    pub fn reset_tx_builder(&mut self) {
-        self.tx_step = TxBuilderStep::SelectSender;
-        self.tx_commands.clear();
-        self.tx_cmd_selected = 0;
-        self.tx_gas_budget = "10000000".into();
-        self.tx_edit_field = 0;
-        self.tx_edit_buffers = vec![];
-        self.tx_adding_cmd = None;
-        self.tx_multi_values.clear();
-        self.tx_dry_run = None;
-        self.tx_dry_running = false;
-        self.tx_dry_run_dirty = true;
-        self.tx_gas_edited = false;
     }
 
     pub fn load_error_log(&mut self) {
@@ -661,64 +607,10 @@ impl App {
         }
     }
 
-    /// Returns true if the current form field accepts an address (alias-completable).
-    pub fn is_address_field(&self) -> bool {
-        let Some(ct) = self.tx_adding_cmd else {
-            return false;
-        };
-        matches!(
-            (ct, self.tx_edit_field),
-            (AddCommandType::TransferIota, 0)
-                | (AddCommandType::TransferObjects, 0)
-                | (AddCommandType::Stake, 1)
-        )
-    }
-
-    /// Returns true if the current form field accepts an object ID.
-    pub fn is_object_field(&self) -> bool {
-        let Some(ct) = self.tx_adding_cmd else {
-            return false;
-        };
-        matches!(
-            (ct, self.tx_edit_field),
-            (AddCommandType::TransferObjects, 1)
-                | (AddCommandType::SplitCoins, 0)
-                | (AddCommandType::MergeCoins, 0)
-                | (AddCommandType::MergeCoins, 1)
-                | (AddCommandType::Unstake, 0)
-        )
-    }
-
-    /// Returns true if the current object field should suggest coins specifically.
-    fn is_coin_field(&self) -> bool {
-        let Some(ct) = self.tx_adding_cmd else {
-            return false;
-        };
-        matches!(
-            (ct, self.tx_edit_field),
-            (AddCommandType::SplitCoins, 0)
-                | (AddCommandType::MergeCoins, 0)
-                | (AddCommandType::MergeCoins, 1)
-        )
-    }
-
-    /// Returns true if the current field accepts multiple values (added one at a time).
-    pub fn is_multi_value_field(&self) -> bool {
-        let Some(ct) = self.tx_adding_cmd else {
-            return false;
-        };
-        matches!(
-            (ct, self.tx_edit_field),
-            (AddCommandType::TransferObjects, 1)
-                | (AddCommandType::SplitCoins, 1)
-                | (AddCommandType::MergeCoins, 1)
-        )
-    }
-
     /// Compute autocomplete suggestions based on current input.
     pub fn update_autocomplete(&mut self) {
-        let is_addr = self.is_address_field();
-        let is_obj = self.is_object_field();
+        let is_addr = self.tx.is_address_field();
+        let is_obj = self.tx.is_object_field();
 
         if (!is_addr && !is_obj) || self.input_buffer.is_empty() {
             self.autocomplete.clear();
@@ -747,8 +639,8 @@ impl App {
                 }
             }
         } else if is_obj {
-            let already = &self.tx_multi_values;
-            if self.is_coin_field() {
+            let already = &self.tx.multi_values;
+            if self.tx.is_coin_field() {
                 for coin in &self.coins {
                     if already.contains(&coin.object_id) {
                         continue;
@@ -797,19 +689,19 @@ impl App {
     /// Accept the currently highlighted autocomplete suggestion.
     /// Returns true if a suggestion was accepted.
     /// For address fields, inserts the alias (resolved later). For object fields, inserts the ID.
-    /// For multi-value fields, adds to `tx_multi_values` and clears the input for the next pick.
+    /// For multi-value fields, adds to `tx.multi_values` and clears the input for the next pick.
     pub fn accept_autocomplete(&mut self) -> bool {
         if self.autocomplete.is_empty() {
             return false;
         }
         let idx = self.autocomplete_idx.unwrap_or(0);
-        let is_obj = self.is_object_field();
+        let is_obj = self.tx.is_object_field();
         if let Some((label, value)) = self.autocomplete.get(idx) {
             let insertion = if is_obj { value.clone() } else { label.clone() };
 
-            if self.is_multi_value_field() {
+            if self.tx.is_multi_value_field() {
                 // Add to the accumulated list and clear input for the next selection
-                self.tx_multi_values.push(insertion);
+                self.tx.multi_values.push(insertion);
                 self.input_buffer.clear();
                 self.input_cursor = 0;
             } else {
@@ -826,7 +718,7 @@ impl App {
 
     /// Remove the last item from multi-value accumulator (undo last pick).
     pub fn remove_last_multi_value(&mut self) {
-        self.tx_multi_values.pop();
+        self.tx.multi_values.pop();
     }
 
     /// Resolve an alias or label to an address.
@@ -1102,7 +994,7 @@ fn parse_address(hex: &str) -> Option<iota_sdk::types::Address> {
 }
 
 /// Parse an IOTA amount string (decimal IOTA or raw nanos) into nanos.
-fn parse_iota_amount(s: &str) -> Option<u64> {
+pub(crate) fn parse_iota_amount(s: &str) -> Option<u64> {
     if let Ok(f) = s.parse::<f64>() {
         Some((f * 1_000_000_000.0) as u64)
     } else {

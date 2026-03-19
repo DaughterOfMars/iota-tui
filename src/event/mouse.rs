@@ -113,24 +113,24 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                             let w =
                                 3 + step.title().len() as u16 + 2 + if si < last { 3 } else { 0 };
                             if col >= x && col < x + w {
-                                app.tx_step = TxBuilderStep::ALL[si];
+                                app.tx.step = TxBuilderStep::ALL[si];
                                 break;
                             }
                             x += w;
                         }
                     } else if row >= step_end {
                         // Content area below step indicator
-                        match app.tx_step {
+                        match app.tx.step {
                             // SelectSender uses List: border(1) then items
                             TxBuilderStep::SelectSender => {
                                 let data_start = step_end + 1;
                                 if row >= data_start {
                                     let idx = (row - data_start) as usize;
                                     if idx < app.keys.len() {
-                                        if app.tx_sender != idx {
-                                            app.tx_dry_run_dirty = true;
+                                        if app.tx.sender != idx {
+                                            app.tx.dry_run_dirty = true;
                                         }
-                                        app.tx_sender = idx;
+                                        app.tx.sender = idx;
                                     }
                                 }
                             }
@@ -139,8 +139,8 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                                 let data_start = step_end + 1 + 1 + 1;
                                 if row >= data_start {
                                     let idx = (row - data_start) as usize;
-                                    if idx < app.tx_commands.len() {
-                                        app.tx_cmd_selected = idx;
+                                    if idx < app.tx.commands.len() {
+                                        app.tx.cmd_selected = idx;
                                     }
                                 }
                             }
@@ -295,17 +295,17 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
                 app.content_visible_rows,
             );
         }
-        Screen::TxBuilder => match app.tx_step {
+        Screen::TxBuilder => match app.tx.step {
             TxBuilderStep::SelectSender => {
-                let old = app.tx_sender;
-                app.tx_sender = apply_delta(app.tx_sender, delta, app.keys.len());
-                if app.tx_sender != old {
-                    app.tx_dry_run_dirty = true;
+                let old = app.tx.sender;
+                app.tx.sender = apply_delta(app.tx.sender, delta, app.keys.len());
+                if app.tx.sender != old {
+                    app.tx.dry_run_dirty = true;
                 }
             }
             TxBuilderStep::EditCommands => {
-                app.tx_cmd_selected =
-                    apply_delta(app.tx_cmd_selected, delta, app.tx_commands.len());
+                app.tx.cmd_selected =
+                    apply_delta(app.tx.cmd_selected, delta, app.tx.commands.len());
             }
             _ => {}
         },

@@ -20,7 +20,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
 
     draw_step_indicator(frame, app, layout[0]);
 
-    match app.tx_step {
+    match app.tx.step {
         TxBuilderStep::SelectSender => draw_select_sender(frame, app, layout[1]),
         TxBuilderStep::EditCommands => draw_commands(frame, app, layout[1]),
         TxBuilderStep::SetGas => draw_gas(frame, app, layout[1]),
@@ -33,7 +33,7 @@ fn draw_step_indicator(frame: &mut Frame, app: &App, area: Rect) {
         .iter()
         .enumerate()
         .flat_map(|(i, step)| {
-            let is_current = *step == app.tx_step;
+            let is_current = *step == app.tx.step;
             let num = format!(" {} ", i + 1);
             let title = format!(" {} ", step.title());
 
@@ -94,7 +94,7 @@ fn draw_select_sender(frame: &mut Frame, app: &App, area: Rect) {
         .iter()
         .enumerate()
         .map(|(i, key)| {
-            let is_selected = i == app.tx_sender;
+            let is_selected = i == app.tx.sender;
             let marker = if is_selected { "> " } else { "  " };
             let active = if key.is_active { " (active)" } else { "" };
             let addr_display = common::truncate_address(&key.address, 30);
@@ -124,13 +124,13 @@ fn draw_commands(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
         .title(format!(
             " Commands ({}) - a:add  d:delete ",
-            app.tx_commands.len()
+            app.tx.commands.len()
         ))
         .title_style(common::header_style())
         .borders(Borders::ALL)
         .border_style(common::dim_style());
 
-    if app.tx_commands.is_empty() {
+    if app.tx.commands.is_empty() {
         let text = vec![
             Line::from(""),
             Line::from(vec![Span::styled(
@@ -158,11 +158,12 @@ fn draw_commands(frame: &mut Frame, app: &App, area: Rect) {
     let detail_width = area.width.saturating_sub(30) as usize;
 
     let rows: Vec<Row> = app
-        .tx_commands
+        .tx
+        .commands
         .iter()
         .enumerate()
         .map(|(i, cmd)| {
-            let style = if i == app.tx_cmd_selected {
+            let style = if i == app.tx.cmd_selected {
                 common::selected_style()
             } else {
                 Style::default()
@@ -197,7 +198,7 @@ fn draw_gas(frame: &mut Frame, app: &App, area: Rect) {
     let display = if app.input_mode == InputMode::Editing {
         format!("{}|", app.input_buffer)
     } else {
-        app.tx_gas_budget.clone()
+        app.tx.gas_budget.clone()
     };
 
     let edit_hint = if app.input_mode == InputMode::Editing {
@@ -223,7 +224,7 @@ fn draw_gas(frame: &mut Frame, app: &App, area: Rect) {
         ]),
         Line::from(""),
         Line::from(vec![Span::styled(
-            format!("  Approx: {} IOTA", parse_gas_iota(&app.tx_gas_budget)),
+            format!("  Approx: {} IOTA", parse_gas_iota(&app.tx.gas_budget)),
             common::dim_style(),
         )]),
         Line::from(""),
@@ -250,7 +251,7 @@ fn draw_review(frame: &mut Frame, app: &App, area: Rect) {
 
     let sender = app
         .keys
-        .get(app.tx_sender)
+        .get(app.tx.sender)
         .map(|k| {
             format!(
                 "{} ({})",
@@ -260,8 +261,8 @@ fn draw_review(frame: &mut Frame, app: &App, area: Rect) {
         })
         .unwrap_or_else(|| "None".into());
 
-    let transfer_nanos = app.total_transfer_nanos();
-    let gas_budget: u64 = app.tx_gas_budget.parse().unwrap_or(10_000_000);
+    let transfer_nanos = app.tx.total_transfer_nanos();
+    let gas_budget: u64 = app.tx.gas_budget.parse().unwrap_or(10_000_000);
     let total_cost = transfer_nanos as u128 + gas_budget as u128;
     let balance = app.total_balance_iota;
     let balance_ok = total_cost <= balance;
@@ -276,8 +277,8 @@ fn draw_review(frame: &mut Frame, app: &App, area: Rect) {
             Span::styled("  Gas Budget: ", Style::default().fg(Color::White).bold()),
             Span::raw(format!(
                 "{} NANOS ({} IOTA)",
-                app.tx_gas_budget,
-                parse_gas_iota(&app.tx_gas_budget)
+                app.tx.gas_budget,
+                parse_gas_iota(&app.tx.gas_budget)
             )),
         ]),
         Line::from(vec![
@@ -301,18 +302,18 @@ fn draw_review(frame: &mut Frame, app: &App, area: Rect) {
         ]),
         Line::from(""),
         Line::from(vec![Span::styled(
-            format!("  Commands ({}):", app.tx_commands.len()),
+            format!("  Commands ({}):", app.tx.commands.len()),
             Style::default().fg(Color::White).bold(),
         )]),
     ];
 
-    if app.tx_commands.is_empty() {
+    if app.tx.commands.is_empty() {
         lines.push(Line::from(vec![Span::styled(
             "    (none - go back and add commands)",
             Style::default().fg(Color::Red),
         )]));
     } else {
-        for (i, cmd) in app.tx_commands.iter().enumerate() {
+        for (i, cmd) in app.tx.commands.iter().enumerate() {
             lines.push(Line::from(vec![
                 Span::styled(format!("    {}. ", i + 1), common::dim_style()),
                 Span::styled(
@@ -326,12 +327,12 @@ fn draw_review(frame: &mut Frame, app: &App, area: Rect) {
 
     // Dry run results
     lines.push(Line::from(""));
-    if app.tx_dry_running {
+    if app.tx.dry_running {
         lines.push(Line::from(vec![Span::styled(
             "  Dry run: simulating...",
             Style::default().fg(Color::Yellow),
         )]));
-    } else if let Some(ref info) = app.tx_dry_run {
+    } else if let Some(ref info) = app.tx.dry_run {
         let status_style = if info.status == "Success" {
             Style::default().fg(Color::Green).bold()
         } else {
@@ -359,7 +360,7 @@ fn draw_review(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     lines.push(Line::from(""));
-    if app.tx_commands.is_empty() {
+    if app.tx.commands.is_empty() {
         lines.push(Line::from(vec![Span::styled(
             "  Cannot submit: no commands",
             Style::default().fg(Color::Red),

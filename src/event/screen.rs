@@ -221,58 +221,58 @@ pub fn handle_keys_key(app: &mut App, key: KeyEvent) {
 pub fn handle_tx_key(app: &mut App, key: KeyEvent) {
     // Global tx builder keybind: clear/reset (when not editing)
     if app.input_mode != InputMode::Editing && key.code == KeyCode::Char('c') {
-        if app.tx_commands.is_empty() {
-            app.reset_tx_builder();
+        if app.tx.commands.is_empty() {
+            app.tx.reset();
         } else {
             app.open_popup(Popup::ConfirmClearTx);
         }
         return;
     }
-    match app.tx_step {
+    match app.tx.step {
         TxBuilderStep::SelectSender => match key.code {
             KeyCode::Up => {
-                if app.tx_sender > 0 {
-                    app.tx_sender -= 1;
-                    app.tx_dry_run_dirty = true;
+                if app.tx.sender > 0 {
+                    app.tx.sender -= 1;
+                    app.tx.dry_run_dirty = true;
                 }
             }
             KeyCode::Down => {
-                if app.tx_sender + 1 < app.keys.len() {
-                    app.tx_sender += 1;
-                    app.tx_dry_run_dirty = true;
+                if app.tx.sender + 1 < app.keys.len() {
+                    app.tx.sender += 1;
+                    app.tx.dry_run_dirty = true;
                 }
             }
             KeyCode::Enter | KeyCode::Right => {
-                app.tx_step = TxBuilderStep::EditCommands;
+                app.tx.step = TxBuilderStep::EditCommands;
             }
             _ => {}
         },
         TxBuilderStep::EditCommands => match key.code {
             KeyCode::Left => {
-                app.tx_step = TxBuilderStep::SelectSender;
+                app.tx.step = TxBuilderStep::SelectSender;
             }
             KeyCode::Right => {
-                app.tx_step = TxBuilderStep::SetGas;
+                app.tx.step = TxBuilderStep::SetGas;
             }
             KeyCode::Char('a') => {
                 app.open_popup(Popup::AddCommand);
             }
             KeyCode::Up => {
-                if app.tx_cmd_selected > 0 {
-                    app.tx_cmd_selected -= 1;
+                if app.tx.cmd_selected > 0 {
+                    app.tx.cmd_selected -= 1;
                 }
             }
             KeyCode::Down => {
-                if app.tx_cmd_selected + 1 < app.tx_commands.len() {
-                    app.tx_cmd_selected += 1;
+                if app.tx.cmd_selected + 1 < app.tx.commands.len() {
+                    app.tx.cmd_selected += 1;
                 }
             }
             KeyCode::Char('d') | KeyCode::Delete => {
-                if !app.tx_commands.is_empty() {
-                    app.tx_commands.remove(app.tx_cmd_selected);
-                    app.tx_dry_run_dirty = true;
-                    if app.tx_cmd_selected >= app.tx_commands.len() && app.tx_cmd_selected > 0 {
-                        app.tx_cmd_selected -= 1;
+                if !app.tx.commands.is_empty() {
+                    app.tx.commands.remove(app.tx.cmd_selected);
+                    app.tx.dry_run_dirty = true;
+                    if app.tx.cmd_selected >= app.tx.commands.len() && app.tx.cmd_selected > 0 {
+                        app.tx.cmd_selected -= 1;
                     }
                 }
             }
@@ -282,8 +282,8 @@ pub fn handle_tx_key(app: &mut App, key: KeyEvent) {
             if app.input_mode == InputMode::Editing {
                 match key.code {
                     KeyCode::Enter => {
-                        app.tx_gas_budget = app.stop_input();
-                        app.tx_gas_edited = true;
+                        app.tx.gas_budget = app.stop_input();
+                        app.tx.gas_edited = true;
                     }
                     KeyCode::Esc => {
                         app.stop_input();
@@ -293,14 +293,14 @@ pub fn handle_tx_key(app: &mut App, key: KeyEvent) {
             } else {
                 match key.code {
                     KeyCode::Left => {
-                        app.tx_step = TxBuilderStep::EditCommands;
+                        app.tx.step = TxBuilderStep::EditCommands;
                     }
                     KeyCode::Right => {
-                        app.tx_step = TxBuilderStep::Review;
+                        app.tx.step = TxBuilderStep::Review;
                         super::trigger_dry_run(app);
                     }
                     KeyCode::Enter | KeyCode::Char('e') => {
-                        app.start_input(&app.tx_gas_budget.clone());
+                        app.start_input(&app.tx.gas_budget.clone());
                     }
                     _ => {}
                 }
@@ -308,7 +308,7 @@ pub fn handle_tx_key(app: &mut App, key: KeyEvent) {
         }
         TxBuilderStep::Review => match key.code {
             KeyCode::Left => {
-                app.tx_step = TxBuilderStep::SetGas;
+                app.tx.step = TxBuilderStep::SetGas;
             }
             KeyCode::Enter => {
                 super::submit_transaction(app);

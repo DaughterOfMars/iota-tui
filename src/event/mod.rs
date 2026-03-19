@@ -139,31 +139,31 @@ fn handle_key(app: &mut App, key: KeyEvent) {
 }
 
 fn submit_transaction(app: &mut App) {
-    if app.keys.is_empty() || app.tx_commands.is_empty() {
+    if app.keys.is_empty() || app.tx.commands.is_empty() {
         return;
     }
     if app.validate_balance().is_err() {
         return;
     }
 
-    let gas_budget: u64 = app.tx_gas_budget.parse().unwrap_or(10_000_000);
+    let gas_budget: u64 = app.tx.gas_budget.parse().unwrap_or(10_000_000);
 
     app.send_cmd(WalletCmd::ExecutePtb {
-        sender_idx: app.tx_sender,
-        commands: app.tx_commands.clone(),
+        sender_idx: app.tx.sender,
+        commands: app.tx.commands.clone(),
         gas_budget,
     });
 }
 
 fn trigger_dry_run(app: &mut App) {
-    if !app.tx_dry_run_dirty || app.keys.is_empty() || app.tx_commands.is_empty() {
+    if !app.tx.dry_run_dirty || app.keys.is_empty() || app.tx.commands.is_empty() {
         return;
     }
-    app.tx_dry_run = None;
-    app.tx_dry_running = true;
-    app.tx_dry_run_dirty = false;
+    app.tx.dry_run = None;
+    app.tx.dry_running = true;
+    app.tx.dry_run_dirty = false;
     app.send_cmd(WalletCmd::DryRun {
-        sender_idx: app.tx_sender,
-        commands: app.tx_commands.clone(),
+        sender_idx: app.tx.sender,
+        commands: app.tx.commands.clone(),
     });
 }
