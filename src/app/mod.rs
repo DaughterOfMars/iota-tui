@@ -82,6 +82,8 @@ pub struct App {
     pub content_area_y: u16,
     // Full content area Rect (updated each frame, for icon-column hit-testing)
     pub content_area: ratatui::layout::Rect,
+    // Full frame area (updated each frame, for popup area computation in mouse handler)
+    pub frame_area: ratatui::layout::Rect,
 }
 
 impl App {
@@ -158,6 +160,7 @@ impl App {
             content_visible_rows: 20,
             content_area_y: 2,
             content_area: ratatui::layout::Rect::default(),
+            frame_area: ratatui::layout::Rect::default(),
         }
     }
 

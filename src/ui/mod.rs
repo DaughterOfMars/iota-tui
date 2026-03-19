@@ -16,6 +16,7 @@ use ratatui::Frame;
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
+    app.frame_area = area;
 
     let layout = ratatui::layout::Layout::vertical([
         ratatui::layout::Constraint::Length(1), // tab bar

@@ -2,8 +2,11 @@
 
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
-use crate::app::{App, ExplorerView, InputMode, LookupAction, Popup, Screen, TxBuilderStep};
-use crate::wallet::WalletCmd;
+use crate::app::{
+    AddCommandType, App, ExplorerView, InputMode, LookupAction, Popup, Screen, TxBuilderStep,
+};
+use crate::ui::common::centered_rect_min;
+use crate::wallet::{Network, WalletCmd};
 
 pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
     match mouse.kind {
@@ -11,11 +14,9 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
             let col = mouse.column;
             let row = mouse.row;
 
-            // Dismiss popups on click outside (simplistic)
+            // Handle popup clicks: dismiss on click outside, handle options inside
             if app.popup.is_some() {
-                app.popup = None;
-                app.input_mode = InputMode::Normal;
-                app.input_clear();
+                handle_popup_click(app, col, row);
                 return;
             }
 
@@ -439,6 +440,178 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
                 _ => {}
             }
         }
+    }
+}
+
+/// Handle a mouse click when a popup is open.
+/// Clicks outside the popup area dismiss it; clicks inside may trigger options.
+fn handle_popup_click(app: &mut App, col: u16, row: u16) {
+    let area = app.frame_area;
+
+    // Compute the popup area using the same params as the renderer
+    let popup_area = match app.popup {
+        Some(Popup::Help) => centered_rect_min(70, 80, 50, 24, area),
+        Some(Popup::Detail) => centered_rect_min(65, 70, 50, 16, area),
+        Some(Popup::AddAddress | Popup::EditAddress) => centered_rect_min(60, 60, 48, 14, area),
+        Some(Popup::GenerateKey) => centered_rect_min(50, 40, 36, 11, area),
+        Some(Popup::GenerateKeyAlias) => centered_rect_min(50, 30, 40, 8, area),
+        Some(Popup::ImportKey) => centered_rect_min(60, 30, 48, 10, area),
+        Some(Popup::AddCommand) => centered_rect_min(50, 50, 40, 16, area),
+        Some(Popup::AddCommandForm) => centered_rect_min(65, 60, 52, 14, area),
+        Some(Popup::RenameKey) => centered_rect_min(50, 30, 40, 8, area),
+        Some(Popup::SwitchNetwork) => centered_rect_min(50, 40, 36, 12, area),
+        Some(Popup::ConfirmDeleteAddress) => centered_rect_min(55, 40, 44, 10, area),
+        Some(Popup::ConfirmDeleteKey) => centered_rect_min(55, 40, 44, 10, area),
+        Some(Popup::ConfirmClearTx) => centered_rect_min(55, 40, 44, 10, area),
+        Some(Popup::LookupIotaName) => centered_rect_min(60, 30, 48, 10, area),
+        Some(Popup::ErrorLog) => centered_rect_min(80, 80, 60, 20, area),
+        Some(Popup::ConfirmQuit) => centered_rect_min(50, 30, 40, 7, area),
+        None => return,
+    };
+
+    // Click outside popup → dismiss
+    if col < popup_area.x
+        || col >= popup_area.x + popup_area.width
+        || row < popup_area.y
+        || row >= popup_area.y + popup_area.height
+    {
+        app.popup = None;
+        app.input_mode = InputMode::Normal;
+        app.input_clear();
+        return;
+    }
+
+    // inner_row: 0 = first line inside border (border is row 0 = popup_area.y)
+    let inner_row = row.saturating_sub(popup_area.y + 1) as usize;
+
+    match app.popup {
+        Some(Popup::GenerateKey) => {
+            // Lines: 0=blank, 1="Select...", 2=blank, 3=Ed25519, 4=Secp256k1, 5=Secp256r1
+            let scheme = match inner_row {
+                3 => Some("ed25519"),
+                4 => Some("secp256k1"),
+                5 => Some("secp256r1"),
+                _ => None,
+            };
+            if let Some(scheme) = scheme {
+                app.keys_gen_scheme = Some(scheme.to_string());
+                let default_alias = format!("key-{}", app.keys.len());
+                app.open_popup(Popup::GenerateKeyAlias);
+                app.start_input(&default_alias);
+            }
+        }
+        Some(Popup::SwitchNetwork) => {
+            // Lines: 0=blank, 1="Select...", 2=blank, 3=Mainnet, 4=Testnet, 5=Devnet
+            let network = match inner_row {
+                3 => Some(Network::Mainnet),
+                4 => Some(Network::Testnet),
+                5 => Some(Network::Devnet),
+                _ => None,
+            };
+            if let Some(net) = network {
+                app.connected = false;
+                app.network_name = format!("{}...", net.name());
+                app.loading = true;
+                app.send_cmd(WalletCmd::Connect(net));
+                app.popup = None;
+            }
+        }
+        Some(Popup::AddCommand) => {
+            // Lines: 0=blank, 1="Select...", 2=blank, 3-9 = 7 command types
+            let cmd_type = match inner_row {
+                3 => Some(AddCommandType::TransferIota),
+                4 => Some(AddCommandType::TransferObjects),
+                5 => Some(AddCommandType::MoveCall),
+                6 => Some(AddCommandType::SplitCoins),
+                7 => Some(AddCommandType::MergeCoins),
+                8 => Some(AddCommandType::Stake),
+                9 => Some(AddCommandType::Unstake),
+                _ => None,
+            };
+            if let Some(ct) = cmd_type {
+                let field_count = match ct {
+                    AddCommandType::TransferIota => 2,
+                    AddCommandType::TransferObjects => 2,
+                    AddCommandType::MoveCall => 5,
+                    AddCommandType::SplitCoins => 2,
+                    AddCommandType::MergeCoins => 2,
+                    AddCommandType::Stake => 2,
+                    AddCommandType::Unstake => 1,
+                };
+                app.tx.adding_cmd = Some(ct);
+                app.tx.edit_field = 0;
+                app.tx.edit_buffers = vec![String::new(); field_count];
+                app.tx.multi_values.clear();
+                app.open_popup(Popup::AddCommandForm);
+                app.start_input("");
+            }
+        }
+        Some(Popup::ConfirmDeleteAddress) => {
+            // Lines: 0=blank, 1="Delete?", 2=blank, 3=label, 4=blank, 5=confirm/cancel
+            if inner_row == 5 {
+                let mid = popup_area.x + popup_area.width / 2;
+                if col < mid {
+                    // Confirm
+                    if let Some(user_idx) = app.user_address_index(app.address_selected)
+                        && user_idx < app.address_book.len()
+                    {
+                        app.address_book.remove(user_idx);
+                        let combined_len = app.key_entry_count() + app.address_book.len();
+                        if app.address_selected >= combined_len && app.address_selected > 0 {
+                            app.address_selected -= 1;
+                        }
+                        crate::app::save_address_book(&app.address_book);
+                    }
+                }
+                app.popup = None;
+            }
+        }
+        Some(Popup::ConfirmDeleteKey) => {
+            // Lines: 0=blank, 1="Delete?", 2=blank, 3=alias, 4=blank, 5=confirm/cancel
+            if inner_row == 5 {
+                let mid = popup_area.x + popup_area.width / 2;
+                if col < mid {
+                    // Confirm
+                    let idx = app.keys_selected;
+                    if idx < app.keys.len() {
+                        let removed = app.keys.remove(idx);
+                        app.send_cmd(WalletCmd::DeleteKey(idx));
+                        if removed.is_active && !app.keys.is_empty() {
+                            app.keys[0].is_active = true;
+                            app.send_cmd(WalletCmd::SetActiveKey(0));
+                            app.request_refresh();
+                        }
+                        if app.keys_selected >= app.keys.len() && app.keys_selected > 0 {
+                            app.keys_selected -= 1;
+                        }
+                    }
+                }
+                app.popup = None;
+            }
+        }
+        Some(Popup::ConfirmClearTx) => {
+            // Lines: 0=blank, 1="Clear all?", 2=blank, 3=confirm/cancel
+            if inner_row == 3 {
+                let mid = popup_area.x + popup_area.width / 2;
+                if col < mid {
+                    app.tx.reset();
+                }
+                app.popup = None;
+            }
+        }
+        Some(Popup::ConfirmQuit) => {
+            // Lines: 0=blank, 1="Quit?", 2=blank, 3=confirm/cancel
+            if inner_row == 3 {
+                let mid = popup_area.x + popup_area.width / 2;
+                if col < mid {
+                    app.running = false;
+                } else {
+                    app.popup = None;
+                }
+            }
+        }
+        // Scroll-only or input popups: click inside does nothing (no dismiss)
+        _ => {}
     }
 }
 
