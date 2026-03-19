@@ -5,7 +5,7 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Row, Table},
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
 };
 
 use super::common;
@@ -23,7 +23,7 @@ fn draw_address_table(frame: &mut Frame, app: &App, area: Rect) {
     let combined = app.combined_address_book();
     let key_count = app.key_entry_count();
 
-    let header = Row::new(vec!["Label", "Address", "Notes"])
+    let header = Row::new(vec!["Label", "Address", "Notes", ""])
         .style(common::header_style())
         .bottom_margin(1);
 
@@ -45,9 +45,10 @@ fn draw_address_table(frame: &mut Frame, app: &App, area: Rect) {
             };
 
             Row::new(vec![
-                entry.label.clone(),
-                common::truncate_address(&entry.address, addr_width.max(20)),
-                entry.notes.clone(),
+                Cell::from(entry.label.clone()),
+                Cell::from(common::truncate_address(&entry.address, addr_width.max(20))),
+                Cell::from(entry.notes.clone()),
+                Cell::from("⏎").style(Style::default().fg(Color::Green)),
             ])
             .style(style)
         })
@@ -57,6 +58,7 @@ fn draw_address_table(frame: &mut Frame, app: &App, area: Rect) {
         Constraint::Length(22),
         Constraint::Min(24),
         Constraint::Length(28),
+        Constraint::Length(2),
     ];
 
     let title = format!(

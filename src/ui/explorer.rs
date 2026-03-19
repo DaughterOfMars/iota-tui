@@ -5,7 +5,7 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Row, Table},
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
 };
 
 use super::common;
@@ -126,6 +126,7 @@ fn draw_checkpoints(frame: &mut Frame, app: &mut App, area: Rect) {
         "Digest".to_string(),
         "Timestamp".to_string(),
         "TXs".to_string(),
+        String::new(),
     ])
     .style(common::header_style())
     .bottom_margin(1);
@@ -143,10 +144,11 @@ fn draw_checkpoints(frame: &mut Frame, app: &mut App, area: Rect) {
                 Style::default()
             };
             Row::new(vec![
-                cp.sequence.to_string(),
-                common::truncate_address(&cp.digest, 20),
-                cp.timestamp.clone(),
-                cp.tx_count.to_string(),
+                Cell::from(cp.sequence.to_string()),
+                Cell::from(common::truncate_address(&cp.digest, 20)),
+                Cell::from(cp.timestamp.clone()),
+                Cell::from(cp.tx_count.to_string()),
+                Cell::from("⏎").style(Style::default().fg(Color::Green)),
             ])
             .style(style)
         })
@@ -157,6 +159,7 @@ fn draw_checkpoints(frame: &mut Frame, app: &mut App, area: Rect) {
         Constraint::Length(22),
         Constraint::Min(20),
         Constraint::Length(10),
+        Constraint::Length(2),
     ];
 
     let page_num = app.explorer.checkpoints_page + 1;
@@ -222,7 +225,7 @@ fn draw_validators(frame: &mut Frame, app: &mut App, area: Rect) {
         visible_rows,
     );
 
-    let header = Row::new(vec!["Name", "Address", "Voting Power"])
+    let header = Row::new(vec!["Name", "Address", "Voting Power", ""])
         .style(common::header_style())
         .bottom_margin(1);
 
@@ -240,9 +243,10 @@ fn draw_validators(frame: &mut Frame, app: &mut App, area: Rect) {
                 Style::default()
             };
             Row::new(vec![
-                v.name.clone(),
-                common::truncate_address(&v.address, 24),
-                v.stake.clone(),
+                Cell::from(v.name.clone()),
+                Cell::from(common::truncate_address(&v.address, 24)),
+                Cell::from(v.stake.clone()),
+                Cell::from("⏎").style(Style::default().fg(Color::Green)),
             ])
             .style(style)
         })
@@ -252,6 +256,7 @@ fn draw_validators(frame: &mut Frame, app: &mut App, area: Rect) {
         Constraint::Min(20),
         Constraint::Length(26),
         Constraint::Length(14),
+        Constraint::Length(2),
     ];
 
     let title = format!(" Validators ({}) ", app.explorer.validators.len());
@@ -329,7 +334,7 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
             &mut app.explorer.search_offset,
             visible_rows,
         );
-        let header = Row::new(vec!["Object ID", "Type", "Version", "Owner"])
+        let header = Row::new(vec!["Object ID", "Type", "Version", "Owner", ""])
             .style(common::header_style())
             .bottom_margin(1);
 
@@ -347,10 +352,11 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
                     Style::default()
                 };
                 Row::new(vec![
-                    common::truncate_address(&obj.object_id, 24),
-                    common::truncate_type(&obj.type_name, 30),
-                    obj.version.clone(),
-                    common::truncate_address(&obj.owner, 20),
+                    Cell::from(common::truncate_address(&obj.object_id, 24)),
+                    Cell::from(common::truncate_type(&obj.type_name, 30)),
+                    Cell::from(obj.version.clone()),
+                    Cell::from(common::truncate_address(&obj.owner, 20)),
+                    Cell::from("⏎").style(Style::default().fg(Color::Green)),
                 ])
                 .style(style)
             })
@@ -361,6 +367,7 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
             Constraint::Min(20),
             Constraint::Length(10),
             Constraint::Length(22),
+            Constraint::Length(2),
         ];
 
         let page_num = app.explorer.search_cursors.len() + 1;

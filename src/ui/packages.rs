@@ -3,9 +3,9 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Rect},
-    style::Style,
+    style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Row, Table},
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
 };
 
 use super::common;
@@ -43,7 +43,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
 
     let visible_rows = area.height.saturating_sub(4) as usize;
 
-    let header = Row::new(vec!["Object ID", "Version"])
+    let header = Row::new(vec!["Object ID", "Version", ""])
         .style(common::header_style())
         .bottom_margin(1);
 
@@ -60,14 +60,19 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
                 Style::default()
             };
             Row::new(vec![
-                common::truncate_address(&obj.object_id, 40),
-                obj.version.clone(),
+                Cell::from(common::truncate_address(&obj.object_id, 40)),
+                Cell::from(obj.version.clone()),
+                Cell::from("⏎").style(Style::default().fg(Color::Green)),
             ])
             .style(style)
         })
         .collect();
 
-    let widths = [Constraint::Min(42), Constraint::Length(10)];
+    let widths = [
+        Constraint::Min(42),
+        Constraint::Length(10),
+        Constraint::Length(2),
+    ];
 
     let title = if packages.len() > visible_rows {
         format!(

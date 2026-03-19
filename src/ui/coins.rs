@@ -5,7 +5,7 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Row, Table},
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
 };
 
 use super::common;
@@ -74,9 +74,9 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
     let show_all = app.show_multiple_owners();
 
     let header_cols: Vec<&str> = if show_all {
-        vec!["Symbol", "Type", "Balance", "Object ID", "Owner"]
+        vec!["Symbol", "Type", "Balance", "Object ID", "Owner", ""]
     } else {
-        vec!["Symbol", "Type", "Balance", "Object ID"]
+        vec!["Symbol", "Type", "Balance", "Object ID", ""]
     };
     let header = Row::new(header_cols)
         .style(common::header_style())
@@ -97,15 +97,16 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
 
             let id_display = common::truncate_address(&coin.object_id, 24);
 
-            let mut cells = vec![
-                coin.symbol.clone(),
-                common::truncate_type(&coin.coin_type, 30),
-                coin.balance_display.clone(),
-                id_display,
+            let mut cells: Vec<Cell> = vec![
+                Cell::from(coin.symbol.clone()),
+                Cell::from(common::truncate_type(&coin.coin_type, 30)),
+                Cell::from(coin.balance_display.clone()),
+                Cell::from(id_display),
             ];
             if show_all {
-                cells.push(coin.owner_alias.clone());
+                cells.push(Cell::from(coin.owner_alias.clone()));
             }
+            cells.push(Cell::from("⏎").style(Style::default().fg(Color::Green)));
 
             Row::new(cells).style(style)
         })
@@ -118,6 +119,7 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
             Constraint::Length(20),
             Constraint::Length(26),
             Constraint::Length(14),
+            Constraint::Length(2),
         ]
     } else {
         vec![
@@ -125,6 +127,7 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
             Constraint::Min(20),
             Constraint::Length(20),
             Constraint::Length(26),
+            Constraint::Length(2),
         ]
     };
 

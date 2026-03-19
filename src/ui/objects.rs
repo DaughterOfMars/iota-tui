@@ -5,7 +5,7 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Row, Table},
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
 };
 
 use super::common;
@@ -43,9 +43,9 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
     let show_all = app.show_multiple_owners();
 
     let header_cols: Vec<&str> = if show_all {
-        vec!["Object ID", "Type", "Version", "Digest", "Owner"]
+        vec!["Object ID", "Type", "Version", "Digest", "Owner", ""]
     } else {
-        vec!["Object ID", "Type", "Version", "Digest"]
+        vec!["Object ID", "Type", "Version", "Digest", ""]
     };
     let header = Row::new(header_cols)
         .style(common::header_style())
@@ -66,15 +66,16 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
                 Style::default()
             };
 
-            let mut cells = vec![
-                common::truncate_address(&obj.object_id, 20),
-                common::truncate_type(&obj.type_name, max_type_width),
-                obj.version.clone(),
-                common::truncate_address(&obj.digest, 16),
+            let mut cells: Vec<Cell> = vec![
+                Cell::from(common::truncate_address(&obj.object_id, 20)),
+                Cell::from(common::truncate_type(&obj.type_name, max_type_width)),
+                Cell::from(obj.version.clone()),
+                Cell::from(common::truncate_address(&obj.digest, 16)),
             ];
             if show_all {
-                cells.push(obj.owner_alias.clone());
+                cells.push(Cell::from(obj.owner_alias.clone()));
             }
+            cells.push(Cell::from("⏎").style(Style::default().fg(Color::Green)));
 
             Row::new(cells).style(style)
         })
@@ -87,6 +88,7 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
             Constraint::Length(8),
             Constraint::Length(18),
             Constraint::Length(14),
+            Constraint::Length(2),
         ]
     } else {
         vec![
@@ -94,6 +96,7 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
             Constraint::Min(20),
             Constraint::Length(8),
             Constraint::Length(18),
+            Constraint::Length(2),
         ]
     };
 

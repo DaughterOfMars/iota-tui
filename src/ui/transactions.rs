@@ -3,7 +3,7 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Rect},
-    style::Style,
+    style::{Color, Style},
     widgets::{Block, Borders, Cell, Row, Table},
 };
 
@@ -16,6 +16,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         Cell::from("Status").style(header_style()),
         Cell::from("Gas").style(header_style()),
         Cell::from("Epoch").style(header_style()),
+        Cell::from("").style(header_style()),
     ])
     .height(1);
 
@@ -48,6 +49,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 Cell::from(tx.status.clone()).style(status_style),
                 Cell::from(tx.gas_used.clone()),
                 Cell::from(tx.epoch.clone()),
+                Cell::from("⏎").style(Style::default().fg(Color::Green)),
             ])
             .style(style)
         })
@@ -70,6 +72,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         Constraint::Length(16),
         Constraint::Length(14),
         Constraint::Length(8),
+        Constraint::Length(2),
     ];
 
     let table = Table::new(rows, widths).header(header).block(block);

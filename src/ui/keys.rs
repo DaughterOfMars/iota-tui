@@ -5,7 +5,7 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Row, Table},
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
 };
 
 use super::common;
@@ -47,7 +47,7 @@ fn draw_key_table(frame: &mut Frame, app: &App, area: Rect) {
 
     let visible_rows = area.height.saturating_sub(4) as usize;
 
-    let header = Row::new(vec!["", "Show", "Alias", "Scheme", "Address"])
+    let header = Row::new(vec!["", "Show", "Alias", "Scheme", "Address", ""])
         .style(common::header_style())
         .bottom_margin(1);
 
@@ -70,11 +70,12 @@ fn draw_key_table(frame: &mut Frame, app: &App, area: Rect) {
             let visible_marker = if key.visible { "[x]" } else { "[ ]" };
 
             Row::new(vec![
-                active_marker.to_string(),
-                visible_marker.to_string(),
-                key.alias.clone(),
-                key.scheme.clone(),
-                common::truncate_address(&key.address, addr_width.max(20)),
+                Cell::from(active_marker.to_string()),
+                Cell::from(visible_marker.to_string()),
+                Cell::from(key.alias.clone()),
+                Cell::from(key.scheme.clone()),
+                Cell::from(common::truncate_address(&key.address, addr_width.max(20))),
+                Cell::from("⏎").style(Style::default().fg(Color::Green)),
             ])
             .style(style)
         })
@@ -86,6 +87,7 @@ fn draw_key_table(frame: &mut Frame, app: &App, area: Rect) {
         Constraint::Length(14),
         Constraint::Length(12),
         Constraint::Min(24),
+        Constraint::Length(2),
     ];
 
     let table = Table::new(rows, widths).header(header).block(

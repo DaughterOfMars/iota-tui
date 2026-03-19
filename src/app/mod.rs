@@ -80,6 +80,8 @@ pub struct App {
     pub content_visible_rows: usize,
     // Absolute Y position of the content area (updated each frame)
     pub content_area_y: u16,
+    // Full content area Rect (updated each frame, for icon-column hit-testing)
+    pub content_area: ratatui::layout::Rect,
 }
 
 impl App {
@@ -155,6 +157,7 @@ impl App {
 
             content_visible_rows: 20,
             content_area_y: 2,
+            content_area: ratatui::layout::Rect::default(),
         }
     }
 

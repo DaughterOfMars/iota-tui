@@ -31,6 +31,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     // Update layout info for scroll calculations and mouse hit-testing
     app.content_visible_rows = layout[2].height.saturating_sub(4) as usize;
     app.content_area_y = layout[2].y;
+    app.content_area = layout[2];
 
     match app.screen {
         Screen::Coins => coins::draw(frame, app, layout[2]),

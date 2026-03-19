@@ -2,7 +2,8 @@
 
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
-use crate::app::{App, ExplorerView, InputMode, Screen, TxBuilderStep};
+use crate::app::{App, ExplorerView, InputMode, LookupAction, Popup, Screen, TxBuilderStep};
+use crate::wallet::WalletCmd;
 
 pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
     match mouse.kind {
@@ -44,6 +45,10 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                         let idx = app.coins_offset + (row - data_start) as usize;
                         if idx < app.coins.len() {
                             app.coins_selected = idx;
+                            if is_icon_click(app, col) {
+                                let id = app.coins[idx].object_id.clone();
+                                app.explore_item(id);
+                            }
                         }
                     }
                 }
@@ -54,6 +59,10 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                         let idx = app.objects_offset + (row - data_start) as usize;
                         if idx < app.objects.len() {
                             app.objects_selected = idx;
+                            if is_icon_click(app, col) {
+                                let id = app.objects[idx].object_id.clone();
+                                app.explore_item(id);
+                            }
                         }
                     }
                 }
@@ -64,6 +73,10 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                         let idx = app.transactions_offset + (row - data_start) as usize;
                         if idx < app.transactions.len() {
                             app.transactions_selected = idx;
+                            if is_icon_click(app, col) {
+                                let digest = app.transactions[idx].digest.clone();
+                                app.explore_item(digest);
+                            }
                         }
                     }
                 }
@@ -75,6 +88,10 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                         let idx = app.packages_offset + (row - data_start) as usize;
                         if idx < packages.len() {
                             app.packages_selected = idx;
+                            if is_icon_click(app, col) {
+                                let id = app.objects[packages[idx]].object_id.clone();
+                                app.explore_item(id);
+                            }
                         }
                     }
                 }
@@ -86,6 +103,13 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                         let combined_len = app.key_entry_count() + app.address_book.len();
                         if idx < combined_len {
                             app.address_selected = idx;
+                            if is_icon_click(app, col) {
+                                let combined = app.combined_address_book();
+                                if let Some(entry) = combined.get(idx) {
+                                    let addr = entry.address.clone();
+                                    app.explore_item(addr);
+                                }
+                            }
                         }
                     }
                 }
@@ -96,6 +120,14 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                         let idx = app.keys_offset + (row - data_start) as usize;
                         if idx < app.keys.len() {
                             app.keys_selected = idx;
+                            if is_icon_click(app, col) {
+                                // Activate key (same as Enter)
+                                for (i, k) in app.keys.iter_mut().enumerate() {
+                                    k.is_active = i == idx;
+                                }
+                                app.send_cmd(WalletCmd::SetActiveKey(idx));
+                                app.request_refresh();
+                            }
                         }
                     }
                 }
@@ -184,6 +216,11 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                                         + (row - data_start) as usize;
                                     if idx < app.explorer.checkpoints.len() {
                                         app.explorer.checkpoints_selected = idx;
+                                        if is_icon_click(app, col)
+                                            && !app.explorer.checkpoints.is_empty()
+                                        {
+                                            app.open_popup(Popup::Detail);
+                                        }
                                     }
                                 }
                             }
@@ -195,6 +232,10 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                                         + (row - data_start) as usize;
                                     if idx < app.explorer.validators.len() {
                                         app.explorer.validators_selected = idx;
+                                        if is_icon_click(app, col) {
+                                            let addr = app.explorer.validators[idx].address.clone();
+                                            app.explore_item(addr);
+                                        }
                                     }
                                 }
                             }
@@ -209,6 +250,13 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                                             + (row - data_start) as usize;
                                         if idx < app.explorer.search_results.len() {
                                             app.explorer.search_selected = idx;
+                                            if is_icon_click(app, col) {
+                                                let id = app.explorer.search_results[idx]
+                                                    .object_id
+                                                    .clone();
+                                                app.explorer.search_results.clear();
+                                                app.explore_item(id);
+                                            }
                                         }
                                     }
                                 } else if let Some(ref result) = app.explorer.lookup_result {
@@ -223,6 +271,20 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                                             && field_idx < result.total_fields()
                                         {
                                             app.explorer.lookup_selected = field_idx;
+                                            // Activate on click if field has an action
+                                            if let Some(field) = result.field_at(field_idx) {
+                                                match &field.action {
+                                                    Some(LookupAction::Explore(val)) => {
+                                                        let val = val.clone();
+                                                        app.explore_item(val);
+                                                    }
+                                                    Some(LookupAction::TypeSearch(val)) => {
+                                                        let val = val.clone();
+                                                        app.explore_type(val);
+                                                    }
+                                                    None => {}
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -378,6 +440,15 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
             }
         }
     }
+}
+
+/// Check whether a click column falls in the icon (⏎) column.
+/// The icon column is 2 chars wide, positioned as the last column inside the table border.
+fn is_icon_click(app: &App, col: u16) -> bool {
+    let area = app.content_area;
+    // Right border is at area.x + area.width - 1, icon column is 2 chars before that
+    let icon_start = area.x + area.width.saturating_sub(3);
+    col >= icon_start && col < area.x + area.width.saturating_sub(1)
 }
 
 fn apply_delta(current: usize, delta: i32, len: usize) -> usize {
