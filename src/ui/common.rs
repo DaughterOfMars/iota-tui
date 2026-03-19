@@ -188,8 +188,7 @@ pub fn screen_hints(screen: Screen) -> Vec<(&'static str, &'static str, &'static
             ("?", "help", "help"),
         ],
         Screen::Explorer => vec![
-            ("Enter", "lookup", "explore"),
-            ("s", "type-search", "explorer_search"),
+            ("Enter", "search", "explore"),
             ("r", "refresh", "refresh"),
             ("n", "network", "network"),
             ("?", "help", "help"),

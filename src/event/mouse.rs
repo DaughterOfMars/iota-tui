@@ -562,7 +562,6 @@ pub(crate) fn handle_hint_click(app: &mut App, action_id: &str) {
             }
         }
         "explorer_search" => {
-            app.explorer.search_mode = true;
             app.start_input("");
         }
         _ => {}

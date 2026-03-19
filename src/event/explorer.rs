@@ -8,6 +8,22 @@ use crate::wallet::WalletCmd;
 use super::input::handle_input_key;
 use super::nav::ListNav;
 
+/// Determine whether a query string is a lookup (address/object/tx digest)
+/// or a type search. Lookups start with `0x` (hex IDs) or look like base58
+/// transaction digests (alphanumeric, 32-44 chars, no `::` separator).
+fn is_lookup_query(query: &str) -> bool {
+    if query.starts_with("0x") {
+        return true;
+    }
+    // Type strings contain `::` (e.g. `0x2::coin::Coin<0x2::iota::IOTA>`)
+    if query.contains("::") {
+        return false;
+    }
+    // Base58 transaction digests: alphanumeric, typically 32-44 chars
+    let len = query.len();
+    (32..=44).contains(&len) && query.chars().all(|c| c.is_alphanumeric())
+}
+
 pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
     // When editing (lookup input), handle text input
     if app.input_mode == InputMode::Editing {
@@ -15,7 +31,13 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
             KeyCode::Enter => {
                 let query = app.stop_input();
                 if !query.is_empty() {
-                    if app.explorer.search_mode {
+                    if is_lookup_query(&query) {
+                        app.explorer.search_mode = false;
+                        app.explorer.lookup_query = Some(query.clone());
+                        app.explorer.lookup_address = Some(query.clone());
+                        app.send_cmd(WalletCmd::LookupAddress(query));
+                    } else {
+                        app.explorer.search_mode = true;
                         app.explorer.search_type = query.clone();
                         app.explorer.search_cursors.clear();
                         app.explorer.search_has_next = false;
@@ -24,8 +46,6 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                             type_filter: query,
                             cursor: None,
                         });
-                    } else {
-                        app.send_cmd(WalletCmd::LookupAddress(query));
                     }
                 }
             }
@@ -211,11 +231,6 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                         return;
                     }
                     // No results at all — open lookup input
-                    app.explorer.search_mode = false;
-                    app.start_input("");
-                }
-                KeyCode::Char('s') => {
-                    app.explorer.search_mode = true;
                     app.start_input("");
                 }
                 KeyCode::Esc => {

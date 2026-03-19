@@ -333,7 +333,7 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
         ])
     } else {
         Line::from(Span::styled(
-            "  Enter:lookup  s:type-search",
+            "  Enter: search by address, object, digest, or type",
             common::dim_style(),
         ))
     };
