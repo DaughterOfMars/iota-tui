@@ -439,45 +439,15 @@ impl LookupResult {
         None
     }
 
-    /// Compute the rendered line offset for a field-based scroll offset.
-    /// When offset is 0, we show from the very top (line 0, including the first
-    /// section header). Otherwise, we show from the field's own line.
-    fn rendered_line_offset(&self, offset: usize) -> usize {
-        if offset == 0 {
-            return 0;
-        }
-        self.field_to_line(offset)
-    }
-
-    /// Scroll `offset` (field index) so that `selected` (field index) is visible
-    /// within `visible_lines` terminal rows, correctly accounting for section
-    /// header lines that occupy space but aren't fields.
+    /// Scroll `offset` (a **line** index) so that the line for `selected`
+    /// (a field index) is visible within `visible_lines` terminal rows.
     pub fn scroll_into_view(&self, selected: usize, offset: &mut usize, visible_lines: usize) {
         let selected_line = self.field_to_line(selected);
-        let offset_line = self.rendered_line_offset(*offset);
 
-        if selected_line < offset_line {
-            // Selected is above the viewport — scroll up
-            *offset = selected;
-        } else if selected_line >= offset_line + visible_lines {
-            // Selected is below the viewport — find the field offset that puts
-            // selected_line at the bottom of the viewport
-            let target_start = selected_line + 1 - visible_lines;
-            // Find the first field at or after target_start line
-            let mut current_line = 0;
-            let mut field_count = 0;
-            for section in self.sections() {
-                current_line += 1; // header
-                for _ in &section.fields {
-                    if current_line >= target_start {
-                        *offset = field_count;
-                        return;
-                    }
-                    field_count += 1;
-                    current_line += 1;
-                }
-            }
-            *offset = selected;
+        if selected_line < *offset {
+            *offset = selected_line;
+        } else if selected_line >= *offset + visible_lines {
+            *offset = selected_line + 1 - visible_lines;
         }
     }
 }

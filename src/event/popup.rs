@@ -67,7 +67,6 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                                 label,
                                 notes,
                             });
-                            app.set_status("Looking up IOTA name...");
                         } else {
                             app.address_book.push(crate::app::AddressEntry {
                                 label,
@@ -75,14 +74,12 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                                 notes,
                             });
                             save_address_book(&app.address_book);
-                            app.set_status("Address added");
                         }
                     } else if let Some(user_idx) = app.user_address_index(app.address_selected) {
                         if let Some(entry) = app.address_book.get_mut(user_idx) {
                             entry.label = label;
                             entry.address = address;
                             entry.notes = notes;
-                            app.set_status("Address updated");
                         }
                         save_address_book(&app.address_book);
                     }
@@ -201,7 +198,7 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                     if let Some(cmd) = build_command_from_form(app) {
                         app.tx_commands.push(cmd);
                         app.tx_dry_run_dirty = true;
-                        app.set_status("Command added");
+
                         app.popup = None;
                         app.tx_adding_cmd = None;
                         app.input_mode = InputMode::Normal;
@@ -209,8 +206,6 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                         app.autocomplete.clear();
                         app.autocomplete_idx = None;
                         app.tx_multi_values.clear();
-                    } else {
-                        app.set_status("Fill in all required fields");
                     }
                 }
             }
@@ -256,7 +251,6 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                         scheme: scheme.clone(),
                         alias,
                     });
-                    app.set_status(format!("Generating {} keypair...", scheme));
                 }
                 app.popup = None;
             }
@@ -277,7 +271,6 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                         private_key_hex: val,
                         alias,
                     });
-                    app.set_status("Importing key...");
                 }
                 app.popup = None;
             }
@@ -297,7 +290,6 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                         k.alias = new_alias.clone();
                     }
                     app.send_cmd(WalletCmd::RenameKey { idx, new_alias });
-                    app.set_status("Key renamed");
                 }
                 app.popup = None;
             }
@@ -320,7 +312,7 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                 app.network_name = format!("{}...", net.name());
                 app.loading = true;
                 app.send_cmd(WalletCmd::Connect(net));
-                app.set_status("Switching network...");
+
                 app.popup = None;
             }
         }
@@ -335,7 +327,6 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                         app.address_selected -= 1;
                     }
                     save_address_book(&app.address_book);
-                    app.set_status("Address removed");
                 }
                 app.popup = None;
             }
@@ -358,7 +349,6 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                     if app.keys_selected >= app.keys.len() && app.keys_selected > 0 {
                         app.keys_selected -= 1;
                     }
-                    app.set_status("Key removed");
                 }
                 app.popup = None;
             }
@@ -381,7 +371,6 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                         label: String::new(),
                         notes: String::new(),
                     });
-                    app.set_status("Looking up IOTA name...");
                 }
                 app.popup = None;
             }
@@ -406,7 +395,6 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
         Some(Popup::ConfirmClearTx) => match key.code {
             KeyCode::Enter | KeyCode::Char('y') => {
                 app.reset_tx_builder();
-                app.set_status("Transaction cleared");
                 app.popup = None;
             }
             KeyCode::Esc | KeyCode::Char('n') => {

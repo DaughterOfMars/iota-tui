@@ -198,9 +198,7 @@ pub enum WalletEvent {
         private_key_hex: String,
     },
     DryRunResult(crate::app::DryRunInfo),
-    TxSubmitted {
-        digest: String,
-    },
+    TxSubmitted,
     FaucetRequested(String),
     IotaNameResolved {
         name: String,
@@ -678,15 +676,9 @@ impl WalletBackend {
         }
 
         builder.gas_budget(gas_budget);
-        let effects = builder.execute(keypair, None).await?;
+        let _effects = builder.execute(keypair, None).await?;
 
-        let digest = match &effects {
-            iota_sdk::types::TransactionEffects::V1(v1) => v1.transaction_digest.to_string(),
-            _ => "unknown".to_string(),
-        };
-        self.event_tx
-            .send(WalletEvent::TxSubmitted { digest })
-            .await?;
+        self.event_tx.send(WalletEvent::TxSubmitted).await?;
         Ok(())
     }
 

@@ -61,8 +61,6 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> colo
     let mut tick_interval = tokio::time::interval(std::time::Duration::from_millis(100));
 
     loop {
-        app.clear_expired_status();
-
         terminal.draw(|frame| ui::draw(frame, &mut app))?;
 
         tokio::select! {

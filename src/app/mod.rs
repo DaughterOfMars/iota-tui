@@ -16,7 +16,6 @@ pub struct App {
     pub input_buffer: String,
     pub input_cursor: usize,
     pub popup: Option<Popup>,
-    pub status_message: Option<(String, std::time::Instant)>,
 
     // Network state
     pub connected: bool,
@@ -153,7 +152,6 @@ impl App {
             input_buffer: String::new(),
             input_cursor: 0,
             popup: None,
-            status_message: None,
 
             connected: false,
             network_name: "disconnected".into(),
@@ -262,7 +260,6 @@ impl App {
             WalletEvent::Connected(network) => {
                 self.connected = true;
                 self.network_name = network;
-                self.set_status("Connected");
                 self.request_refresh();
                 // Refresh explorer data for the new network
                 self.explorer_overview = None;
@@ -373,7 +370,6 @@ impl App {
                     visible: true,
                     private_key_hex,
                 });
-                self.set_status(format!("Key '{}' ready", alias));
                 if is_first {
                     self.request_refresh();
                 }
@@ -387,12 +383,7 @@ impl App {
                 }
                 self.tx_dry_run = Some(info);
             }
-            WalletEvent::TxSubmitted { digest } => {
-                self.set_status(format!(
-                    "Tx submitted: {}..{}",
-                    &digest[..8],
-                    &digest[digest.len().saturating_sub(6)..]
-                ));
+            WalletEvent::TxSubmitted => {
                 self.reset_tx_builder();
                 self.navigate(Screen::Transactions);
                 self.request_refresh();
@@ -420,13 +411,9 @@ impl App {
                         notes: display_notes,
                     });
                     save_address_book(&self.address_book);
-                    self.set_status(format!("Resolved @{}", name));
-                } else {
-                    self.set_status(format!("Name '{}' not found", name));
                 }
             }
-            WalletEvent::FaucetRequested(msg) => {
-                self.set_status(msg);
+            WalletEvent::FaucetRequested(_msg) => {
                 self.request_refresh();
             }
             WalletEvent::NetworkOverview {
@@ -496,9 +483,7 @@ impl App {
                 self.explorer_search_has_next = has_next_page;
                 self.explorer_search_cursor = end_cursor;
             }
-            WalletEvent::Error(e) => {
-                self.set_status(format!("Error: {}", e));
-            }
+            WalletEvent::Error(_e) => {}
         }
     }
 
@@ -605,18 +590,6 @@ impl App {
         }
     }
 
-    pub fn set_status(&mut self, msg: impl Into<String>) {
-        self.status_message = Some((msg.into(), std::time::Instant::now()));
-    }
-
-    pub fn clear_expired_status(&mut self) {
-        if let Some((_, instant)) = &self.status_message
-            && instant.elapsed().as_secs() >= 5
-        {
-            self.status_message = None;
-        }
-    }
-
     pub fn navigate(&mut self, screen: Screen) {
         self.screen = screen;
         self.input_mode = InputMode::Normal;
@@ -660,7 +633,6 @@ impl App {
         self.explorer_search_cursor = None;
         self.explorer_search_cursors.clear();
         self.send_cmd(WalletCmd::LookupAddress(query));
-        self.set_status("Looking up...");
     }
 
     /// Navigate to Explorer > Lookup and immediately submit a type search.
@@ -683,7 +655,6 @@ impl App {
             type_filter,
             cursor: None,
         });
-        self.set_status("Searching objects by type...");
     }
 
     pub fn open_popup(&mut self, popup: Popup) {

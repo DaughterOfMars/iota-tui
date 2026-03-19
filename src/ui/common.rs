@@ -11,7 +11,6 @@ use ratatui::{
 use crate::app::{App, InputMode, Screen};
 
 pub const ACCENT: Color = Color::Cyan;
-pub const HIGHLIGHT: Color = Color::Yellow;
 pub const DIM: Color = Color::DarkGray;
 
 /// Draw the top tab bar showing all screens.
@@ -54,16 +53,6 @@ pub fn draw_separator(frame: &mut Frame, area: Rect) {
 }
 
 /// Draw a dedicated row for the status message above the status bar.
-pub fn draw_status_message(frame: &mut Frame, app: &App, area: Rect) {
-    if let Some((msg, _)) = &app.status_message {
-        let line = Line::from(vec![Span::styled(
-            msg.as_str(),
-            Style::default().fg(HIGHLIGHT),
-        )]);
-        frame.render_widget(Paragraph::new(line).alignment(Alignment::Center), area);
-    }
-}
-
 /// Draw the bottom status bar with mode, hints, network, and active address.
 pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     let active_addr = app

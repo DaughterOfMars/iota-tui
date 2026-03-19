@@ -215,10 +215,9 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                                     // Lookup result: border(1) then content lines
                                     let data_start = result_start + 1;
                                     if row >= data_start {
-                                        // Convert visual row to absolute line index
-                                        let line_offset =
-                                            result.field_to_line(app.explorer_lookup_offset);
-                                        let abs_line = line_offset + (row - data_start) as usize;
+                                        // explorer_lookup_offset is a line index
+                                        let abs_line = app.explorer_lookup_offset
+                                            + (row - data_start) as usize;
                                         // Convert line index to field index (skip headers)
                                         if let Some(field_idx) = result.line_to_field(abs_line)
                                             && field_idx < result.total_fields()

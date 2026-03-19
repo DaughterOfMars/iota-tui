@@ -37,7 +37,6 @@ pub fn handle_coins_key(app: &mut App, key: KeyEvent) {
                 && let Ok(addr) = iota_sdk::types::Address::from_hex(&key.address)
             {
                 app.send_cmd(WalletCmd::RequestFaucet(addr));
-                app.set_status("Requesting faucet...");
             }
         }
         _ => {}
@@ -134,27 +133,23 @@ pub fn handle_address_key(app: &mut App, key: KeyEvent) {
             app.start_input("");
         }
         KeyCode::Char('e') => {
-            if let Some(user_idx) = app.user_address_index(app.address_selected) {
-                if let Some(entry) = app.address_book.get(user_idx) {
-                    let label = entry.label.clone();
-                    let address = entry.address.clone();
-                    let notes = entry.notes.clone();
-                    app.address_edit_field = 0;
-                    app.address_edit_buffers = [label.clone(), address, notes];
-                    app.open_popup(Popup::EditAddress);
-                    app.start_input(&label);
-                }
-            } else {
-                app.set_status("Key entries are read-only");
+            if let Some(user_idx) = app.user_address_index(app.address_selected)
+                && let Some(entry) = app.address_book.get(user_idx)
+            {
+                let label = entry.label.clone();
+                let address = entry.address.clone();
+                let notes = entry.notes.clone();
+                app.address_edit_field = 0;
+                app.address_edit_buffers = [label.clone(), address, notes];
+                app.open_popup(Popup::EditAddress);
+                app.start_input(&label);
             }
         }
         KeyCode::Char('d') | KeyCode::Delete => {
-            if let Some(user_idx) = app.user_address_index(app.address_selected) {
-                if user_idx < app.address_book.len() {
-                    app.open_popup(Popup::ConfirmDeleteAddress);
-                }
-            } else {
-                app.set_status("Key entries cannot be deleted here");
+            if let Some(user_idx) = app.user_address_index(app.address_selected)
+                && user_idx < app.address_book.len()
+            {
+                app.open_popup(Popup::ConfirmDeleteAddress);
             }
         }
         KeyCode::Char('l') => {
@@ -182,7 +177,7 @@ pub fn handle_keys_key(app: &mut App, key: KeyEvent) {
                 k.is_active = i == idx;
             }
             app.send_cmd(WalletCmd::SetActiveKey(idx));
-            app.set_status("Active key changed");
+
             app.request_refresh();
         }
         KeyCode::Char('x') => {
@@ -228,7 +223,6 @@ pub fn handle_tx_key(app: &mut App, key: KeyEvent) {
     if app.input_mode != InputMode::Editing && key.code == KeyCode::Char('c') {
         if app.tx_commands.is_empty() {
             app.reset_tx_builder();
-            app.set_status("Transaction cleared");
         } else {
             app.open_popup(Popup::ConfirmClearTx);
         }
@@ -340,10 +334,8 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                             type_filter: query,
                             cursor: None,
                         });
-                        app.set_status("Searching objects by type...");
                     } else {
                         app.send_cmd(WalletCmd::LookupAddress(query));
-                        app.set_status("Looking up...");
                     }
                 }
             }
@@ -464,13 +456,11 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                     app.explorer_checkpoints_page += 1;
                     let cursor = app.explorer_checkpoints_cursor.clone();
                     app.send_cmd(WalletCmd::RefreshCheckpoints { cursor });
-                    app.set_status("Loading next page...");
                 }
                 KeyCode::Char('[') if !app.explorer_checkpoints_cursors.is_empty() => {
                     let prev = app.explorer_checkpoints_cursors.pop().flatten();
                     app.explorer_checkpoints_page = app.explorer_checkpoints_page.saturating_sub(1);
                     app.send_cmd(WalletCmd::RefreshCheckpoints { cursor: prev });
-                    app.set_status("Loading previous page...");
                 }
                 _ => {}
             }
@@ -593,7 +583,6 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                         type_filter,
                         cursor,
                     });
-                    app.set_status("Loading next page...");
                 }
                 KeyCode::Char('[')
                     if !app.explorer_search_results.is_empty()
@@ -606,7 +595,6 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                         type_filter,
                         cursor: prev_cursor,
                     });
-                    app.set_status("Loading previous page...");
                 }
                 // Address lookup pagination: next page
                 KeyCode::Char(']')
@@ -633,7 +621,6 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                         obj_cursor,
                         tx_cursor,
                     });
-                    app.set_status("Loading next page...");
                 }
                 // Address lookup pagination: prev page
                 KeyCode::Char('[')
@@ -655,7 +642,6 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                         obj_cursor: prev_obj,
                         tx_cursor: prev_tx,
                     });
-                    app.set_status("Loading previous page...");
                 }
                 _ => {}
             }

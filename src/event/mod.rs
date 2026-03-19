@@ -64,7 +64,6 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             } else {
                 app.request_refresh();
             }
-            app.set_status("Refreshing...");
             return;
         }
         KeyCode::Char('n') => {
@@ -140,16 +139,10 @@ fn handle_key(app: &mut App, key: KeyEvent) {
 }
 
 fn submit_transaction(app: &mut App) {
-    if app.keys.is_empty() {
-        app.set_status("No keys available");
+    if app.keys.is_empty() || app.tx_commands.is_empty() {
         return;
     }
-    if app.tx_commands.is_empty() {
-        app.set_status("No commands added");
-        return;
-    }
-    if let Err(msg) = app.validate_balance() {
-        app.set_status(msg);
+    if app.validate_balance().is_err() {
         return;
     }
 
@@ -160,7 +153,6 @@ fn submit_transaction(app: &mut App) {
         commands: app.tx_commands.clone(),
         gas_budget,
     });
-    app.set_status("Submitting transaction...");
 }
 
 fn trigger_dry_run(app: &mut App) {
