@@ -5,7 +5,7 @@ use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, BorderType, Borders, Paragraph, Wrap},
 };
 
 use crate::app::{AddCommandType, App};
@@ -59,6 +59,7 @@ pub(super) fn draw_add_command_popup(frame: &mut Frame, area: Rect) {
         .title(" Add Command ")
         .title_style(Style::default().fg(ACCENT).bold())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(ACCENT));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
@@ -207,6 +208,7 @@ pub(super) fn draw_add_command_form(frame: &mut Frame, app: &mut App, area: Rect
         .title(format!(" {} ", ct.label()))
         .title_style(Style::default().fg(ACCENT).bold())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(ACCENT));
 
     frame.render_widget(

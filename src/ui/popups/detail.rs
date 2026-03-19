@@ -5,7 +5,7 @@ use ratatui::{
     layout::Rect,
     style::{Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, BorderType, Borders, Paragraph, Wrap},
 };
 
 use crate::app::App;
@@ -57,6 +57,7 @@ pub(super) fn draw_detail_popup(frame: &mut Frame, app: &mut App, area: Rect) {
         .title(format!(" {} ", title))
         .title_style(Style::default().fg(ACCENT).bold())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(ACCENT));
 
     let paragraph = Paragraph::new(lines)

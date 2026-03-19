@@ -4,7 +4,7 @@ use ratatui::{
     Frame,
     layout::{Constraint, Rect},
     style::{Color, Style},
-    widgets::{Block, Borders, Cell, Row, Table},
+    widgets::{Block, BorderType, Borders, Cell, Row, Table},
 };
 
 use super::common::{accent_style, dim_style, header_style, selected_style, truncate_address};
@@ -65,6 +65,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         .title(title)
         .title_style(header_style())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(dim_style());
 
     let widths = [

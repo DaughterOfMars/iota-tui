@@ -5,7 +5,7 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Row, Table},
+    widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Row, Table},
 };
 
 use super::common;
@@ -65,6 +65,7 @@ fn draw_step_indicator(frame: &mut Frame, app: &App, area: Rect) {
         .title(" Transaction Builder ")
         .title_style(common::header_style())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(common::dim_style());
 
     frame.render_widget(Paragraph::new(Line::from(steps)).block(block), area);
@@ -75,6 +76,7 @@ fn draw_select_sender(frame: &mut Frame, app: &App, area: Rect) {
         .title(" Select Sender ")
         .title_style(common::header_style())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(common::dim_style());
 
     if app.keys.is_empty() {
@@ -122,12 +124,10 @@ fn draw_select_sender(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_commands(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
-        .title(format!(
-            " Commands ({}) - a:add  d:delete ",
-            app.tx.commands.len()
-        ))
+        .title(format!(" Commands ({}) ", app.tx.commands.len()))
         .title_style(common::header_style())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(common::dim_style());
 
     if app.tx.commands.is_empty() {
@@ -193,6 +193,7 @@ fn draw_gas(frame: &mut Frame, app: &App, area: Rect) {
         .title(" Gas Budget ")
         .title_style(common::header_style())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(common::dim_style());
 
     let display = if app.input_mode == InputMode::Editing {
@@ -247,6 +248,7 @@ fn draw_review(frame: &mut Frame, app: &App, area: Rect) {
         .title(" Review Transaction ")
         .title_style(common::header_style())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(common::dim_style());
 
     let sender = app

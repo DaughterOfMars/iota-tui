@@ -8,7 +8,7 @@ use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, BorderType, Borders, Paragraph, Wrap},
 };
 
 use crate::app::{App, Popup};
@@ -179,6 +179,7 @@ fn draw_help_popup(frame: &mut Frame, app: &mut App, area: Rect) {
         .title(" Help ")
         .title_style(Style::default().fg(ACCENT).bold())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(ACCENT));
 
     let paragraph = Paragraph::new(text)
@@ -247,6 +248,7 @@ fn draw_address_form(frame: &mut Frame, app: &App, area: Rect, title: &str) {
         .title(format!(" {} ", title))
         .title_style(Style::default().fg(ACCENT).bold())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(ACCENT));
 
     frame.render_widget(Paragraph::new(lines).block(block), area);
@@ -283,6 +285,7 @@ fn draw_generate_key_popup(frame: &mut Frame, area: Rect) {
         .title(" Generate Key ")
         .title_style(Style::default().fg(ACCENT).bold())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(ACCENT));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
@@ -316,6 +319,7 @@ fn draw_generate_key_alias_popup(frame: &mut Frame, app: &App, area: Rect) {
         .title(" Key Alias ")
         .title_style(Style::default().fg(ACCENT).bold())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(ACCENT));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
@@ -352,6 +356,7 @@ fn draw_import_key_popup(frame: &mut Frame, app: &App, area: Rect) {
         .title(" Import Key ")
         .title_style(Style::default().fg(ACCENT).bold())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(ACCENT));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
@@ -381,6 +386,7 @@ fn draw_rename_key_popup(frame: &mut Frame, app: &App, area: Rect) {
         .title(" Rename Key ")
         .title_style(Style::default().fg(ACCENT).bold())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(ACCENT));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
@@ -417,6 +423,7 @@ fn draw_switch_network_popup(frame: &mut Frame, area: Rect) {
         .title(" Switch Network ")
         .title_style(Style::default().fg(ACCENT).bold())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(ACCENT));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
@@ -453,6 +460,7 @@ fn draw_confirm_delete_address(frame: &mut Frame, app: &App, area: Rect) {
         .title(" Confirm Delete ")
         .title_style(Style::default().fg(Color::Red).bold())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(Color::Red));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
@@ -489,6 +497,7 @@ fn draw_confirm_delete_key(frame: &mut Frame, app: &App, area: Rect) {
         .title(" Confirm Delete ")
         .title_style(Style::default().fg(Color::Red).bold())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(Color::Red));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
@@ -514,6 +523,7 @@ fn draw_confirm_clear_tx(frame: &mut Frame, area: Rect) {
         .title(" Confirm Clear ")
         .title_style(Style::default().fg(Color::Yellow).bold())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(Color::Yellow));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
@@ -546,6 +556,7 @@ fn draw_iota_name_lookup(frame: &mut Frame, app: &App, area: Rect) {
         .title(" IOTA-Name Lookup ")
         .title_style(Style::default().fg(ACCENT).bold())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(ACCENT));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
@@ -575,6 +586,7 @@ fn draw_error_log_popup(frame: &mut Frame, app: &mut App, area: Rect) {
         .title(" Error Log (newest first) ")
         .title_style(Style::default().fg(Color::Red).bold())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(Color::Red));
 
     let paragraph = Paragraph::new(lines)
@@ -633,6 +645,7 @@ fn draw_actions_menu(frame: &mut Frame, app: &App, area: Rect) {
         .title(" Actions ")
         .title_style(Style::default().fg(ACCENT).bold())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(ACCENT));
 
     frame.render_widget(Paragraph::new(lines).block(block), area);
@@ -666,6 +679,7 @@ fn draw_confirm_quit(frame: &mut Frame, area: Rect) {
         .title(" Confirm Quit ")
         .title_style(Style::default().fg(Color::Yellow).bold())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(Color::Yellow));
 
     frame.render_widget(Paragraph::new(text).block(block), area);

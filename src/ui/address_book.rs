@@ -3,9 +3,9 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::{Color, Style, Stylize},
+    style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
+    widgets::{Block, BorderType, Borders, Cell, Paragraph, Row, Table},
 };
 
 use super::common;
@@ -72,6 +72,7 @@ fn draw_address_table(frame: &mut Frame, app: &App, area: Rect) {
             .title(title)
             .title_style(common::header_style())
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(common::dim_style()),
     );
 
@@ -83,25 +84,21 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
         .title(" Address Details ")
         .title_style(common::header_style())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(common::dim_style());
 
     let combined = app.combined_address_book();
     let content = if let Some(entry) = combined.get(app.address_selected) {
-        let addr_width = area.width.saturating_sub(14) as usize;
+        let addr_width = area.width.saturating_sub(16) as usize;
         let is_key = app.address_selected < app.key_entry_count();
         let mut lines = vec![
-            Line::from(vec![
-                Span::styled("  Label:   ", Style::default().fg(Color::White).bold()),
-                Span::styled(&entry.label, common::accent_style()),
-            ]),
-            Line::from(vec![
-                Span::styled("  Address: ", Style::default().fg(Color::White).bold()),
-                Span::raw(common::truncate_address(&entry.address, addr_width)),
-            ]),
-            Line::from(vec![
-                Span::styled("  Notes:   ", Style::default().fg(Color::White).bold()),
-                Span::styled(&entry.notes, common::dim_style()),
-            ]),
+            common::detail_line("Label", &entry.label, common::accent_style()),
+            common::detail_line(
+                "Address",
+                &common::truncate_address(&entry.address, addr_width),
+                Style::default(),
+            ),
+            common::detail_line("Notes", &entry.notes, common::dim_style()),
         ];
         if is_key {
             lines.push(Line::from(vec![Span::styled(

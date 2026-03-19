@@ -5,7 +5,7 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
+    widgets::{Block, BorderType, Borders, Cell, Paragraph, Row, Table},
 };
 
 use super::common;
@@ -29,10 +29,10 @@ fn draw_summary(frame: &mut Frame, app: &App, area: Rect) {
         .title(" Portfolio ")
         .title_style(common::header_style())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(common::dim_style());
 
     let balance_display = format_nanos(app.total_balance_iota);
-    let network = &app.network_name;
 
     let text = Line::from(vec![
         Span::styled("  Total IOTA: ", Style::default().fg(Color::White)),
@@ -41,8 +41,6 @@ fn draw_summary(frame: &mut Frame, app: &App, area: Rect) {
             format!("    {} coin objects", app.coins.len()),
             common::dim_style(),
         ),
-        Span::styled(format!("    [{}]", network), common::accent_style()),
-        Span::styled("    f:faucet  r:refresh", common::dim_style()),
     ]);
 
     frame.render_widget(Paragraph::new(text).block(block), area);
@@ -54,6 +52,7 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
             .title(" Coins ")
             .title_style(common::header_style())
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(common::dim_style());
 
         let msg = if app.keys.is_empty() {
@@ -148,6 +147,7 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
             .title(title)
             .title_style(common::header_style())
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(common::dim_style()),
     );
 
@@ -159,28 +159,24 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
         .title(" Details ")
         .title_style(common::header_style())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(common::dim_style());
 
     let content = if let Some(coin) = app.coins.get(app.coins_selected) {
         let id_width = area.width.saturating_sub(16) as usize;
         vec![
-            Line::from(vec![
-                Span::styled("  Symbol:  ", Style::default().fg(Color::White).bold()),
-                Span::styled(&coin.symbol, common::accent_style()),
-                Span::styled("  |  Balance: ", Style::default().fg(Color::White).bold()),
-                Span::styled(&coin.balance_display, Style::default().fg(Color::Green)),
-            ]),
-            Line::from(vec![
-                Span::styled("  Type:    ", Style::default().fg(Color::White).bold()),
-                Span::raw(&coin.coin_type),
-            ]),
-            Line::from(vec![
-                Span::styled("  Object:  ", Style::default().fg(Color::White).bold()),
-                Span::styled(
-                    common::truncate_address(&coin.object_id, id_width),
-                    common::dim_style(),
-                ),
-            ]),
+            common::detail_line("Symbol", &coin.symbol, common::accent_style()),
+            common::detail_line(
+                "Balance",
+                &coin.balance_display,
+                Style::default().fg(Color::Green),
+            ),
+            common::detail_line("Type", &coin.coin_type, Style::default()),
+            common::detail_line(
+                "Object",
+                &common::truncate_address(&coin.object_id, id_width),
+                common::dim_style(),
+            ),
         ]
     } else {
         vec![Line::from("  No coin selected")]

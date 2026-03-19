@@ -3,9 +3,9 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::{Color, Style, Stylize},
+    style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
+    widgets::{Block, BorderType, Borders, Cell, Paragraph, Row, Table},
 };
 
 use super::common;
@@ -24,6 +24,7 @@ fn draw_key_table(frame: &mut Frame, app: &App, area: Rect) {
             .title(" Keys (0) ")
             .title_style(common::header_style())
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(common::dim_style());
 
         let text = vec![
@@ -95,6 +96,7 @@ fn draw_key_table(frame: &mut Frame, app: &App, area: Rect) {
             .title(format!(" Keys ({}) ", app.keys.len()))
             .title_style(common::header_style())
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(common::dim_style()),
     );
 
@@ -106,15 +108,16 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
         .title(" Key Details ")
         .title_style(common::header_style())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(common::dim_style());
 
     let content = if let Some(key) = app.keys.get(app.keys_selected) {
-        let addr_width = area.width.saturating_sub(14) as usize;
+        let addr_width = area.width.saturating_sub(16) as usize;
         let active_str = if key.is_active { "Yes (active)" } else { "No" };
-        let active_color = if key.is_active {
-            Color::Green
+        let active_style = if key.is_active {
+            Style::default().fg(Color::Green)
         } else {
-            Color::White
+            Style::default()
         };
 
         let private_line = if app.keys_show_private {
@@ -127,35 +130,24 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
             } else {
                 key.private_key_hex.clone()
             };
-            Line::from(vec![
-                Span::styled("  Private: ", Style::default().fg(Color::White).bold()),
-                Span::styled(hex_display, Style::default().fg(Color::Red)),
-            ])
+            common::detail_line("Private", &hex_display, Style::default().fg(Color::Red))
         } else {
-            Line::from(vec![
-                Span::styled("  Private: ", Style::default().fg(Color::White).bold()),
-                Span::styled(
-                    "********** (press 'p' to reveal)",
-                    Style::default().fg(Color::DarkGray),
-                ),
-            ])
+            common::detail_line(
+                "Private",
+                "********** (press 'p' to reveal)",
+                common::dim_style(),
+            )
         };
 
         vec![
-            Line::from(vec![
-                Span::styled("  Alias:   ", Style::default().fg(Color::White).bold()),
-                Span::styled(&key.alias, common::accent_style()),
-                Span::styled("  |  Active: ", Style::default().fg(Color::White).bold()),
-                Span::styled(active_str, Style::default().fg(active_color)),
-            ]),
-            Line::from(vec![
-                Span::styled("  Scheme:  ", Style::default().fg(Color::White).bold()),
-                Span::raw(&key.scheme),
-            ]),
-            Line::from(vec![
-                Span::styled("  Address: ", Style::default().fg(Color::White).bold()),
-                Span::raw(common::truncate_address(&key.address, addr_width)),
-            ]),
+            common::detail_line("Alias", &key.alias, common::accent_style()),
+            common::detail_line("Active", active_str, active_style),
+            common::detail_line("Scheme", &key.scheme, Style::default()),
+            common::detail_line(
+                "Address",
+                &common::truncate_address(&key.address, addr_width),
+                Style::default(),
+            ),
             private_line,
         ]
     } else {

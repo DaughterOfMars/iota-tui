@@ -5,7 +5,7 @@ use ratatui::{
     layout::{Constraint, Rect},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
+    widgets::{Block, BorderType, Borders, Cell, Paragraph, Row, Table},
 };
 
 use super::common;
@@ -19,6 +19,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
             .title(" Packages ")
             .title_style(common::header_style())
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(common::dim_style());
 
         let text = vec![
@@ -91,6 +92,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
             .title(title)
             .title_style(common::header_style())
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(common::dim_style()),
     );
 

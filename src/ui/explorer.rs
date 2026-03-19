@@ -5,7 +5,7 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
+    widgets::{Block, BorderType, Borders, Cell, Paragraph, Row, Table},
 };
 
 use super::common;
@@ -46,6 +46,7 @@ fn draw_sub_tabs(frame: &mut Frame, app: &App, area: Rect) {
         .title(" Explorer ")
         .title_style(common::header_style())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(common::dim_style());
 
     let line = Line::from(tabs);
@@ -57,6 +58,7 @@ fn draw_overview(frame: &mut Frame, app: &App, area: Rect) {
         .title(" Network Overview ")
         .title_style(common::header_style())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(common::dim_style());
 
     let content = if let Some(ref overview) = app.explorer.overview {
@@ -80,6 +82,7 @@ fn draw_checkpoints(frame: &mut Frame, app: &mut App, area: Rect) {
             .title(" Checkpoints ")
             .title_style(common::header_style())
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(common::dim_style());
         frame.render_widget(
             Paragraph::new("  Loading checkpoints...").block(block),
@@ -215,6 +218,7 @@ fn draw_checkpoints(frame: &mut Frame, app: &mut App, area: Rect) {
             .title(title)
             .title_style(common::header_style())
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(common::dim_style()),
     );
 
@@ -234,6 +238,7 @@ fn draw_validators(frame: &mut Frame, app: &mut App, area: Rect) {
             .title(" Validators ")
             .title_style(common::header_style())
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(common::dim_style());
         frame.render_widget(Paragraph::new("  Loading validators...").block(block), area);
         return;
@@ -287,6 +292,7 @@ fn draw_validators(frame: &mut Frame, app: &mut App, area: Rect) {
             .title(title)
             .title_style(common::header_style())
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(common::dim_style()),
     );
 
@@ -317,6 +323,7 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
         .title(input_title)
         .title_style(common::header_style())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(if editing {
             Style::default().fg(Color::Green)
         } else {
@@ -345,6 +352,7 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
         .title(" Result ")
         .title_style(common::header_style())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(common::dim_style());
 
     if !app.explorer.search_results.is_empty() {
@@ -420,6 +428,7 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
                 .title(title)
                 .title_style(common::header_style())
                 .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
                 .border_style(common::dim_style()),
         );
 
@@ -523,6 +532,7 @@ fn draw_lookup_sections(
         .title(title.unwrap_or(" Result "))
         .title_style(common::header_style())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(common::dim_style());
 
     let inner = block.inner(area);

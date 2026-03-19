@@ -25,10 +25,13 @@ pub fn draw_tabs(frame: &mut Frame, app: &mut App, area: Rect) {
             let style = if *screen == app.screen {
                 Style::default().fg(Color::Black).bg(ACCENT).bold()
             } else {
-                Style::default().fg(Color::White).dim()
+                Style::default().fg(DIM)
             };
-            let sep = Span::styled(" ", Style::default());
-            vec![Span::styled(label, style), sep]
+            let mut spans = vec![Span::styled(label, style)];
+            if i < Screen::ALL.len() - 1 {
+                spans.push(Span::styled(" │ ", Style::default().fg(DIM)));
+            }
+            spans
         })
         .collect();
 
@@ -38,7 +41,10 @@ pub fn draw_tabs(frame: &mut Frame, app: &mut App, area: Rect) {
         let label = format!(" {} {} ", i + 1, screen.title());
         let width = label.len() as u16;
         app.tab_areas.push(Rect::new(x, area.y, width, 1));
-        x += width + 1; // +1 for separator
+        x += width;
+        if i < Screen::ALL.len() - 1 {
+            x += 3; // " │ " separator
+        }
     }
 
     let line = Line::from(tabs);
@@ -226,7 +232,7 @@ pub fn truncate_address(addr: &str, max_width: usize) -> String {
 }
 
 pub fn selected_style() -> Style {
-    Style::default().bg(Color::DarkGray).fg(Color::White).bold()
+    Style::default().bg(Color::Indexed(236)).fg(ACCENT).bold()
 }
 
 pub fn header_style() -> Style {
@@ -239,6 +245,17 @@ pub fn dim_style() -> Style {
 
 pub fn accent_style() -> Style {
     Style::default().fg(ACCENT)
+}
+
+/// Create a detail line with a fixed-width label and styled value.
+pub fn detail_line(label: &str, value: &str, value_style: Style) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(
+            format!("  {:<12}", label),
+            Style::default().fg(Color::White).bold(),
+        ),
+        Span::styled(value.to_string(), value_style),
+    ])
 }
 
 /// Clamp scroll offset so content doesn't scroll past the end.

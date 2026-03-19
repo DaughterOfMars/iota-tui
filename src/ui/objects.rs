@@ -3,9 +3,9 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::{Color, Style, Stylize},
-    text::{Line, Span},
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
+    style::{Color, Style},
+    text::Line,
+    widgets::{Block, BorderType, Borders, Cell, Paragraph, Row, Table},
 };
 
 use super::common;
@@ -24,6 +24,7 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
             .title(" Objects ")
             .title_style(common::header_style())
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(common::dim_style());
 
         let msg = if app.keys.is_empty() {
@@ -117,6 +118,7 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
             .title(title)
             .title_style(common::header_style())
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(common::dim_style()),
     );
 
@@ -128,31 +130,25 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
         .title(" Object Details ")
         .title_style(common::header_style())
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .border_style(common::dim_style());
 
     let content = if let Some(obj) = app.objects.get(app.objects_selected) {
-        let id_width = area.width.saturating_sub(14) as usize;
-        let type_width = area.width.saturating_sub(14) as usize;
+        let id_width = area.width.saturating_sub(16) as usize;
+        let type_width = area.width.saturating_sub(16) as usize;
         vec![
-            Line::from(vec![
-                Span::styled("  Object ID: ", Style::default().fg(Color::White).bold()),
-                Span::styled(
-                    common::truncate_address(&obj.object_id, id_width),
-                    common::accent_style(),
-                ),
-            ]),
-            Line::from(vec![
-                Span::styled("  Type:      ", Style::default().fg(Color::White).bold()),
-                Span::raw(common::truncate_type(&obj.type_name, type_width)),
-            ]),
-            Line::from(vec![
-                Span::styled("  Version:   ", Style::default().fg(Color::White).bold()),
-                Span::raw(&obj.version),
-            ]),
-            Line::from(vec![
-                Span::styled("  Digest:    ", Style::default().fg(Color::White).bold()),
-                Span::styled(&obj.digest, common::dim_style()),
-            ]),
+            common::detail_line(
+                "Object ID",
+                &common::truncate_address(&obj.object_id, id_width),
+                common::accent_style(),
+            ),
+            common::detail_line(
+                "Type",
+                &common::truncate_type(&obj.type_name, type_width),
+                Style::default(),
+            ),
+            common::detail_line("Version", &obj.version, Style::default()),
+            common::detail_line("Digest", &obj.digest, common::dim_style()),
         ]
     } else {
         vec![Line::from("  No object selected")]
