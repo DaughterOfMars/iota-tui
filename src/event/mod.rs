@@ -1,5 +1,6 @@
 //! Event handling — dispatches keyboard and mouse events to the appropriate handler.
 
+mod explorer;
 mod input;
 mod mouse;
 pub(crate) mod nav;
@@ -35,7 +36,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         // Screens that handle their own editing (Enter/Esc to submit/cancel)
         match app.screen {
             Screen::Explorer => {
-                screen::handle_explorer_key(app, key);
+                explorer::handle_explorer_key(app, key);
                 return;
             }
             Screen::TxBuilder => {
@@ -134,7 +135,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         Screen::AddressBook => screen::handle_address_key(app, key),
         Screen::Keys => screen::handle_keys_key(app, key),
         Screen::TxBuilder => screen::handle_tx_key(app, key),
-        Screen::Explorer => screen::handle_explorer_key(app, key),
+        Screen::Explorer => explorer::handle_explorer_key(app, key),
     }
 }
 
