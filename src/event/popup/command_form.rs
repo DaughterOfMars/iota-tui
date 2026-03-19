@@ -102,7 +102,7 @@ pub fn handle_command_form_key(app: &mut App, key: KeyEvent) {
 
 /// Parse the form buffers into a PtbCommand based on the selected command type.
 /// Address fields are resolved through aliases (key aliases + address book labels).
-fn build_command_from_form(app: &App) -> Option<PtbCommand> {
+pub(crate) fn build_command_from_form(app: &App) -> Option<PtbCommand> {
     let ct = app.tx.adding_cmd?;
     let bufs = &app.tx.edit_buffers;
     match ct {

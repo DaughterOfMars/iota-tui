@@ -228,10 +228,12 @@ fn draw_address_form(frame: &mut Frame, app: &App, area: Rect, title: &str) {
         lines.push(Line::from(""));
     }
 
-    lines.push(Line::from(vec![Span::styled(
-        "  Tab: next field  Enter: save  Esc: cancel",
-        Style::default().fg(DIM),
-    )]));
+    lines.push(Line::from(vec![
+        Span::styled("  Tab: next  ", Style::default().fg(DIM)),
+        Span::styled("[ Save ]", Style::default().fg(ACCENT).bold()),
+        Span::raw("  "),
+        Span::styled("[ Cancel ]", Style::default().fg(DIM)),
+    ]));
 
     let block = Block::default()
         .title(format!(" {} ", title))
@@ -294,10 +296,12 @@ fn draw_generate_key_alias_popup(frame: &mut Frame, app: &App, area: Rect) {
                 .add_modifier(Modifier::UNDERLINED),
         )]),
         Line::from(""),
-        Line::from(vec![Span::styled(
-            "  Enter: confirm  Esc: cancel",
-            Style::default().fg(DIM),
-        )]),
+        Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled("[ Confirm ]", Style::default().fg(ACCENT).bold()),
+            Span::raw("  "),
+            Span::styled("[ Cancel ]", Style::default().fg(DIM)),
+        ]),
     ];
 
     let block = Block::default()
@@ -328,10 +332,12 @@ fn draw_import_key_popup(frame: &mut Frame, app: &App, area: Rect) {
                 .add_modifier(Modifier::UNDERLINED),
         )]),
         Line::from(""),
-        Line::from(vec![Span::styled(
-            "  Enter: import  Esc: cancel",
-            Style::default().fg(DIM),
-        )]),
+        Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled("[ Import ]", Style::default().fg(ACCENT).bold()),
+            Span::raw("  "),
+            Span::styled("[ Cancel ]", Style::default().fg(DIM)),
+        ]),
     ];
 
     let block = Block::default()
@@ -355,10 +361,12 @@ fn draw_rename_key_popup(frame: &mut Frame, app: &App, area: Rect) {
                 .add_modifier(Modifier::UNDERLINED),
         )]),
         Line::from(""),
-        Line::from(vec![Span::styled(
-            "  Enter: save  Esc: cancel",
-            Style::default().fg(DIM),
-        )]),
+        Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled("[ Save ]", Style::default().fg(ACCENT).bold()),
+            Span::raw("  "),
+            Span::styled("[ Cancel ]", Style::default().fg(DIM)),
+        ]),
     ];
 
     let block = Block::default()
@@ -518,10 +526,12 @@ fn draw_iota_name_lookup(frame: &mut Frame, app: &App, area: Rect) {
                 .add_modifier(Modifier::UNDERLINED),
         )]),
         Line::from(""),
-        Line::from(vec![Span::styled(
-            "  Enter: lookup  Esc: cancel",
-            Style::default().fg(DIM),
-        )]),
+        Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled("[ Lookup ]", Style::default().fg(ACCENT).bold()),
+            Span::raw("  "),
+            Span::styled("[ Cancel ]", Style::default().fg(DIM)),
+        ]),
     ];
 
     let block = Block::default()

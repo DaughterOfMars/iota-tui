@@ -610,7 +610,159 @@ fn handle_popup_click(app: &mut App, col: u16, row: u16) {
                 }
             }
         }
-        // Scroll-only or input popups: click inside does nothing (no dismiss)
+        // Input popups: check for submit/cancel button clicks on the last inner line
+        Some(
+            Popup::AddAddress
+            | Popup::EditAddress
+            | Popup::GenerateKeyAlias
+            | Popup::ImportKey
+            | Popup::RenameKey
+            | Popup::LookupIotaName
+            | Popup::AddCommandForm,
+        ) => {
+            let button_row = (popup_area.height.saturating_sub(2)) as usize;
+            if inner_row == button_row {
+                // Button layout: "  [ Submit ]  [ Cancel ]"
+                // Submit button starts at popup_area.x + 3, Cancel after a gap
+                let inner_col = col.saturating_sub(popup_area.x + 1) as usize;
+                if (2..14).contains(&inner_col) {
+                    // Submit button region — simulate Enter key
+                    submit_input_popup(app);
+                } else if inner_col >= 16 {
+                    // Cancel button region — simulate Esc key
+                    cancel_input_popup(app);
+                }
+            }
+        }
+        // Scroll-only popups (Help, Detail, ErrorLog): click inside does nothing
+        _ => {}
+    }
+}
+
+/// Cancel an input popup (same as pressing Esc).
+fn cancel_input_popup(app: &mut App) {
+    match app.popup {
+        Some(Popup::GenerateKeyAlias) => {
+            app.keys_gen_scheme = None;
+        }
+        Some(Popup::AddCommandForm) => {
+            app.tx.adding_cmd = None;
+            app.autocomplete.clear();
+            app.tx.multi_values.clear();
+        }
+        _ => {}
+    }
+    app.popup = None;
+    app.input_mode = InputMode::Normal;
+    app.input_clear();
+}
+
+/// Submit an input popup (same as pressing Enter).
+fn submit_input_popup(app: &mut App) {
+    match app.popup {
+        Some(Popup::AddAddress | Popup::EditAddress) => {
+            app.address_edit_buffers[app.address_edit_field] = app.input_buffer.clone();
+            let [label, address, notes] = app.address_edit_buffers.clone();
+            if !label.is_empty() && !address.is_empty() {
+                if app.popup == Some(Popup::AddAddress) {
+                    if !address.starts_with("0x") {
+                        app.send_cmd(WalletCmd::LookupIotaName {
+                            name: address,
+                            label,
+                            notes,
+                        });
+                    } else {
+                        app.address_book.push(crate::app::AddressEntry {
+                            label,
+                            address,
+                            notes,
+                        });
+                        crate::app::save_address_book(&app.address_book);
+                    }
+                } else if let Some(user_idx) = app.user_address_index(app.address_selected) {
+                    if let Some(entry) = app.address_book.get_mut(user_idx) {
+                        entry.label = label;
+                        entry.address = address;
+                        entry.notes = notes;
+                    }
+                    crate::app::save_address_book(&app.address_book);
+                }
+            }
+            app.popup = None;
+            app.input_mode = InputMode::Normal;
+            app.input_clear();
+        }
+        Some(Popup::GenerateKeyAlias) => {
+            let alias = app.stop_input();
+            if let Some(scheme) = app.keys_gen_scheme.take() {
+                let alias = if alias.is_empty() {
+                    format!("key-{}", app.keys.len())
+                } else {
+                    alias
+                };
+                app.send_cmd(WalletCmd::GenerateKey {
+                    scheme: scheme.clone(),
+                    alias,
+                });
+            }
+            app.popup = None;
+        }
+        Some(Popup::ImportKey) => {
+            let val = app.stop_input();
+            if !val.is_empty() {
+                let alias = format!("imported-{}", app.keys.len());
+                app.send_cmd(WalletCmd::ImportKey {
+                    scheme: "ed25519".to_string(),
+                    private_key_hex: val,
+                    alias,
+                });
+            }
+            app.popup = None;
+        }
+        Some(Popup::RenameKey) => {
+            let new_alias = app.stop_input();
+            if !new_alias.is_empty() {
+                let idx = app.keys_selected;
+                if let Some(k) = app.keys.get_mut(idx) {
+                    k.alias = new_alias.clone();
+                }
+                app.send_cmd(WalletCmd::RenameKey { idx, new_alias });
+            }
+            app.popup = None;
+        }
+        Some(Popup::LookupIotaName) => {
+            let name = app.stop_input();
+            if !name.is_empty() {
+                app.send_cmd(WalletCmd::LookupIotaName {
+                    name,
+                    label: String::new(),
+                    notes: String::new(),
+                });
+            }
+            app.popup = None;
+        }
+        Some(Popup::AddCommandForm) => {
+            // Simulate Enter with empty buffer → submit form
+            // This mirrors the keyboard handler in command_form.rs
+            if app.autocomplete_idx.is_some() {
+                app.accept_autocomplete();
+            } else {
+                app.tx.edit_buffers[app.tx.edit_field] = app.input_buffer.clone();
+                // Try to build command
+                use crate::event::popup::command_form_build_command;
+                if let Some(cmd) = command_form_build_command(app) {
+                    app.tx.commands.push(cmd);
+                    app.tx.dry_run_dirty = true;
+                    app.popup = None;
+                    app.tx.adding_cmd = None;
+                    app.input_mode = InputMode::Normal;
+                    app.input_clear();
+                    app.autocomplete.clear();
+                    app.autocomplete_idx = None;
+                    app.tx.multi_values.clear();
+                }
+            }
+        }
         _ => {}
     }
 }

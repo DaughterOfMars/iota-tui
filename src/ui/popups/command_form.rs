@@ -181,15 +181,23 @@ pub(super) fn draw_add_command_form(frame: &mut Frame, app: &mut App, area: Rect
         lines.push(Line::from(""));
     }
 
-    let hint = if app.tx.is_multi_value_field() {
-        "  Tab/Enter: add item  Backspace: undo  Enter(empty): submit  Esc: cancel"
+    if app.tx.is_multi_value_field() {
+        lines.push(Line::from(vec![Span::styled(
+            "  Tab/Enter: add  Backspace: undo",
+            Style::default().fg(DIM),
+        )]));
     } else {
-        "  Tab: next field  Enter: add  Esc: cancel"
-    };
-    lines.push(Line::from(vec![Span::styled(
-        hint,
-        Style::default().fg(DIM),
-    )]));
+        lines.push(Line::from(vec![Span::styled(
+            "  Tab: next field",
+            Style::default().fg(DIM),
+        )]));
+    }
+    lines.push(Line::from(vec![
+        Span::styled("  ", Style::default()),
+        Span::styled("[ Add ]", Style::default().fg(ACCENT).bold()),
+        Span::raw("  "),
+        Span::styled("[ Cancel ]", Style::default().fg(DIM)),
+    ]));
 
     let content_len = lines.len();
     let inner_height = area.height.saturating_sub(2) as usize;

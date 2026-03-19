@@ -1,6 +1,7 @@
 //! Keyboard event handling for popup overlays.
 
 mod command_form;
+pub(crate) use command_form::build_command_from_form as command_form_build_command;
 
 use crossterm::event::{KeyCode, KeyEvent};
 
