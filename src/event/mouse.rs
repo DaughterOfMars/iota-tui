@@ -32,6 +32,14 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                 }
             }
 
+            // Check for status bar hint clicks
+            for (hint_rect, action_id) in &app.hint_areas.clone() {
+                if col >= hint_rect.x && col < hint_rect.x + hint_rect.width && row == hint_rect.y {
+                    handle_hint_click(app, action_id);
+                    return;
+                }
+            }
+
             // Content area Y position (set each frame by the UI draw function)
             let cy = app.content_area_y;
             if row < cy {
@@ -113,8 +121,11 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                         let idx = app.keys_offset + (row - data_start) as usize;
                         if idx < app.keys.len() {
                             app.keys_selected = idx;
-                            if is_icon_click(app, col) {
-                                app.activate_selected_key();
+                            if is_icon_click(app, col)
+                                && let Some(key) = app.keys.get(idx)
+                            {
+                                let addr = key.address.clone();
+                                app.explore_item(addr);
                             }
                         }
                     }
@@ -432,6 +443,107 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
                 _ => {}
             }
         }
+    }
+}
+
+/// Handle a click on a status bar action hint.
+fn handle_hint_click(app: &mut App, action_id: &str) {
+    match action_id {
+        "help" => app.open_popup(Popup::Help),
+        "refresh" => app.request_refresh(),
+        "network" => app.open_popup(Popup::SwitchNetwork),
+        "faucet" => {
+            if let Some(key) = app.active_key()
+                && let Ok(addr) = iota_sdk::types::Address::from_hex(&key.address)
+            {
+                app.send_cmd(WalletCmd::RequestFaucet(addr));
+            }
+        }
+        "type_search" => {
+            // Coins/Objects: explore the type of the selected item
+            match app.screen {
+                Screen::Coins => {
+                    if let Some(coin) = app.coins.get(app.coins_selected) {
+                        let ct = coin.coin_type.clone();
+                        app.explore_type(ct);
+                    }
+                }
+                Screen::Objects => {
+                    if let Some(obj) = app.objects.get(app.objects_selected) {
+                        let tn = obj.type_name.clone();
+                        app.explore_type(tn);
+                    }
+                }
+                _ => {}
+            }
+        }
+        "addr_add" => {
+            app.address_edit_field = 0;
+            app.address_edit_buffers = [String::new(), String::new(), String::new()];
+            app.open_popup(Popup::AddAddress);
+            app.start_input("");
+        }
+        "addr_edit" => {
+            if let Some(user_idx) = app.user_address_index(app.address_selected)
+                && let Some(entry) = app.address_book.get(user_idx)
+            {
+                let label = entry.label.clone();
+                let address = entry.address.clone();
+                let notes = entry.notes.clone();
+                app.address_edit_field = 0;
+                app.address_edit_buffers = [label.clone(), address, notes];
+                app.open_popup(Popup::EditAddress);
+                app.start_input(&label);
+            }
+        }
+        "addr_delete" => {
+            if let Some(user_idx) = app.user_address_index(app.address_selected)
+                && user_idx < app.address_book.len()
+            {
+                app.open_popup(Popup::ConfirmDeleteAddress);
+            }
+        }
+        "iota_name" => {
+            app.open_popup(Popup::LookupIotaName);
+            app.start_input("");
+        }
+        "key_activate" => app.activate_selected_key(),
+        "key_visible" => {
+            if let Some(key) = app.keys.get_mut(app.keys_selected) {
+                key.visible = !key.visible;
+                app.request_refresh();
+            }
+        }
+        "key_gen" => app.open_popup(Popup::GenerateKey),
+        "key_import" => {
+            app.open_popup(Popup::ImportKey);
+            app.start_input("");
+        }
+        "key_rename" => {
+            if let Some(key_display) = app.keys.get(app.keys_selected) {
+                let current = key_display.alias.clone();
+                app.open_popup(Popup::RenameKey);
+                app.start_input(&current);
+            }
+        }
+        "key_delete" => {
+            if !app.keys.is_empty() {
+                app.open_popup(Popup::ConfirmDeleteKey);
+            }
+        }
+        "tx_add" => app.open_popup(Popup::AddCommand),
+        "tx_clear" => {
+            if app.tx.commands.is_empty() {
+                app.tx.reset();
+            } else {
+                app.open_popup(Popup::ConfirmClearTx);
+            }
+        }
+        "explorer_search" => {
+            app.explorer.search_mode = true;
+            app.start_input("");
+        }
+        _ => {}
     }
 }
 

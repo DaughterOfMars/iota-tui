@@ -52,15 +52,14 @@ pub fn draw_separator(frame: &mut Frame, area: Rect) {
     frame.render_widget(sep, area);
 }
 
-/// Draw a dedicated row for the status message above the status bar.
-/// Draw the bottom status bar with mode, hints, network, and active address.
-pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
+/// Draw the bottom status bar with mode, clickable action hints, network, and active address.
+pub fn draw_status_bar(frame: &mut Frame, app: &mut App, area: Rect) {
+    app.hint_areas.clear();
+
     let active_addr = app
         .active_key()
         .map(|k| format!("{}..{}", &k.address[..8], &k.address[k.address.len() - 6..]))
         .unwrap_or_else(|| "No active key".into());
-
-    let hint = Span::styled(screen_hint(app.screen), Style::default().fg(DIM));
 
     let mode_indicator = if app.input_mode == InputMode::Editing {
         Span::styled(
@@ -107,7 +106,38 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     .split(area);
 
     frame.render_widget(Paragraph::new(Line::from(vec![mode_indicator])), cols[0]);
-    frame.render_widget(Paragraph::new(Line::from(vec![hint])), cols[1]);
+
+    // Build clickable action hint spans
+    let hints = screen_hints(app.screen);
+    let hint_area = cols[1];
+    let mut spans: Vec<Span> = Vec::new();
+    let mut x_offset = hint_area.x + 1; // 1 char padding
+
+    for (key_label, description, action_id) in &hints {
+        let text = format!(" {}:{}", key_label, description);
+        let w = text.len() as u16;
+
+        if !action_id.is_empty() {
+            // Clickable action — use accent styling for the key
+            spans.push(Span::styled(
+                format!(" {}", key_label),
+                Style::default().fg(ACCENT).bold(),
+            ));
+            spans.push(Span::styled(
+                format!(":{}", description),
+                Style::default().fg(DIM),
+            ));
+            // Store the full span area for mouse hit-testing
+            app.hint_areas
+                .push((Rect::new(x_offset, hint_area.y, w, 1), action_id));
+        } else {
+            // Non-clickable hint (navigation)
+            spans.push(Span::styled(text.clone(), Style::default().fg(DIM)));
+        }
+        x_offset += w;
+    }
+
+    frame.render_widget(Paragraph::new(Line::from(spans)), hint_area);
     frame.render_widget(Paragraph::new(Line::from(vec![net_indicator])), cols[2]);
     frame.render_widget(
         Paragraph::new(Line::from(vec![right])).alignment(Alignment::Right),
@@ -115,26 +145,71 @@ pub fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     );
 }
 
-fn screen_hint(screen: Screen) -> &'static str {
+/// Return structured hints for each screen.
+/// Each entry: (key_label, description, action_id).
+/// Empty action_id means not clickable (navigation hints).
+fn screen_hints(screen: Screen) -> Vec<(&'static str, &'static str, &'static str)> {
     match screen {
-        Screen::Coins => {
-            " Up/Down:navigate  Enter:explore  t:type-search  f:faucet  r:refresh  ?:help"
-        }
-        Screen::Objects => " Up/Down:navigate  Enter:explore  t:type-search  r:refresh  ?:help",
-        Screen::Transactions => " Up/Down:navigate  Enter:explore  r:refresh  ?:help",
-        Screen::Packages => " r:refresh  ?:help",
-        Screen::AddressBook => {
-            " Up/Down:navigate  Enter:explore  a:add  e:edit  d:delete  l:iota-name  ?:help"
-        }
-        Screen::Keys => {
-            " Up/Down:navigate  Enter:active  x:explore  Space:visible  g:gen  i:import  e:rename  ?:help"
-        }
-        Screen::TxBuilder => {
-            " Left/Right:step  Up/Down:navigate  a:add  c:clear  Enter:confirm  ?:help"
-        }
-        Screen::Explorer => {
-            " Left/Right:sub-view  Up/Down:navigate  Enter:lookup  s:type-search  ]/[:page  r:refresh  ?:help"
-        }
+        Screen::Coins => vec![
+            ("Enter", "explore", ""),
+            ("t", "type-search", "type_search"),
+            ("f", "faucet", "faucet"),
+            ("r", "refresh", "refresh"),
+            ("n", "network", "network"),
+            ("?", "help", "help"),
+        ],
+        Screen::Objects => vec![
+            ("Enter", "explore", ""),
+            ("t", "type-search", "type_search"),
+            ("r", "refresh", "refresh"),
+            ("n", "network", "network"),
+            ("?", "help", "help"),
+        ],
+        Screen::Transactions => vec![
+            ("Enter", "explore", ""),
+            ("r", "refresh", "refresh"),
+            ("n", "network", "network"),
+            ("?", "help", "help"),
+        ],
+        Screen::Packages => vec![
+            ("Enter", "explore", ""),
+            ("r", "refresh", "refresh"),
+            ("n", "network", "network"),
+            ("?", "help", "help"),
+        ],
+        Screen::AddressBook => vec![
+            ("Enter", "explore", ""),
+            ("a", "add", "addr_add"),
+            ("e", "edit", "addr_edit"),
+            ("d", "delete", "addr_delete"),
+            ("l", "iota-name", "iota_name"),
+            ("n", "network", "network"),
+            ("?", "help", "help"),
+        ],
+        Screen::Keys => vec![
+            ("Enter", "explore", ""),
+            ("a", "activate", "key_activate"),
+            ("Sp", "visible", "key_visible"),
+            ("g", "gen", "key_gen"),
+            ("i", "import", "key_import"),
+            ("e", "rename", "key_rename"),
+            ("d", "delete", "key_delete"),
+            ("n", "network", "network"),
+            ("?", "help", "help"),
+        ],
+        Screen::TxBuilder => vec![
+            ("a", "add", "tx_add"),
+            ("c", "clear", "tx_clear"),
+            ("n", "network", "network"),
+            ("?", "help", "help"),
+        ],
+        Screen::Explorer => vec![
+            ("Enter", "lookup", ""),
+            ("s", "type-search", "explorer_search"),
+            ("r", "refresh", "refresh"),
+            ("n", "network", "network"),
+            ("?", "help", "help"),
+        ],
     }
 }
 

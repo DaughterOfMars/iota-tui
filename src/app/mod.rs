@@ -75,6 +75,8 @@ pub struct App {
 
     // Layout state for mouse hit-testing
     pub tab_areas: Vec<ratatui::layout::Rect>,
+    // Clickable action hint areas in the status bar: (rect, action_id)
+    pub hint_areas: Vec<(ratatui::layout::Rect, &'static str)>,
 
     // Visible rows in the content area (updated each frame)
     pub content_visible_rows: usize,
@@ -156,6 +158,7 @@ impl App {
             popup_scroll: 0,
 
             tab_areas: vec![],
+            hint_areas: vec![],
 
             content_visible_rows: 20,
             content_area_y: 2,

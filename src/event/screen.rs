@@ -156,13 +156,13 @@ pub fn handle_keys_key(app: &mut App, key: KeyEvent) {
     }
     match key.code {
         KeyCode::Enter => {
-            app.activate_selected_key();
-        }
-        KeyCode::Char('x') => {
             if let Some(key) = app.keys.get(app.keys_selected) {
                 let addr = key.address.clone();
                 app.explore_item(addr);
             }
+        }
+        KeyCode::Char('a') => {
+            app.activate_selected_key();
         }
         KeyCode::Char('g') => {
             app.open_popup(Popup::GenerateKey);
