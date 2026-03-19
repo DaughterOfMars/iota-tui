@@ -1,5 +1,8 @@
 //! Drawing functions for popup overlays.
 
+mod command_form;
+mod detail;
+
 use ratatui::{
     Frame,
     layout::Rect,
@@ -10,10 +13,7 @@ use ratatui::{
 
 use crate::app::{App, Popup};
 
-use super::common::{
-    ACCENT, DIM, accent_style, centered_rect_min, clamp_scroll, render_popup_scrollbar,
-    truncate_address,
-};
+use super::common::{ACCENT, DIM, centered_rect_min, clamp_scroll, render_popup_scrollbar};
 
 /// Dispatch popup drawing to the appropriate function.
 pub fn draw_popup(frame: &mut Frame, app: &mut App) {
@@ -30,7 +30,7 @@ pub fn draw_popup(frame: &mut Frame, app: &mut App) {
         Some(Popup::Detail) => {
             let popup_area = centered_rect_min(65, 70, 50, 16, area);
             frame.render_widget(Clear, popup_area);
-            draw_detail_popup(frame, app, popup_area);
+            detail::draw_detail_popup(frame, app, popup_area);
         }
         Some(Popup::AddAddress) => {
             let popup_area = centered_rect_min(60, 60, 48, 14, area);
@@ -60,12 +60,12 @@ pub fn draw_popup(frame: &mut Frame, app: &mut App) {
         Some(Popup::AddCommand) => {
             let popup_area = centered_rect_min(50, 50, 40, 16, area);
             frame.render_widget(Clear, popup_area);
-            draw_add_command_popup(frame, popup_area);
+            command_form::draw_add_command_popup(frame, popup_area);
         }
         Some(Popup::AddCommandForm) => {
             let popup_area = centered_rect_min(65, 60, 52, 14, area);
             frame.render_widget(Clear, popup_area);
-            draw_add_command_form(frame, app, popup_area);
+            command_form::draw_add_command_form(frame, app, popup_area);
         }
         Some(Popup::RenameKey) => {
             let popup_area = centered_rect_min(50, 30, 40, 8, area);
@@ -174,62 +174,6 @@ fn draw_help_popup(frame: &mut Frame, app: &mut App, area: Rect) {
         .border_style(Style::default().fg(ACCENT));
 
     let paragraph = Paragraph::new(text)
-        .block(block)
-        .wrap(Wrap { trim: false })
-        .scroll((app.popup_scroll as u16, 0));
-    frame.render_widget(paragraph, area);
-
-    render_popup_scrollbar(frame, area, app.popup_scroll, content_len, inner_height);
-}
-
-fn draw_detail_popup(frame: &mut Frame, app: &mut App, area: Rect) {
-    let (title, fields) = app.detail_info();
-
-    let mut lines: Vec<Line> = vec![Line::from("")];
-    if fields.is_empty() {
-        lines.push(Line::from(vec![Span::styled(
-            "  No item selected",
-            Style::default().fg(DIM),
-        )]));
-    } else {
-        for (label, value) in &fields {
-            lines.push(Line::from(vec![Span::styled(
-                format!("  {}", label),
-                accent_style().bold(),
-            )]));
-            let max_w = area.width.saturating_sub(6) as usize;
-            if value.is_empty() {
-                lines.push(Line::from(vec![Span::styled(
-                    "  (empty)",
-                    Style::default().fg(DIM),
-                )]));
-            } else if value.len() <= max_w {
-                lines.push(Line::from(format!("  {}", value)));
-            } else {
-                for chunk in value.as_bytes().chunks(max_w) {
-                    let s = String::from_utf8_lossy(chunk);
-                    lines.push(Line::from(format!("  {}", s)));
-                }
-            }
-            lines.push(Line::from(""));
-        }
-    }
-    lines.push(Line::from(vec![Span::styled(
-        "  Esc to close",
-        Style::default().fg(DIM),
-    )]));
-
-    let content_len = lines.len();
-    let inner_height = area.height.saturating_sub(2) as usize;
-    clamp_scroll(&mut app.popup_scroll, content_len, inner_height);
-
-    let block = Block::default()
-        .title(format!(" {} ", title))
-        .title_style(Style::default().fg(ACCENT).bold())
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(ACCENT));
-
-    let paragraph = Paragraph::new(lines)
         .block(block)
         .wrap(Wrap { trim: false })
         .scroll((app.popup_scroll as u16, 0));
@@ -647,205 +591,4 @@ fn draw_confirm_quit(frame: &mut Frame, area: Rect) {
         .border_style(Style::default().fg(Color::Yellow));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
-}
-
-fn draw_add_command_popup(frame: &mut Frame, area: Rect) {
-    let text = vec![
-        Line::from(""),
-        Line::from(vec![Span::styled(
-            "Select command type:",
-            Style::default().bold(),
-        )]),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("  [1/t] ", Style::default().fg(ACCENT).bold()),
-            Span::raw("Transfer IOTA"),
-        ]),
-        Line::from(vec![
-            Span::styled("  [2/o] ", Style::default().fg(ACCENT).bold()),
-            Span::raw("Transfer Objects"),
-        ]),
-        Line::from(vec![
-            Span::styled("  [3/m] ", Style::default().fg(ACCENT).bold()),
-            Span::raw("Move Call"),
-        ]),
-        Line::from(vec![
-            Span::styled("  [4/s] ", Style::default().fg(ACCENT).bold()),
-            Span::raw("Split Coins"),
-        ]),
-        Line::from(vec![
-            Span::styled("  [5/r] ", Style::default().fg(ACCENT).bold()),
-            Span::raw("Merge Coins"),
-        ]),
-        Line::from(vec![
-            Span::styled("  [6/k] ", Style::default().fg(ACCENT).bold()),
-            Span::raw("Stake"),
-        ]),
-        Line::from(vec![
-            Span::styled("  [7/u] ", Style::default().fg(ACCENT).bold()),
-            Span::raw("Unstake"),
-        ]),
-        Line::from(""),
-        Line::from(vec![Span::styled(
-            "  Esc to cancel",
-            Style::default().fg(DIM),
-        )]),
-    ];
-
-    let block = Block::default()
-        .title(" Add Command ")
-        .title_style(Style::default().fg(ACCENT).bold())
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(ACCENT));
-
-    frame.render_widget(Paragraph::new(text).block(block), area);
-}
-
-fn draw_add_command_form(frame: &mut Frame, app: &mut App, area: Rect) {
-    use crate::app::AddCommandType;
-    let Some(ct) = app.tx.adding_cmd else {
-        return;
-    };
-
-    let fields: &[&str] = match ct {
-        AddCommandType::TransferIota => &["Recipient (address or alias)", "Amount (IOTA)"],
-        AddCommandType::TransferObjects => &["Recipient (address or alias)", "Object IDs"],
-        AddCommandType::MoveCall => &["Package", "Module", "Function", "Type Args", "Arguments"],
-        AddCommandType::SplitCoins => &["Coin Object ID", "Amounts (comma-sep)"],
-        AddCommandType::MergeCoins => &["Primary Coin ID", "Source Coin IDs"],
-        AddCommandType::Stake => &["Amount (IOTA)", "Validator (address or alias)"],
-        AddCommandType::Unstake => &["Staked IOTA Object ID"],
-    };
-
-    // Check which field indices are multi-value for this command type
-    let is_multi = |field_idx: usize| -> bool {
-        matches!(
-            (ct, field_idx),
-            (AddCommandType::TransferObjects, 1) | (AddCommandType::MergeCoins, 1)
-        )
-    };
-
-    let mut lines = vec![Line::from("")];
-    for (i, field) in fields.iter().enumerate() {
-        let is_active = i == app.tx.edit_field;
-        let value = if is_active {
-            &app.input_buffer
-        } else {
-            app.tx.edit_buffers.get(i).map(|s| s.as_str()).unwrap_or("")
-        };
-
-        let label_style = if is_active {
-            Style::default().fg(ACCENT).bold()
-        } else {
-            Style::default().fg(Color::White)
-        };
-
-        // For multi-value fields, show the count in the label
-        if is_multi(i) && !app.tx.multi_values.is_empty() {
-            lines.push(Line::from(vec![Span::styled(
-                format!("  {} ({} selected): ", field, app.tx.multi_values.len()),
-                label_style,
-            )]));
-        } else {
-            lines.push(Line::from(vec![Span::styled(
-                format!("  {}: ", field),
-                label_style,
-            )]));
-        }
-
-        // For multi-value fields, show the accumulated items
-        if is_multi(i) && !app.tx.multi_values.is_empty() {
-            for mv in &app.tx.multi_values {
-                lines.push(Line::from(vec![Span::styled(
-                    format!("    • {}", truncate_address(mv, 36)),
-                    Style::default().fg(Color::Green),
-                )]));
-            }
-        }
-
-        let input_style = if is_active {
-            Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::UNDERLINED)
-        } else {
-            Style::default().fg(DIM)
-        };
-
-        if is_multi(i) {
-            // Multi-value: show the input line for adding more
-            if is_active {
-                lines.push(Line::from(vec![Span::styled(
-                    format!("  {}|", value),
-                    input_style,
-                )]));
-            } else if app.tx.multi_values.is_empty() {
-                lines.push(Line::from(vec![Span::styled(
-                    "  (none)".to_string(),
-                    Style::default().fg(DIM),
-                )]));
-            }
-        } else {
-            let display = if value.is_empty() && !is_active {
-                "(empty)".to_string()
-            } else if is_active {
-                format!("{}|", value)
-            } else {
-                value.to_string()
-            };
-
-            lines.push(Line::from(vec![Span::styled(
-                format!("  {}", display),
-                input_style,
-            )]));
-        }
-
-        if is_active && !app.autocomplete.is_empty() {
-            for (j, (alias, addr)) in app.autocomplete.iter().enumerate() {
-                let is_sel = app.autocomplete_idx == Some(j);
-                let trunc = truncate_address(addr, 24);
-                let style = if is_sel {
-                    Style::default().fg(ACCENT).bold()
-                } else {
-                    Style::default().fg(DIM)
-                };
-                let prefix = if is_sel { "▸ " } else { "  " };
-                lines.push(Line::from(vec![Span::styled(
-                    format!("    {}{} → {}", prefix, alias, trunc),
-                    style,
-                )]));
-            }
-        }
-
-        lines.push(Line::from(""));
-    }
-
-    let hint = if app.tx.is_multi_value_field() {
-        "  Tab/Enter: add item  Backspace: undo  Enter(empty): submit  Esc: cancel"
-    } else {
-        "  Tab: next field  Enter: add  Esc: cancel"
-    };
-    lines.push(Line::from(vec![Span::styled(
-        hint,
-        Style::default().fg(DIM),
-    )]));
-
-    let content_len = lines.len();
-    let inner_height = area.height.saturating_sub(2) as usize;
-    clamp_scroll(&mut app.popup_scroll, content_len, inner_height);
-
-    let block = Block::default()
-        .title(format!(" {} ", ct.label()))
-        .title_style(Style::default().fg(ACCENT).bold())
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(ACCENT));
-
-    frame.render_widget(
-        Paragraph::new(lines)
-            .block(block)
-            .wrap(Wrap { trim: false })
-            .scroll((app.popup_scroll as u16, 0)),
-        area,
-    );
-
-    render_popup_scrollbar(frame, area, app.popup_scroll, content_len, inner_height);
 }
