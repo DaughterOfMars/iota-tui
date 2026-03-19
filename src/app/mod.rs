@@ -529,6 +529,60 @@ impl App {
         });
     }
 
+    /// Activate the currently selected coin (explore it).
+    pub fn activate_selected_coin(&mut self) {
+        if let Some(coin) = self.coins.get(self.coins_selected) {
+            let id = coin.object_id.clone();
+            self.explore_item(id);
+        }
+    }
+
+    /// Activate the currently selected object (explore it).
+    pub fn activate_selected_object(&mut self) {
+        if let Some(obj) = self.objects.get(self.objects_selected) {
+            let id = obj.object_id.clone();
+            self.explore_item(id);
+        }
+    }
+
+    /// Activate the currently selected transaction (explore it).
+    pub fn activate_selected_transaction(&mut self) {
+        if let Some(tx) = self.transactions.get(self.transactions_selected) {
+            let digest = tx.digest.clone();
+            self.explore_item(digest);
+        }
+    }
+
+    /// Activate the currently selected package (explore it).
+    pub fn activate_selected_package(&mut self) {
+        let packages = self.package_indices();
+        if let Some(&obj_idx) = packages.get(self.packages_selected) {
+            let id = self.objects[obj_idx].object_id.clone();
+            self.explore_item(id);
+        }
+    }
+
+    /// Activate the currently selected address book entry (explore it).
+    pub fn activate_selected_address(&mut self) {
+        let combined = self.combined_address_book();
+        if let Some(entry) = combined.get(self.address_selected) {
+            let addr = entry.address.clone();
+            self.explore_item(addr);
+        }
+    }
+
+    /// Activate the currently selected key (set it as active).
+    pub fn activate_selected_key(&mut self) {
+        let idx = self.keys_selected;
+        if idx < self.keys.len() {
+            for (i, k) in self.keys.iter_mut().enumerate() {
+                k.is_active = i == idx;
+            }
+            self.send_cmd(WalletCmd::SetActiveKey(idx));
+            self.request_refresh();
+        }
+    }
+
     pub fn open_popup(&mut self, popup: Popup) {
         self.popup = Some(popup);
         self.popup_scroll = 0;

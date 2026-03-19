@@ -47,8 +47,7 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                         if idx < app.coins.len() {
                             app.coins_selected = idx;
                             if is_icon_click(app, col) {
-                                let id = app.coins[idx].object_id.clone();
-                                app.explore_item(id);
+                                app.activate_selected_coin();
                             }
                         }
                     }
@@ -61,8 +60,7 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                         if idx < app.objects.len() {
                             app.objects_selected = idx;
                             if is_icon_click(app, col) {
-                                let id = app.objects[idx].object_id.clone();
-                                app.explore_item(id);
+                                app.activate_selected_object();
                             }
                         }
                     }
@@ -75,8 +73,7 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                         if idx < app.transactions.len() {
                             app.transactions_selected = idx;
                             if is_icon_click(app, col) {
-                                let digest = app.transactions[idx].digest.clone();
-                                app.explore_item(digest);
+                                app.activate_selected_transaction();
                             }
                         }
                     }
@@ -90,8 +87,7 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                         if idx < packages.len() {
                             app.packages_selected = idx;
                             if is_icon_click(app, col) {
-                                let id = app.objects[packages[idx]].object_id.clone();
-                                app.explore_item(id);
+                                app.activate_selected_package();
                             }
                         }
                     }
@@ -105,11 +101,7 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                         if idx < combined_len {
                             app.address_selected = idx;
                             if is_icon_click(app, col) {
-                                let combined = app.combined_address_book();
-                                if let Some(entry) = combined.get(idx) {
-                                    let addr = entry.address.clone();
-                                    app.explore_item(addr);
-                                }
+                                app.activate_selected_address();
                             }
                         }
                     }
@@ -122,12 +114,7 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                         if idx < app.keys.len() {
                             app.keys_selected = idx;
                             if is_icon_click(app, col) {
-                                // Activate key (same as Enter)
-                                for (i, k) in app.keys.iter_mut().enumerate() {
-                                    k.is_active = i == idx;
-                                }
-                                app.send_cmd(WalletCmd::SetActiveKey(idx));
-                                app.request_refresh();
+                                app.activate_selected_key();
                             }
                         }
                     }

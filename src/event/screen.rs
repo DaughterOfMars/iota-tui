@@ -21,10 +21,7 @@ pub fn handle_coins_key(app: &mut App, key: KeyEvent) {
     }
     match key.code {
         KeyCode::Enter => {
-            if let Some(coin) = app.coins.get(app.coins_selected) {
-                let id = coin.object_id.clone();
-                app.explore_item(id);
-            }
+            app.activate_selected_coin();
         }
         KeyCode::Char('t') => {
             if let Some(coin) = app.coins.get(app.coins_selected) {
@@ -55,10 +52,7 @@ pub fn handle_objects_key(app: &mut App, key: KeyEvent) {
     }
     match key.code {
         KeyCode::Enter => {
-            if let Some(obj) = app.objects.get(app.objects_selected) {
-                let id = obj.object_id.clone();
-                app.explore_item(id);
-            }
+            app.activate_selected_object();
         }
         KeyCode::Char('t') => {
             if let Some(obj) = app.objects.get(app.objects_selected) {
@@ -80,11 +74,8 @@ pub fn handle_transactions_key(app: &mut App, key: KeyEvent) {
     if nav.handle_key(key.code) {
         return;
     }
-    if key.code == KeyCode::Enter
-        && let Some(tx) = app.transactions.get(app.transactions_selected)
-    {
-        let digest = tx.digest.clone();
-        app.explore_item(digest);
+    if key.code == KeyCode::Enter {
+        app.activate_selected_transaction();
     }
 }
 
@@ -99,11 +90,8 @@ pub fn handle_packages_key(app: &mut App, key: KeyEvent) {
     if nav.handle_key(key.code) {
         return;
     }
-    if key.code == KeyCode::Enter
-        && let Some(&obj_idx) = packages.get(app.packages_selected)
-    {
-        let id = app.objects[obj_idx].object_id.clone();
-        app.explore_item(id);
+    if key.code == KeyCode::Enter {
+        app.activate_selected_package();
     }
 }
 
@@ -120,11 +108,7 @@ pub fn handle_address_key(app: &mut App, key: KeyEvent) {
     }
     match key.code {
         KeyCode::Enter => {
-            let combined = app.combined_address_book();
-            if let Some(entry) = combined.get(app.address_selected) {
-                let addr = entry.address.clone();
-                app.explore_item(addr);
-            }
+            app.activate_selected_address();
         }
         KeyCode::Char('a') => {
             app.address_edit_field = 0;
@@ -172,13 +156,7 @@ pub fn handle_keys_key(app: &mut App, key: KeyEvent) {
     }
     match key.code {
         KeyCode::Enter => {
-            let idx = app.keys_selected;
-            for (i, k) in app.keys.iter_mut().enumerate() {
-                k.is_active = i == idx;
-            }
-            app.send_cmd(WalletCmd::SetActiveKey(idx));
-
-            app.request_refresh();
+            app.activate_selected_key();
         }
         KeyCode::Char('x') => {
             if let Some(key) = app.keys.get(app.keys_selected) {
