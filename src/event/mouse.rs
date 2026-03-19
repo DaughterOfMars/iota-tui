@@ -187,6 +187,11 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                                 x += w;
                             }
                         }
+                    } else if app.explorer.pagination_row_y > 0
+                        && row == app.explorer.pagination_row_y
+                    {
+                        // Click on pagination row
+                        handle_pagination_click(app, col);
                     } else if row >= sub_tab_end {
                         // Content below sub-tabs; each sub-view has its own layout
                         match app.explorer.view {
@@ -751,6 +756,116 @@ fn submit_input_popup(app: &mut App) {
             }
         }
         _ => {}
+    }
+}
+
+/// Handle clicks on the pagination row in Explorer views.
+fn handle_pagination_click(app: &mut App, col: u16) {
+    // Button layout: "  [ ◀ Prev ]  [ Next ▶ ]"
+    // "  " (2) + "[ ◀ Prev ]" (10) + "  " (2) + "[ Next ▶ ]" (10)
+    let x = app.content_area.x;
+    let rel = col.saturating_sub(x) as usize;
+
+    // Prev button: cols 2..12, Next button: cols 14..24
+    // But if only next (no prev), next starts at col 2
+    let is_prev_click;
+    let is_next_click;
+
+    match app.explorer.view {
+        ExplorerView::Checkpoints => {
+            let has_prev = !app.explorer.checkpoints_cursors.is_empty();
+            let has_next = app.explorer.checkpoints_has_next;
+            (is_prev_click, is_next_click) = pagination_hit(rel, has_prev, has_next);
+
+            if is_prev_click {
+                let prev = app.explorer.checkpoints_cursors.pop().flatten();
+                app.explorer.checkpoints_page = app.explorer.checkpoints_page.saturating_sub(1);
+                app.send_cmd(WalletCmd::RefreshCheckpoints { cursor: prev });
+            } else if is_next_click {
+                app.explorer
+                    .checkpoints_cursors
+                    .push(app.explorer.checkpoints_cursor.clone());
+                app.explorer.checkpoints_page += 1;
+                let cursor = app.explorer.checkpoints_cursor.clone();
+                app.send_cmd(WalletCmd::RefreshCheckpoints { cursor });
+            }
+        }
+        ExplorerView::Lookup if !app.explorer.search_results.is_empty() => {
+            let has_prev = !app.explorer.search_cursors.is_empty();
+            let has_next = app.explorer.search_has_next;
+            (is_prev_click, is_next_click) = pagination_hit(rel, has_prev, has_next);
+
+            if is_prev_click {
+                let prev_cursor = app.explorer.search_cursors.pop().flatten();
+                let type_filter = app.explorer.search_type.clone();
+                app.send_cmd(WalletCmd::SearchObjectsByType {
+                    type_filter,
+                    cursor: prev_cursor,
+                });
+            } else if is_next_click {
+                app.explorer
+                    .search_cursors
+                    .push(app.explorer.search_cursor.clone());
+                let cursor = app.explorer.search_cursor.clone();
+                let type_filter = app.explorer.search_type.clone();
+                app.send_cmd(WalletCmd::SearchObjectsByType {
+                    type_filter,
+                    cursor,
+                });
+            }
+        }
+        ExplorerView::Lookup if app.explorer.lookup_address.is_some() => {
+            let has_prev = !app.explorer.lookup_obj_cursors.is_empty();
+            let has_next = app.explorer.lookup_obj_has_next || app.explorer.lookup_tx_has_next;
+            (is_prev_click, is_next_click) = pagination_hit(rel, has_prev, has_next);
+
+            if is_prev_click {
+                let prev_obj = app.explorer.lookup_obj_cursors.pop().flatten();
+                let prev_tx = app.explorer.lookup_tx_cursors.pop().flatten();
+                app.explorer.lookup_obj_page = app.explorer.lookup_obj_page.saturating_sub(1);
+                app.explorer.lookup_tx_page = app.explorer.lookup_tx_page.saturating_sub(1);
+                let address = app.explorer.lookup_address.clone().unwrap();
+                app.send_cmd(WalletCmd::LookupAddressPage {
+                    address,
+                    obj_cursor: prev_obj,
+                    tx_cursor: prev_tx,
+                });
+            } else if is_next_click {
+                app.explorer
+                    .lookup_obj_cursors
+                    .push(app.explorer.lookup_obj_cursor.clone());
+                app.explorer
+                    .lookup_tx_cursors
+                    .push(app.explorer.lookup_tx_cursor.clone());
+                app.explorer.lookup_obj_page += 1;
+                app.explorer.lookup_tx_page += 1;
+                let address = app.explorer.lookup_address.clone().unwrap();
+                let obj_cursor = app.explorer.lookup_obj_cursor.clone();
+                let tx_cursor = app.explorer.lookup_tx_cursor.clone();
+                app.send_cmd(WalletCmd::LookupAddressPage {
+                    address,
+                    obj_cursor,
+                    tx_cursor,
+                });
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Determine if a click at `rel` column hits Prev or Next button.
+fn pagination_hit(rel: usize, has_prev: bool, has_next: bool) -> (bool, bool) {
+    // "  [ ◀ Prev ]  [ Next ▶ ]"
+    // Prev button occupies cols 2..12, Next starts at 14..24
+    // If no prev, Next starts at 2..12
+    if has_prev && has_next {
+        ((2..12).contains(&rel), (14..24).contains(&rel))
+    } else if has_prev {
+        ((2..12).contains(&rel), false)
+    } else if has_next {
+        (false, (2..12).contains(&rel))
+    } else {
+        (false, false)
     }
 }
 

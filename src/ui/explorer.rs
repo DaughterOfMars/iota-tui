@@ -195,6 +195,21 @@ fn draw_checkpoints(frame: &mut Frame, app: &mut App, area: Rect) {
             search_hint,
         )
     };
+    // Split table area to reserve a pagination row if needed
+    let (actual_table_area, pagination_area) = if has_prev || has_next {
+        let chunks =
+            Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).split(table_area);
+        (chunks[0], Some(chunks[1]))
+    } else {
+        (table_area, None)
+    };
+
+    // Recalculate visible rows with the possibly-reduced area
+    if pagination_area.is_some() {
+        let adjusted_rows = actual_table_area.height.saturating_sub(4) as usize;
+        app.explorer.visible_rows = adjusted_rows;
+    }
+
     let table = Table::new(rows, widths).header(header).block(
         Block::default()
             .title(title)
@@ -203,7 +218,14 @@ fn draw_checkpoints(frame: &mut Frame, app: &mut App, area: Rect) {
             .border_style(common::dim_style()),
     );
 
-    frame.render_widget(table, table_area);
+    frame.render_widget(table, actual_table_area);
+
+    if let Some(pa) = pagination_area {
+        app.explorer.pagination_row_y = pa.y;
+        render_pagination_row(frame, pa, has_prev, has_next);
+    } else {
+        app.explorer.pagination_row_y = 0;
+    }
 }
 
 fn draw_validators(frame: &mut Frame, app: &mut App, area: Rect) {
@@ -384,6 +406,15 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
             app.explorer.search_results.len(),
             page_hint,
         );
+        // Split for pagination row
+        let (search_table_area, search_pagination_area) = if has_prev || has_next {
+            let chunks =
+                Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).split(layout[1]);
+            (chunks[0], Some(chunks[1]))
+        } else {
+            (layout[1], None)
+        };
+
         let table = Table::new(rows, widths).header(header).block(
             Block::default()
                 .title(title)
@@ -392,8 +423,32 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
                 .border_style(common::dim_style()),
         );
 
-        frame.render_widget(table, layout[1]);
+        frame.render_widget(table, search_table_area);
+
+        if let Some(pa) = search_pagination_area {
+            app.explorer.pagination_row_y = pa.y;
+            render_pagination_row(frame, pa, has_prev, has_next);
+        } else {
+            app.explorer.pagination_row_y = 0;
+        }
     } else if app.explorer.lookup_result.is_some() {
+        // Check if address lookup has pagination
+        let addr_has_prev = !app.explorer.lookup_obj_cursors.is_empty();
+        let addr_has_next = app.explorer.lookup_obj_has_next || app.explorer.lookup_tx_has_next;
+        let addr_paginated = matches!(
+            app.explorer.lookup_result,
+            Some(LookupResult::Address { .. })
+        ) && (addr_has_prev || addr_has_next);
+
+        // Split for pagination row if needed
+        let (result_area, addr_pagination_area) = if addr_paginated {
+            let chunks =
+                Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).split(layout[1]);
+            (chunks[0], Some(chunks[1]))
+        } else {
+            (layout[1], None)
+        };
+
         // Extract data needed from the result before passing &mut app
         let (sections, title_override) = match app.explorer.lookup_result.as_ref().unwrap() {
             LookupResult::NotFound(msg) => {
@@ -401,7 +456,7 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
                     format!("  {}", msg),
                     Style::default().fg(Color::Yellow),
                 ))];
-                frame.render_widget(Paragraph::new(content).block(result_block), layout[1]);
+                frame.render_widget(Paragraph::new(content).block(result_block), result_area);
                 return;
             }
             LookupResult::Object { sections } | LookupResult::Transaction { sections } => {
@@ -409,9 +464,7 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
             }
             LookupResult::Address { sections } => {
                 let page_num = app.explorer.lookup_obj_page + 1;
-                let has_prev = !app.explorer.lookup_obj_cursors.is_empty();
-                let has_next = app.explorer.lookup_obj_has_next || app.explorer.lookup_tx_has_next;
-                let page_hint = match (has_prev, has_next) {
+                let page_hint = match (addr_has_prev, addr_has_next) {
                     (true, true) => format!(" | pg {} [:prev ]:next", page_num),
                     (true, false) => format!(" | pg {} [:prev", page_num),
                     (false, true) => " | ]:next".to_string(),
@@ -425,8 +478,13 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
                 (sections.clone(), title)
             }
         };
-        let visible =
-            draw_lookup_sections(frame, app, &sections, title_override.as_deref(), layout[1]);
+        let visible = draw_lookup_sections(
+            frame,
+            app,
+            &sections,
+            title_override.as_deref(),
+            result_area,
+        );
         app.explorer.visible_rows = visible;
         // Re-run scroll with the actual visible rows from this frame to fix
         // any stale-value drift from the event handler.
@@ -436,6 +494,14 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
                 &mut app.explorer.lookup_offset,
                 visible,
             );
+        }
+
+        if let Some(pa) = addr_pagination_area {
+            app.explorer.pagination_row_y = pa.y;
+            render_pagination_row(frame, pa, addr_has_prev, addr_has_next);
+        } else if app.explorer.search_results.is_empty() {
+            // Only reset if no search results pagination set it
+            app.explorer.pagination_row_y = 0;
         }
     } else {
         frame.render_widget(
@@ -521,6 +587,24 @@ fn draw_lookup_sections(
     frame.render_widget(Paragraph::new(display_lines), inner);
 
     visible_rows
+}
+
+fn render_pagination_row(frame: &mut Frame, area: Rect, has_prev: bool, has_next: bool) {
+    let mut spans = vec![Span::raw("  ")];
+    if has_prev {
+        spans.push(Span::styled(
+            "[ \u{25C0} Prev ]",
+            Style::default().fg(common::ACCENT).bold(),
+        ));
+        spans.push(Span::raw("  "));
+    }
+    if has_next {
+        spans.push(Span::styled(
+            "[ Next \u{25B6} ]",
+            Style::default().fg(common::ACCENT).bold(),
+        ));
+    }
+    frame.render_widget(Paragraph::new(Line::from(spans)), area);
 }
 
 fn kv_line(key: &str, value: &str) -> Line<'static> {
