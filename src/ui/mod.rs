@@ -7,7 +7,7 @@ mod explorer;
 mod keys;
 mod objects;
 mod packages;
-mod popups;
+pub(crate) mod popups;
 mod transactions;
 mod tx_builder;
 

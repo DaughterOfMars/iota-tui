@@ -71,6 +71,11 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             app.open_popup(Popup::SwitchNetwork);
             return;
         }
+        KeyCode::Char('.') => {
+            app.action_menu_selected = 0;
+            app.open_popup(Popup::ActionsMenu);
+            return;
+        }
         KeyCode::Char('E') => {
             app.load_error_log();
             app.open_popup(Popup::ErrorLog);

@@ -107,37 +107,21 @@ pub fn draw_status_bar(frame: &mut Frame, app: &mut App, area: Rect) {
 
     frame.render_widget(Paragraph::new(Line::from(vec![mode_indicator])), cols[0]);
 
-    // Build clickable action hint spans
-    let hints = screen_hints(app.screen);
+    // Render clickable [. Actions] button
     let hint_area = cols[1];
-    let mut spans: Vec<Span> = Vec::new();
-    let mut x_offset = hint_area.x + 1; // 1 char padding
+    let button_text = " [. Actions] ";
+    let button_width = button_text.len() as u16;
+    let button_x = hint_area.x + 1;
+    app.hint_areas.push((
+        Rect::new(button_x, hint_area.y, button_width, 1),
+        "open_menu",
+    ));
 
-    for (key_label, description, action_id) in &hints {
-        let text = format!(" {}:{}", key_label, description);
-        let w = text.len() as u16;
-
-        if !action_id.is_empty() {
-            // Clickable action — use accent styling for the key
-            spans.push(Span::styled(
-                format!(" {}", key_label),
-                Style::default().fg(ACCENT).bold(),
-            ));
-            spans.push(Span::styled(
-                format!(":{}", description),
-                Style::default().fg(DIM),
-            ));
-            // Store the full span area for mouse hit-testing
-            app.hint_areas
-                .push((Rect::new(x_offset, hint_area.y, w, 1), action_id));
-        } else {
-            // Non-clickable hint (navigation)
-            spans.push(Span::styled(text.clone(), Style::default().fg(DIM)));
-        }
-        x_offset += w;
-    }
-
-    frame.render_widget(Paragraph::new(Line::from(spans)), hint_area);
+    let button_span = Span::styled(button_text, Style::default().fg(ACCENT).bold());
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![Span::raw(" "), button_span])),
+        hint_area,
+    );
     frame.render_widget(Paragraph::new(Line::from(vec![net_indicator])), cols[2]);
     frame.render_widget(
         Paragraph::new(Line::from(vec![right])).alignment(Alignment::Right),
@@ -148,10 +132,10 @@ pub fn draw_status_bar(frame: &mut Frame, app: &mut App, area: Rect) {
 /// Return structured hints for each screen.
 /// Each entry: (key_label, description, action_id).
 /// Empty action_id means not clickable (navigation hints).
-fn screen_hints(screen: Screen) -> Vec<(&'static str, &'static str, &'static str)> {
+pub fn screen_hints(screen: Screen) -> Vec<(&'static str, &'static str, &'static str)> {
     match screen {
         Screen::Coins => vec![
-            ("Enter", "explore", ""),
+            ("Enter", "explore", "explore"),
             ("t", "type-search", "type_search"),
             ("f", "faucet", "faucet"),
             ("r", "refresh", "refresh"),
@@ -159,26 +143,26 @@ fn screen_hints(screen: Screen) -> Vec<(&'static str, &'static str, &'static str
             ("?", "help", "help"),
         ],
         Screen::Objects => vec![
-            ("Enter", "explore", ""),
+            ("Enter", "explore", "explore"),
             ("t", "type-search", "type_search"),
             ("r", "refresh", "refresh"),
             ("n", "network", "network"),
             ("?", "help", "help"),
         ],
         Screen::Transactions => vec![
-            ("Enter", "explore", ""),
+            ("Enter", "explore", "explore"),
             ("r", "refresh", "refresh"),
             ("n", "network", "network"),
             ("?", "help", "help"),
         ],
         Screen::Packages => vec![
-            ("Enter", "explore", ""),
+            ("Enter", "explore", "explore"),
             ("r", "refresh", "refresh"),
             ("n", "network", "network"),
             ("?", "help", "help"),
         ],
         Screen::AddressBook => vec![
-            ("Enter", "explore", ""),
+            ("Enter", "explore", "explore"),
             ("a", "add", "addr_add"),
             ("e", "edit", "addr_edit"),
             ("d", "delete", "addr_delete"),
@@ -187,7 +171,7 @@ fn screen_hints(screen: Screen) -> Vec<(&'static str, &'static str, &'static str
             ("?", "help", "help"),
         ],
         Screen::Keys => vec![
-            ("Enter", "explore", ""),
+            ("Enter", "explore", "explore"),
             ("a", "activate", "key_activate"),
             ("Sp", "visible", "key_visible"),
             ("g", "gen", "key_gen"),
@@ -204,7 +188,7 @@ fn screen_hints(screen: Screen) -> Vec<(&'static str, &'static str, &'static str
             ("?", "help", "help"),
         ],
         Screen::Explorer => vec![
-            ("Enter", "lookup", ""),
+            ("Enter", "lookup", "explore"),
             ("s", "type-search", "explorer_search"),
             ("r", "refresh", "refresh"),
             ("n", "network", "network"),

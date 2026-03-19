@@ -276,6 +276,7 @@ pub enum Popup {
     ConfirmQuit,
     LookupIotaName,
     ErrorLog,
+    ActionsMenu,
 }
 
 // ── Explorer types ─────────────────────────────────────────────────

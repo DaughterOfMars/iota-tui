@@ -5,7 +5,8 @@ use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use crate::app::{
     AddCommandType, App, ExplorerView, InputMode, LookupAction, Popup, Screen, TxBuilderStep,
 };
-use crate::ui::common::centered_rect_min;
+use crate::ui::common::{centered_rect_min, screen_hints};
+use crate::ui::popups::actions_menu_area;
 use crate::wallet::{Network, WalletCmd};
 
 pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
@@ -447,8 +448,29 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
 }
 
 /// Handle a click on a status bar action hint.
-fn handle_hint_click(app: &mut App, action_id: &str) {
+pub(crate) fn handle_hint_click(app: &mut App, action_id: &str) {
     match action_id {
+        "open_menu" => {
+            app.action_menu_selected = 0;
+            app.open_popup(Popup::ActionsMenu);
+        }
+        "explore" => match app.screen {
+            Screen::Coins => app.activate_selected_coin(),
+            Screen::Objects => app.activate_selected_object(),
+            Screen::Transactions => app.activate_selected_transaction(),
+            Screen::Packages => app.activate_selected_package(),
+            Screen::AddressBook => app.activate_selected_address(),
+            Screen::Keys => {
+                if let Some(key) = app.keys.get(app.keys_selected) {
+                    let addr = key.address.clone();
+                    app.explore_item(addr);
+                }
+            }
+            Screen::Explorer => {
+                // Explorer "explore" triggers lookup submit (handled by screen key handler)
+            }
+            _ => {}
+        },
         "help" => app.open_popup(Popup::Help),
         "refresh" => app.request_refresh(),
         "network" => app.open_popup(Popup::SwitchNetwork),
@@ -570,6 +592,7 @@ fn handle_popup_click(app: &mut App, col: u16, row: u16) {
         Some(Popup::LookupIotaName) => centered_rect_min(60, 30, 48, 10, area),
         Some(Popup::ErrorLog) => centered_rect_min(80, 80, 60, 20, area),
         Some(Popup::ConfirmQuit) => centered_rect_min(50, 30, 40, 7, area),
+        Some(Popup::ActionsMenu) => actions_menu_area(app, area),
         None => return,
     };
 
@@ -736,6 +759,16 @@ fn handle_popup_click(app: &mut App, col: u16, row: u16) {
                     // Cancel button region — simulate Esc key
                     cancel_input_popup(app);
                 }
+            }
+        }
+        Some(Popup::ActionsMenu) => {
+            // Each row inside the border maps directly to a clickable hint
+            let hints = screen_hints(app.screen);
+            let clickable: Vec<_> = hints.iter().filter(|(_, _, id)| !id.is_empty()).collect();
+            if let Some((_, _, action_id)) = clickable.get(inner_row) {
+                let id = *action_id;
+                app.popup = None;
+                handle_hint_click(app, id);
             }
         }
         // Scroll-only popups (Help, Detail, ErrorLog): click inside does nothing

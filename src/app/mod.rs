@@ -77,6 +77,8 @@ pub struct App {
     pub tab_areas: Vec<ratatui::layout::Rect>,
     // Clickable action hint areas in the status bar: (rect, action_id)
     pub hint_areas: Vec<(ratatui::layout::Rect, &'static str)>,
+    // Selected row in the actions drop-down menu
+    pub action_menu_selected: usize,
 
     // Visible rows in the content area (updated each frame)
     pub content_visible_rows: usize,
@@ -159,6 +161,7 @@ impl App {
 
             tab_areas: vec![],
             hint_areas: vec![],
+            action_menu_selected: 0,
 
             content_visible_rows: 20,
             content_area_y: 2,

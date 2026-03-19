@@ -6,9 +6,11 @@ pub(crate) use command_form::build_command_from_form as command_form_build_comma
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::app::{AddCommandType, App, InputMode, Popup, save_address_book};
+use crate::ui::common::screen_hints;
 use crate::wallet::WalletCmd;
 
 use super::input::handle_input_key;
+use super::mouse::handle_hint_click;
 
 /// Dispatch keyboard events when a popup is open.
 pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
@@ -324,6 +326,44 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
             }
             _ => {}
         },
+        Some(Popup::ActionsMenu) => {
+            let hints = screen_hints(app.screen);
+            let clickable: Vec<_> = hints.iter().filter(|(_, _, id)| !id.is_empty()).collect();
+            match key.code {
+                KeyCode::Esc | KeyCode::Char('.') => {
+                    app.popup = None;
+                }
+                KeyCode::Up => {
+                    if app.action_menu_selected > 0 {
+                        app.action_menu_selected -= 1;
+                    }
+                }
+                KeyCode::Down => {
+                    if app.action_menu_selected + 1 < clickable.len() {
+                        app.action_menu_selected += 1;
+                    }
+                }
+                KeyCode::Enter => {
+                    if let Some((_, _, action_id)) = clickable.get(app.action_menu_selected) {
+                        let id = *action_id;
+                        app.popup = None;
+                        handle_hint_click(app, id);
+                    }
+                }
+                KeyCode::Char(c) => {
+                    // Direct shortcut: match single-char key labels
+                    let key_str = c.to_string();
+                    if let Some((_, _, action_id)) =
+                        clickable.iter().find(|(label, _, _)| *label == key_str)
+                    {
+                        let id = *action_id;
+                        app.popup = None;
+                        handle_hint_click(app, id);
+                    }
+                }
+                _ => {}
+            }
+        }
         None => {}
     }
 }

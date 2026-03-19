@@ -13,7 +13,10 @@ use ratatui::{
 
 use crate::app::{App, Popup};
 
-use super::common::{ACCENT, DIM, centered_rect_min, clamp_scroll, render_popup_scrollbar};
+use super::common::{
+    ACCENT, DIM, centered_rect_min, clamp_scroll, render_popup_scrollbar, screen_hints,
+    selected_style,
+};
 
 /// Dispatch popup drawing to the appropriate function.
 pub fn draw_popup(frame: &mut Frame, app: &mut App) {
@@ -106,6 +109,11 @@ pub fn draw_popup(frame: &mut Frame, app: &mut App) {
             let popup_area = centered_rect_min(50, 30, 40, 7, area);
             frame.render_widget(Clear, popup_area);
             draw_confirm_quit(frame, popup_area);
+        }
+        Some(Popup::ActionsMenu) => {
+            let popup_area = actions_menu_area(app, area);
+            frame.render_widget(Clear, popup_area);
+            draw_actions_menu(frame, app, popup_area);
         }
         None => {}
     }
@@ -576,6 +584,66 @@ fn draw_error_log_popup(frame: &mut Frame, app: &mut App, area: Rect) {
     frame.render_widget(paragraph, area);
 
     render_popup_scrollbar(frame, area, app.popup_scroll, content_len, inner_height);
+}
+
+/// Compute the area for the actions menu popup, anchored above the status bar.
+pub fn actions_menu_area(app: &App, frame_area: Rect) -> Rect {
+    let hints = screen_hints(app.screen);
+    let clickable: Vec<_> = hints.iter().filter(|(_, _, id)| !id.is_empty()).collect();
+    let row_count = clickable.len() as u16;
+    let width: u16 = 28;
+    let height = row_count + 2; // +2 for borders
+
+    // Anchor x to the Actions button position, or fallback to left edge
+    let button_x = app.hint_areas.first().map(|(r, _)| r.x).unwrap_or(0);
+    let x = button_x.min(frame_area.width.saturating_sub(width));
+    // Place just above the status bar (last row of frame)
+    let status_bar_y = frame_area.y + frame_area.height.saturating_sub(1);
+    let y = status_bar_y.saturating_sub(height);
+
+    Rect::new(
+        x,
+        y,
+        width.min(frame_area.width),
+        height.min(frame_area.height),
+    )
+}
+
+fn draw_actions_menu(frame: &mut Frame, app: &App, area: Rect) {
+    let hints = screen_hints(app.screen);
+    let clickable: Vec<_> = hints.iter().filter(|(_, _, id)| !id.is_empty()).collect();
+
+    let mut lines: Vec<Line> = Vec::new();
+    for (i, (key_label, description, _)) in clickable.iter().enumerate() {
+        let style = if i == app.action_menu_selected {
+            selected_style()
+        } else {
+            Style::default()
+        };
+        // Capitalize description for display
+        let desc = capitalize(description);
+        let line = Line::from(vec![
+            Span::styled(format!(" [{}]", key_label), style.fg(ACCENT).bold()),
+            Span::styled(format!(" {} ", desc), style),
+        ]);
+        lines.push(line);
+    }
+
+    let block = Block::default()
+        .title(" Actions ")
+        .title_style(Style::default().fg(ACCENT).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ACCENT));
+
+    frame.render_widget(Paragraph::new(lines).block(block), area);
+}
+
+fn capitalize(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(c) => c.to_uppercase().to_string() + chars.as_str(),
+    }
 }
 
 fn draw_confirm_quit(frame: &mut Frame, area: Rect) {
