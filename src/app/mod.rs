@@ -1,7 +1,9 @@
 //! Application state and logic for the TUI.
 
+mod explorer;
 mod types;
 
+pub use explorer::ExplorerState;
 pub use types::*;
 
 use tokio::sync::mpsc;
@@ -71,42 +73,7 @@ pub struct App {
     pub tx_multi_values: Vec<String>,
 
     // Explorer state
-    pub explorer_view: ExplorerView,
-    pub explorer_overview: Option<NetworkOverview>,
-    pub explorer_checkpoints: Vec<CheckpointDisplay>,
-    pub explorer_checkpoints_selected: usize,
-    pub explorer_checkpoints_offset: usize,
-    pub explorer_checkpoints_sort_asc: bool,
-    pub explorer_checkpoints_filter: Option<String>,
-    pub explorer_checkpoints_cursor: Option<String>,
-    pub explorer_checkpoints_cursors: Vec<Option<String>>,
-    pub explorer_checkpoints_has_next: bool,
-    pub explorer_checkpoints_page: usize,
-    pub explorer_validators: Vec<ValidatorDisplay>,
-    pub explorer_validators_selected: usize,
-    pub explorer_validators_offset: usize,
-    pub explorer_lookup_result: Option<LookupResult>,
-    pub explorer_search_results: Vec<ObjectDisplay>,
-    pub explorer_search_selected: usize,
-    pub explorer_search_offset: usize,
-    pub explorer_search_mode: bool,
-    pub explorer_search_type: String,
-    pub explorer_search_cursor: Option<String>,
-    pub explorer_search_has_next: bool,
-    pub explorer_search_cursors: Vec<Option<String>>,
-    pub explorer_lookup_selected: usize,
-    pub explorer_lookup_offset: usize,
-    pub explorer_lookup_query: Option<String>,
-    // Address lookup pagination state
-    pub explorer_lookup_address: Option<String>,
-    pub explorer_lookup_obj_cursor: Option<String>,
-    pub explorer_lookup_obj_cursors: Vec<Option<String>>,
-    pub explorer_lookup_obj_has_next: bool,
-    pub explorer_lookup_obj_page: usize,
-    pub explorer_lookup_tx_cursor: Option<String>,
-    pub explorer_lookup_tx_cursors: Vec<Option<String>>,
-    pub explorer_lookup_tx_has_next: bool,
-    pub explorer_lookup_tx_page: usize,
+    pub explorer: ExplorerState,
 
     // Autocomplete state for address/object fields
     pub autocomplete: Vec<(String, String)>, // (alias/label, address/object_id)
@@ -123,8 +90,6 @@ pub struct App {
 
     // Visible rows in the content area (updated each frame)
     pub content_visible_rows: usize,
-    // Visible rows in the Explorer sub-view data area (updated each frame)
-    pub explorer_visible_rows: usize,
     // Absolute Y position of the content area (updated each frame)
     pub content_area_y: u16,
 }
@@ -202,41 +167,7 @@ impl App {
 
             tx_multi_values: vec![],
 
-            explorer_view: ExplorerView::Overview,
-            explorer_overview: None,
-            explorer_checkpoints: vec![],
-            explorer_checkpoints_selected: 0,
-            explorer_checkpoints_offset: 0,
-            explorer_checkpoints_sort_asc: false,
-            explorer_checkpoints_filter: None,
-            explorer_checkpoints_cursor: None,
-            explorer_checkpoints_cursors: vec![],
-            explorer_checkpoints_has_next: false,
-            explorer_checkpoints_page: 0,
-            explorer_validators: vec![],
-            explorer_validators_selected: 0,
-            explorer_validators_offset: 0,
-            explorer_lookup_result: None,
-            explorer_search_results: vec![],
-            explorer_search_selected: 0,
-            explorer_search_offset: 0,
-            explorer_search_mode: false,
-            explorer_search_type: String::new(),
-            explorer_search_cursor: None,
-            explorer_search_has_next: false,
-            explorer_search_cursors: vec![],
-            explorer_lookup_selected: 0,
-            explorer_lookup_offset: 0,
-            explorer_lookup_query: None,
-            explorer_lookup_address: None,
-            explorer_lookup_obj_cursor: None,
-            explorer_lookup_obj_cursors: vec![],
-            explorer_lookup_obj_has_next: false,
-            explorer_lookup_obj_page: 0,
-            explorer_lookup_tx_cursor: None,
-            explorer_lookup_tx_cursors: vec![],
-            explorer_lookup_tx_has_next: false,
-            explorer_lookup_tx_page: 0,
+            explorer: ExplorerState::default(),
 
             autocomplete: vec![],
             autocomplete_idx: None,
@@ -248,7 +179,6 @@ impl App {
             tab_areas: vec![],
 
             content_visible_rows: 20,
-            explorer_visible_rows: 15,
             content_area_y: 2,
         }
     }
@@ -262,21 +192,21 @@ impl App {
                 self.network_name = network;
                 self.request_refresh();
                 // Refresh explorer data for the new network
-                self.explorer_overview = None;
-                self.explorer_checkpoints.clear();
-                self.explorer_validators.clear();
+                self.explorer.overview = None;
+                self.explorer.checkpoints.clear();
+                self.explorer.validators.clear();
                 self.send_cmd(WalletCmd::RefreshNetworkOverview);
                 self.send_cmd(WalletCmd::RefreshCheckpoints { cursor: None });
                 self.send_cmd(WalletCmd::RefreshValidators);
                 // Re-run explorer lookup/search if one was active
-                if let Some(query) = self.explorer_lookup_query.clone() {
+                if let Some(query) = self.explorer.lookup_query.clone() {
                     self.send_cmd(WalletCmd::LookupAddress(query));
                 }
-                if self.explorer_search_mode {
-                    let type_filter = self.explorer_search_type.clone();
+                if self.explorer.search_mode {
+                    let type_filter = self.explorer.search_type.clone();
                     if !type_filter.is_empty() {
-                        self.explorer_search_cursors.clear();
-                        self.explorer_search_cursor = None;
+                        self.explorer.search_cursors.clear();
+                        self.explorer.search_cursor = None;
                         self.send_cmd(WalletCmd::SearchObjectsByType {
                             type_filter,
                             cursor: None,
@@ -423,7 +353,7 @@ impl App {
                 latest_checkpoint,
                 total_transactions,
             } => {
-                self.explorer_overview = Some(NetworkOverview {
+                self.explorer.overview = Some(NetworkOverview {
                     chain_id,
                     epoch,
                     gas_price,
@@ -436,26 +366,26 @@ impl App {
                 cursor,
                 has_next,
             } => {
-                self.explorer_checkpoints = checkpoints;
-                self.explorer_checkpoints_cursor = cursor;
-                self.explorer_checkpoints_has_next = has_next;
-                if self.explorer_checkpoints_selected >= self.explorer_checkpoints.len() {
-                    self.explorer_checkpoints_selected =
-                        self.explorer_checkpoints.len().saturating_sub(1);
+                self.explorer.checkpoints = checkpoints;
+                self.explorer.checkpoints_cursor = cursor;
+                self.explorer.checkpoints_has_next = has_next;
+                if self.explorer.checkpoints_selected >= self.explorer.checkpoints.len() {
+                    self.explorer.checkpoints_selected =
+                        self.explorer.checkpoints.len().saturating_sub(1);
                 }
             }
             WalletEvent::Validators(validators) => {
-                self.explorer_validators = validators;
-                if self.explorer_validators_selected >= self.explorer_validators.len() {
-                    self.explorer_validators_selected =
-                        self.explorer_validators.len().saturating_sub(1);
+                self.explorer.validators = validators;
+                if self.explorer.validators_selected >= self.explorer.validators.len() {
+                    self.explorer.validators_selected =
+                        self.explorer.validators.len().saturating_sub(1);
                 }
             }
             WalletEvent::ExplorerLookupResult(result) => {
-                self.explorer_lookup_selected = 0;
-                self.explorer_lookup_offset = 0;
-                self.explorer_lookup_address = None;
-                self.explorer_lookup_result = Some(result);
+                self.explorer.lookup_selected = 0;
+                self.explorer.lookup_offset = 0;
+                self.explorer.lookup_address = None;
+                self.explorer.lookup_result = Some(result);
             }
             WalletEvent::AddressLookupPage {
                 result,
@@ -464,24 +394,24 @@ impl App {
                 tx_cursor,
                 tx_has_next,
             } => {
-                self.explorer_lookup_selected = 0;
-                self.explorer_lookup_offset = 0;
-                self.explorer_lookup_obj_cursor = obj_cursor;
-                self.explorer_lookup_obj_has_next = obj_has_next;
-                self.explorer_lookup_tx_cursor = tx_cursor;
-                self.explorer_lookup_tx_has_next = tx_has_next;
-                self.explorer_lookup_result = Some(result);
+                self.explorer.lookup_selected = 0;
+                self.explorer.lookup_offset = 0;
+                self.explorer.lookup_obj_cursor = obj_cursor;
+                self.explorer.lookup_obj_has_next = obj_has_next;
+                self.explorer.lookup_tx_cursor = tx_cursor;
+                self.explorer.lookup_tx_has_next = tx_has_next;
+                self.explorer.lookup_result = Some(result);
             }
             WalletEvent::ObjectSearchResults {
                 objects,
                 has_next_page,
                 end_cursor,
             } => {
-                self.explorer_search_results = objects;
-                self.explorer_search_selected = 0;
-                self.explorer_search_offset = 0;
-                self.explorer_search_has_next = has_next_page;
-                self.explorer_search_cursor = end_cursor;
+                self.explorer.search_results = objects;
+                self.explorer.search_selected = 0;
+                self.explorer.search_offset = 0;
+                self.explorer.search_has_next = has_next_page;
+                self.explorer.search_cursor = end_cursor;
             }
             WalletEvent::Error(_e) => {}
         }
@@ -490,34 +420,6 @@ impl App {
     /// Send a command to the wallet backend (non-blocking).
     pub fn send_cmd(&self, cmd: WalletCmd) {
         let _ = self.cmd_tx.try_send(cmd);
-    }
-
-    /// Return checkpoint indices matching the current filter and sort order.
-    pub fn filtered_checkpoints(&self) -> Vec<usize> {
-        let mut indices: Vec<usize> = if let Some(ref q) = self.explorer_checkpoints_filter {
-            self.explorer_checkpoints
-                .iter()
-                .enumerate()
-                .filter(|(_, cp)| cp.sequence.to_string().contains(q))
-                .map(|(i, _)| i)
-                .collect()
-        } else {
-            (0..self.explorer_checkpoints.len()).collect()
-        };
-        if self.explorer_checkpoints_sort_asc {
-            indices.sort_by(|a, b| {
-                self.explorer_checkpoints[*a]
-                    .sequence
-                    .cmp(&self.explorer_checkpoints[*b].sequence)
-            });
-        } else {
-            indices.sort_by(|a, b| {
-                self.explorer_checkpoints[*b]
-                    .sequence
-                    .cmp(&self.explorer_checkpoints[*a].sequence)
-            });
-        }
-        indices
     }
 
     /// Number of keys with visibility enabled.
@@ -576,18 +478,7 @@ impl App {
 
     /// Refresh explorer data for the current sub-view.
     pub fn refresh_explorer(&mut self) {
-        match self.explorer_view {
-            ExplorerView::Overview => self.send_cmd(WalletCmd::RefreshNetworkOverview),
-            ExplorerView::Checkpoints => {
-                self.explorer_checkpoints_cursor = None;
-                self.explorer_checkpoints_cursors.clear();
-                self.explorer_checkpoints_has_next = false;
-                self.explorer_checkpoints_page = 0;
-                self.send_cmd(WalletCmd::RefreshCheckpoints { cursor: None });
-            }
-            ExplorerView::Validators => self.send_cmd(WalletCmd::RefreshValidators),
-            ExplorerView::Lookup => {}
-        }
+        self.explorer.refresh_explorer(&self.cmd_tx);
     }
 
     pub fn navigate(&mut self, screen: Screen) {
@@ -598,10 +489,10 @@ impl App {
         if screen == Screen::Explorer {
             // Load all explorer data upfront so sub-views aren't empty
             self.send_cmd(WalletCmd::RefreshNetworkOverview);
-            if self.explorer_checkpoints.is_empty() {
+            if self.explorer.checkpoints.is_empty() {
                 self.send_cmd(WalletCmd::RefreshCheckpoints { cursor: None });
             }
-            if self.explorer_validators.is_empty() {
+            if self.explorer.validators.is_empty() {
                 self.send_cmd(WalletCmd::RefreshValidators);
             }
         }
@@ -610,47 +501,47 @@ impl App {
     /// Navigate to Explorer > Lookup and immediately submit a lookup query.
     pub fn explore_item(&mut self, query: String) {
         self.screen = Screen::Explorer;
-        self.explorer_view = ExplorerView::Lookup;
+        self.explorer.view = ExplorerView::Lookup;
         self.input_mode = InputMode::Normal;
         self.popup = None;
         self.popup_scroll = 0;
-        self.explorer_search_mode = false;
-        self.explorer_lookup_result = None;
-        self.explorer_lookup_selected = 0;
-        self.explorer_lookup_offset = 0;
-        self.explorer_lookup_query = Some(query.clone());
-        self.explorer_lookup_address = Some(query.clone());
-        self.explorer_lookup_obj_cursor = None;
-        self.explorer_lookup_obj_cursors.clear();
-        self.explorer_lookup_obj_has_next = false;
-        self.explorer_lookup_obj_page = 0;
-        self.explorer_lookup_tx_cursor = None;
-        self.explorer_lookup_tx_cursors.clear();
-        self.explorer_lookup_tx_has_next = false;
-        self.explorer_lookup_tx_page = 0;
-        self.explorer_search_results.clear();
-        self.explorer_search_has_next = false;
-        self.explorer_search_cursor = None;
-        self.explorer_search_cursors.clear();
+        self.explorer.search_mode = false;
+        self.explorer.lookup_result = None;
+        self.explorer.lookup_selected = 0;
+        self.explorer.lookup_offset = 0;
+        self.explorer.lookup_query = Some(query.clone());
+        self.explorer.lookup_address = Some(query.clone());
+        self.explorer.lookup_obj_cursor = None;
+        self.explorer.lookup_obj_cursors.clear();
+        self.explorer.lookup_obj_has_next = false;
+        self.explorer.lookup_obj_page = 0;
+        self.explorer.lookup_tx_cursor = None;
+        self.explorer.lookup_tx_cursors.clear();
+        self.explorer.lookup_tx_has_next = false;
+        self.explorer.lookup_tx_page = 0;
+        self.explorer.search_results.clear();
+        self.explorer.search_has_next = false;
+        self.explorer.search_cursor = None;
+        self.explorer.search_cursors.clear();
         self.send_cmd(WalletCmd::LookupAddress(query));
     }
 
     /// Navigate to Explorer > Lookup and immediately submit a type search.
     pub fn explore_type(&mut self, type_filter: String) {
         self.screen = Screen::Explorer;
-        self.explorer_view = ExplorerView::Lookup;
+        self.explorer.view = ExplorerView::Lookup;
         self.input_mode = InputMode::Normal;
         self.popup = None;
         self.popup_scroll = 0;
-        self.explorer_search_mode = true;
-        self.explorer_lookup_result = None;
-        self.explorer_search_results.clear();
-        self.explorer_search_selected = 0;
-        self.explorer_search_offset = 0;
-        self.explorer_search_has_next = false;
-        self.explorer_search_cursor = None;
-        self.explorer_search_cursors.clear();
-        self.explorer_search_type = type_filter.clone();
+        self.explorer.search_mode = true;
+        self.explorer.lookup_result = None;
+        self.explorer.search_results.clear();
+        self.explorer.search_selected = 0;
+        self.explorer.search_offset = 0;
+        self.explorer.search_has_next = false;
+        self.explorer.search_cursor = None;
+        self.explorer.search_cursors.clear();
+        self.explorer.search_type = type_filter.clone();
         self.send_cmd(WalletCmd::SearchObjectsByType {
             type_filter,
             cursor: None,
@@ -1039,11 +930,11 @@ impl App {
                     ("Address Details", vec![])
                 }
             }
-            Screen::Explorer => match self.explorer_view {
+            Screen::Explorer => match self.explorer.view {
                 ExplorerView::Checkpoints => {
-                    let filtered = self.filtered_checkpoints();
-                    if let Some(&ci) = filtered.get(self.explorer_checkpoints_selected)
-                        && let Some(cp) = self.explorer_checkpoints.get(ci)
+                    let filtered = self.explorer.filtered_checkpoints();
+                    if let Some(&ci) = filtered.get(self.explorer.checkpoints_selected)
+                        && let Some(cp) = self.explorer.checkpoints.get(ci)
                     {
                         (
                             "Checkpoint Details",
@@ -1060,8 +951,9 @@ impl App {
                 }
                 ExplorerView::Validators => {
                     if let Some(v) = self
-                        .explorer_validators
-                        .get(self.explorer_validators_selected)
+                        .explorer
+                        .validators
+                        .get(self.explorer.validators_selected)
                     {
                         (
                             "Validator Details",

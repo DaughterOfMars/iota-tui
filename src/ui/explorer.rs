@@ -20,7 +20,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 
     draw_sub_tabs(frame, app, layout[0]);
 
-    match app.explorer_view {
+    match app.explorer.view {
         ExplorerView::Overview => draw_overview(frame, app, layout[1]),
         ExplorerView::Checkpoints => draw_checkpoints(frame, app, layout[1]),
         ExplorerView::Validators => draw_validators(frame, app, layout[1]),
@@ -33,7 +33,7 @@ fn draw_sub_tabs(frame: &mut Frame, app: &App, area: Rect) {
         .iter()
         .flat_map(|view| {
             let label = format!(" {} ", view.title());
-            let style = if *view == app.explorer_view {
+            let style = if *view == app.explorer.view {
                 Style::default().fg(Color::Black).bg(common::ACCENT).bold()
             } else {
                 Style::default().fg(Color::White).dim()
@@ -59,7 +59,7 @@ fn draw_overview(frame: &mut Frame, app: &App, area: Rect) {
         .borders(Borders::ALL)
         .border_style(common::dim_style());
 
-    let content = if let Some(ref overview) = app.explorer_overview {
+    let content = if let Some(ref overview) = app.explorer.overview {
         vec![
             kv_line("  Chain ID", &overview.chain_id),
             kv_line("  Current Epoch", &overview.epoch),
@@ -75,7 +75,7 @@ fn draw_overview(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_checkpoints(frame: &mut Frame, app: &mut App, area: Rect) {
-    if app.explorer_checkpoints.is_empty() {
+    if app.explorer.checkpoints.is_empty() {
         let block = Block::default()
             .title(" Checkpoints ")
             .title_style(common::header_style())
@@ -88,10 +88,10 @@ fn draw_checkpoints(frame: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
 
-    let filtered = app.filtered_checkpoints();
+    let filtered = app.explorer.filtered_checkpoints();
 
     // If filtering, show a search bar row at the top
-    let (table_area, filter_area) = if app.explorer_checkpoints_filter.is_some() {
+    let (table_area, filter_area) = if app.explorer.checkpoints_filter.is_some() {
         let chunks = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).split(area);
         (chunks[1], Some(chunks[0]))
     } else {
@@ -99,7 +99,7 @@ fn draw_checkpoints(frame: &mut Frame, app: &mut App, area: Rect) {
     };
 
     if let Some(fa) = filter_area {
-        let q = app.explorer_checkpoints_filter.as_deref().unwrap_or("");
+        let q = app.explorer.checkpoints_filter.as_deref().unwrap_or("");
         let line = Line::from(vec![
             Span::styled(" Search: ", Style::default().fg(common::ACCENT).bold()),
             Span::styled(q, Style::default().fg(Color::White)),
@@ -109,14 +109,14 @@ fn draw_checkpoints(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 
     let visible_rows = table_area.height.saturating_sub(4) as usize;
-    app.explorer_visible_rows = visible_rows;
+    app.explorer.visible_rows = visible_rows;
     App::scroll_into_view(
-        app.explorer_checkpoints_selected,
-        &mut app.explorer_checkpoints_offset,
+        app.explorer.checkpoints_selected,
+        &mut app.explorer.checkpoints_offset,
         visible_rows,
     );
 
-    let sort_indicator = if app.explorer_checkpoints_sort_asc {
+    let sort_indicator = if app.explorer.checkpoints_sort_asc {
         " ^"
     } else {
         " v"
@@ -133,11 +133,11 @@ fn draw_checkpoints(frame: &mut Frame, app: &mut App, area: Rect) {
     let rows: Vec<Row> = filtered
         .iter()
         .enumerate()
-        .skip(app.explorer_checkpoints_offset)
+        .skip(app.explorer.checkpoints_offset)
         .take(visible_rows)
         .map(|(vi, &ci)| {
-            let cp = &app.explorer_checkpoints[ci];
-            let style = if vi == app.explorer_checkpoints_selected {
+            let cp = &app.explorer.checkpoints[ci];
+            let style = if vi == app.explorer.checkpoints_selected {
                 common::selected_style()
             } else {
                 Style::default()
@@ -159,9 +159,9 @@ fn draw_checkpoints(frame: &mut Frame, app: &mut App, area: Rect) {
         Constraint::Length(10),
     ];
 
-    let page_num = app.explorer_checkpoints_page + 1;
-    let has_prev = !app.explorer_checkpoints_cursors.is_empty();
-    let has_next = app.explorer_checkpoints_has_next;
+    let page_num = app.explorer.checkpoints_page + 1;
+    let has_prev = !app.explorer.checkpoints_cursors.is_empty();
+    let has_next = app.explorer.checkpoints_has_next;
     let page_hint = match (has_prev, has_next) {
         (true, true) => format!(" | pg {} [:prev ]:next", page_num),
         (true, false) => format!(" | pg {} [:prev", page_num),
@@ -169,16 +169,16 @@ fn draw_checkpoints(frame: &mut Frame, app: &mut App, area: Rect) {
         (false, false) => String::new(),
     };
     let sort_hint = " s:sort";
-    let search_hint = if app.explorer_checkpoints_filter.is_some() {
+    let search_hint = if app.explorer.checkpoints_filter.is_some() {
         " Esc:clear"
     } else {
         " /:search"
     };
-    let title = if app.explorer_checkpoints_filter.is_some() {
+    let title = if app.explorer.checkpoints_filter.is_some() {
         format!(
             " Checkpoints ({}/{}){}{}{} ",
             filtered.len(),
-            app.explorer_checkpoints.len(),
+            app.explorer.checkpoints.len(),
             page_hint,
             sort_hint,
             search_hint,
@@ -186,7 +186,7 @@ fn draw_checkpoints(frame: &mut Frame, app: &mut App, area: Rect) {
     } else {
         format!(
             " Checkpoints ({}){}{}{} ",
-            app.explorer_checkpoints.len(),
+            app.explorer.checkpoints.len(),
             page_hint,
             sort_hint,
             search_hint,
@@ -204,7 +204,7 @@ fn draw_checkpoints(frame: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn draw_validators(frame: &mut Frame, app: &mut App, area: Rect) {
-    if app.explorer_validators.is_empty() {
+    if app.explorer.validators.is_empty() {
         let block = Block::default()
             .title(" Validators ")
             .title_style(common::header_style())
@@ -215,10 +215,10 @@ fn draw_validators(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 
     let visible_rows = area.height.saturating_sub(4) as usize;
-    app.explorer_visible_rows = visible_rows;
+    app.explorer.visible_rows = visible_rows;
     App::scroll_into_view(
-        app.explorer_validators_selected,
-        &mut app.explorer_validators_offset,
+        app.explorer.validators_selected,
+        &mut app.explorer.validators_offset,
         visible_rows,
     );
 
@@ -227,13 +227,14 @@ fn draw_validators(frame: &mut Frame, app: &mut App, area: Rect) {
         .bottom_margin(1);
 
     let rows: Vec<Row> = app
-        .explorer_validators
+        .explorer
+        .validators
         .iter()
         .enumerate()
-        .skip(app.explorer_validators_offset)
+        .skip(app.explorer.validators_offset)
         .take(visible_rows)
         .map(|(i, v)| {
-            let style = if i == app.explorer_validators_selected {
+            let style = if i == app.explorer.validators_selected {
                 common::selected_style()
             } else {
                 Style::default()
@@ -253,7 +254,7 @@ fn draw_validators(frame: &mut Frame, app: &mut App, area: Rect) {
         Constraint::Length(14),
     ];
 
-    let title = format!(" Validators ({}) ", app.explorer_validators.len());
+    let title = format!(" Validators ({}) ", app.explorer.validators.len());
     let table = Table::new(rows, widths).header(header).block(
         Block::default()
             .title(title)
@@ -276,7 +277,7 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
     let editing = app.input_mode == InputMode::Editing;
 
     let input_title = if editing {
-        if app.explorer_search_mode {
+        if app.explorer.search_mode {
             " Type Search (Enter:submit  Esc:cancel) "
         } else {
             " Lookup (Enter:submit  Esc:cancel) "
@@ -319,13 +320,13 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
         .borders(Borders::ALL)
         .border_style(common::dim_style());
 
-    if !app.explorer_search_results.is_empty() {
+    if !app.explorer.search_results.is_empty() {
         // Show type-search results as a table
         let visible_rows = layout[1].height.saturating_sub(4) as usize;
-        app.explorer_visible_rows = visible_rows;
+        app.explorer.visible_rows = visible_rows;
         App::scroll_into_view(
-            app.explorer_search_selected,
-            &mut app.explorer_search_offset,
+            app.explorer.search_selected,
+            &mut app.explorer.search_offset,
             visible_rows,
         );
         let header = Row::new(vec!["Object ID", "Type", "Version", "Owner"])
@@ -333,13 +334,14 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
             .bottom_margin(1);
 
         let rows: Vec<Row> = app
-            .explorer_search_results
+            .explorer
+            .search_results
             .iter()
             .enumerate()
-            .skip(app.explorer_search_offset)
+            .skip(app.explorer.search_offset)
             .take(visible_rows)
             .map(|(i, obj)| {
-                let style = if i == app.explorer_search_selected {
+                let style = if i == app.explorer.search_selected {
                     common::selected_style()
                 } else {
                     Style::default()
@@ -361,9 +363,9 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
             Constraint::Length(22),
         ];
 
-        let page_num = app.explorer_search_cursors.len() + 1;
-        let has_prev = !app.explorer_search_cursors.is_empty();
-        let has_next = app.explorer_search_has_next;
+        let page_num = app.explorer.search_cursors.len() + 1;
+        let has_prev = !app.explorer.search_cursors.is_empty();
+        let has_next = app.explorer.search_has_next;
         let page_hint = match (has_prev, has_next) {
             (true, true) => format!(" | pg {} [:prev ]:next", page_num),
             (true, false) => format!(" | pg {} [:prev", page_num),
@@ -372,7 +374,7 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
         };
         let title = format!(
             " Search Results ({}){}",
-            app.explorer_search_results.len(),
+            app.explorer.search_results.len(),
             page_hint,
         );
         let table = Table::new(rows, widths).header(header).block(
@@ -384,9 +386,9 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
         );
 
         frame.render_widget(table, layout[1]);
-    } else if app.explorer_lookup_result.is_some() {
+    } else if app.explorer.lookup_result.is_some() {
         // Extract data needed from the result before passing &mut app
-        let (sections, title_override) = match app.explorer_lookup_result.as_ref().unwrap() {
+        let (sections, title_override) = match app.explorer.lookup_result.as_ref().unwrap() {
             LookupResult::NotFound(msg) => {
                 let content = vec![Line::from(Span::styled(
                     format!("  {}", msg),
@@ -399,9 +401,9 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
                 (sections.clone(), None)
             }
             LookupResult::Address { sections } => {
-                let page_num = app.explorer_lookup_obj_page + 1;
-                let has_prev = !app.explorer_lookup_obj_cursors.is_empty();
-                let has_next = app.explorer_lookup_obj_has_next || app.explorer_lookup_tx_has_next;
+                let page_num = app.explorer.lookup_obj_page + 1;
+                let has_prev = !app.explorer.lookup_obj_cursors.is_empty();
+                let has_next = app.explorer.lookup_obj_has_next || app.explorer.lookup_tx_has_next;
                 let page_hint = match (has_prev, has_next) {
                     (true, true) => format!(" | pg {} [:prev ]:next", page_num),
                     (true, false) => format!(" | pg {} [:prev", page_num),
@@ -418,13 +420,13 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
         };
         let visible =
             draw_lookup_sections(frame, app, &sections, title_override.as_deref(), layout[1]);
-        app.explorer_visible_rows = visible;
+        app.explorer.visible_rows = visible;
         // Re-run scroll with the actual visible rows from this frame to fix
         // any stale-value drift from the event handler.
-        if let Some(ref result) = app.explorer_lookup_result {
+        if let Some(ref result) = app.explorer.lookup_result {
             result.scroll_into_view(
-                app.explorer_lookup_selected,
-                &mut app.explorer_lookup_offset,
+                app.explorer.lookup_selected,
+                &mut app.explorer.lookup_offset,
                 visible,
             );
         }
@@ -465,7 +467,7 @@ fn draw_lookup_sections(
         )));
 
         for field in &section.fields {
-            let is_selected = flat_idx == app.explorer_lookup_selected;
+            let is_selected = flat_idx == app.explorer.lookup_selected;
             let has_action = field.action.is_some();
 
             let key_style = if is_selected {
@@ -501,7 +503,7 @@ fn draw_lookup_sections(
     }
 
     // explorer_lookup_offset is already a line index
-    let line_offset = app.explorer_lookup_offset;
+    let line_offset = app.explorer.lookup_offset;
 
     let display_lines: Vec<Line> = lines
         .into_iter()

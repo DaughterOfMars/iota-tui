@@ -158,8 +158,8 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                             for &view in ExplorerView::ALL.iter() {
                                 let w = view.title().len() as u16 + 3;
                                 if col >= x && col < x + w {
-                                    if app.explorer_view != view {
-                                        app.explorer_view = view;
+                                    if app.explorer.view != view {
+                                        app.explorer.view = view;
                                         app.refresh_explorer();
                                     }
                                     break;
@@ -169,21 +169,21 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                         }
                     } else if row >= sub_tab_end {
                         // Content below sub-tabs; each sub-view has its own layout
-                        match app.explorer_view {
+                        match app.explorer.view {
                             // Checkpoints table: border(1)+header(1)+margin(1) = +3
                             // (may have a filter row +1 before the table)
                             ExplorerView::Checkpoints => {
-                                let filter_rows = if app.explorer_checkpoints_filter.is_some() {
+                                let filter_rows = if app.explorer.checkpoints_filter.is_some() {
                                     1u16
                                 } else {
                                     0
                                 };
                                 let data_start = sub_tab_end + filter_rows + 1 + 1 + 1;
                                 if row >= data_start {
-                                    let idx = app.explorer_checkpoints_offset
+                                    let idx = app.explorer.checkpoints_offset
                                         + (row - data_start) as usize;
-                                    if idx < app.explorer_checkpoints.len() {
-                                        app.explorer_checkpoints_selected = idx;
+                                    if idx < app.explorer.checkpoints.len() {
+                                        app.explorer.checkpoints_selected = idx;
                                     }
                                 }
                             }
@@ -191,38 +191,38 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                             ExplorerView::Validators => {
                                 let data_start = sub_tab_end + 1 + 1 + 1;
                                 if row >= data_start {
-                                    let idx = app.explorer_validators_offset
+                                    let idx = app.explorer.validators_offset
                                         + (row - data_start) as usize;
-                                    if idx < app.explorer_validators.len() {
-                                        app.explorer_validators_selected = idx;
+                                    if idx < app.explorer.validators.len() {
+                                        app.explorer.validators_selected = idx;
                                     }
                                 }
                             }
                             // Lookup: search input(3) + result block
                             ExplorerView::Lookup => {
                                 let result_start = sub_tab_end + 3;
-                                if !app.explorer_search_results.is_empty() {
+                                if !app.explorer.search_results.is_empty() {
                                     // Search results table: border(1)+header(1)+margin(1)
                                     let data_start = result_start + 1 + 1 + 1;
                                     if row >= data_start {
-                                        let idx = app.explorer_search_offset
+                                        let idx = app.explorer.search_offset
                                             + (row - data_start) as usize;
-                                        if idx < app.explorer_search_results.len() {
-                                            app.explorer_search_selected = idx;
+                                        if idx < app.explorer.search_results.len() {
+                                            app.explorer.search_selected = idx;
                                         }
                                     }
-                                } else if let Some(ref result) = app.explorer_lookup_result {
+                                } else if let Some(ref result) = app.explorer.lookup_result {
                                     // Lookup result: border(1) then content lines
                                     let data_start = result_start + 1;
                                     if row >= data_start {
                                         // explorer_lookup_offset is a line index
-                                        let abs_line = app.explorer_lookup_offset
+                                        let abs_line = app.explorer.lookup_offset
                                             + (row - data_start) as usize;
                                         // Convert line index to field index (skip headers)
                                         if let Some(field_idx) = result.line_to_field(abs_line)
                                             && field_idx < result.total_fields()
                                         {
-                                            app.explorer_lookup_selected = field_idx;
+                                            app.explorer.lookup_selected = field_idx;
                                         }
                                     }
                                 }
@@ -321,55 +321,56 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
         Screen::Explorer => {
             // Explorer sub-view scroll: checkpoints, validators, search results
             use crate::app::ExplorerView;
-            match app.explorer_view {
+            match app.explorer.view {
                 ExplorerView::Checkpoints => {
-                    app.explorer_checkpoints_selected = apply_delta(
-                        app.explorer_checkpoints_selected,
+                    app.explorer.checkpoints_selected = apply_delta(
+                        app.explorer.checkpoints_selected,
                         delta,
-                        app.explorer_checkpoints.len(),
+                        app.explorer.checkpoints.len(),
                     );
                     App::scroll_into_view(
-                        app.explorer_checkpoints_selected,
-                        &mut app.explorer_checkpoints_offset,
-                        app.explorer_visible_rows,
+                        app.explorer.checkpoints_selected,
+                        &mut app.explorer.checkpoints_offset,
+                        app.explorer.visible_rows,
                     );
                 }
                 ExplorerView::Validators => {
-                    app.explorer_validators_selected = apply_delta(
-                        app.explorer_validators_selected,
+                    app.explorer.validators_selected = apply_delta(
+                        app.explorer.validators_selected,
                         delta,
-                        app.explorer_validators.len(),
+                        app.explorer.validators.len(),
                     );
                     App::scroll_into_view(
-                        app.explorer_validators_selected,
-                        &mut app.explorer_validators_offset,
-                        app.explorer_visible_rows,
+                        app.explorer.validators_selected,
+                        &mut app.explorer.validators_offset,
+                        app.explorer.visible_rows,
                     );
                 }
-                ExplorerView::Lookup if !app.explorer_search_results.is_empty() => {
-                    app.explorer_search_selected = apply_delta(
-                        app.explorer_search_selected,
+                ExplorerView::Lookup if !app.explorer.search_results.is_empty() => {
+                    app.explorer.search_selected = apply_delta(
+                        app.explorer.search_selected,
                         delta,
-                        app.explorer_search_results.len(),
+                        app.explorer.search_results.len(),
                     );
                     App::scroll_into_view(
-                        app.explorer_search_selected,
-                        &mut app.explorer_search_offset,
-                        app.explorer_visible_rows,
+                        app.explorer.search_selected,
+                        &mut app.explorer.search_offset,
+                        app.explorer.visible_rows,
                     );
                 }
-                ExplorerView::Lookup if app.explorer_lookup_result.is_some() => {
-                    let result = app.explorer_lookup_result.as_ref().unwrap();
+                ExplorerView::Lookup if app.explorer.lookup_result.is_some() => {
+                    let result = app.explorer.lookup_result.as_ref().unwrap();
                     let total = result.total_fields();
-                    app.explorer_lookup_selected =
-                        apply_delta(app.explorer_lookup_selected, delta, total);
-                    let visible = app.explorer_visible_rows;
-                    app.explorer_lookup_result
+                    app.explorer.lookup_selected =
+                        apply_delta(app.explorer.lookup_selected, delta, total);
+                    let visible = app.explorer.visible_rows;
+                    app.explorer
+                        .lookup_result
                         .as_ref()
                         .unwrap()
                         .scroll_into_view(
-                            app.explorer_lookup_selected,
-                            &mut app.explorer_lookup_offset,
+                            app.explorer.lookup_selected,
+                            &mut app.explorer.lookup_offset,
                             visible,
                         );
                 }
