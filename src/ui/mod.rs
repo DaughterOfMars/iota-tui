@@ -21,7 +21,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
     app.frame_area = area;
 
-    let sw = common::sidebar_width(app.sidebar_collapsed);
+    let sw = app.sidebar_width;
 
     // Horizontal split: sidebar | main content
     let h_layout = ratatui::layout::Layout::horizontal([
@@ -40,6 +40,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     ])
     .split(main_area);
 
+    app.sidebar_rect = sidebar_area;
     common::draw_sidebar(frame, app, sidebar_area);
 
     // Update layout info for scroll calculations and mouse hit-testing

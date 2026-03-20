@@ -339,6 +339,18 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                 scroll_selection(app, 1);
             }
         }
+        MouseEventKind::Moved => {
+            let col = mouse.column;
+            let row = mouse.row;
+            let sr = app.sidebar_rect;
+            let in_sidebar =
+                col >= sr.x && col < sr.x + sr.width && row >= sr.y && row < sr.y + sr.height;
+            if in_sidebar && !app.sidebar_open {
+                app.sidebar_open = true;
+            } else if !in_sidebar && app.sidebar_open && !app.sidebar_focus {
+                app.sidebar_open = false;
+            }
+        }
         _ => {}
     }
 }

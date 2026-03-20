@@ -27,13 +27,6 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
 
-    // Toggle sidebar collapsed/expanded
-    if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('b') {
-        app.sidebar_collapsed = !app.sidebar_collapsed;
-        crate::wallet::save_sidebar_collapsed(app.sidebar_collapsed);
-        return;
-    }
-
     {
         const SEQ: [u8; 10] = [38, 38, 40, 40, 37, 39, 37, 39, 98, 97];
         let code: Option<u8> = match key.code {
@@ -152,20 +145,36 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             app.navigate(Screen::ActivityFeed);
             return;
         }
-        KeyCode::Tab => {
-            let idx = app.screen.index();
-            let next = (idx + 1) % Screen::ALL.len();
-            app.navigate(Screen::ALL[next]);
+        KeyCode::Tab | KeyCode::BackTab => {
+            if app.sidebar_open {
+                app.sidebar_open = false;
+                app.sidebar_focus = false;
+            } else {
+                app.sidebar_open = true;
+                app.sidebar_focus = true;
+                app.sidebar_selected = app.screen.index();
+            }
             return;
         }
-        KeyCode::BackTab => {
-            let idx = app.screen.index();
-            let next = if idx == 0 {
-                Screen::ALL.len() - 1
+        KeyCode::Esc if app.sidebar_focus => {
+            app.sidebar_open = false;
+            app.sidebar_focus = false;
+            return;
+        }
+        KeyCode::Up if app.sidebar_focus => {
+            if app.sidebar_selected == 0 {
+                app.sidebar_selected = Screen::ALL.len() - 1;
             } else {
-                idx - 1
-            };
-            app.navigate(Screen::ALL[next]);
+                app.sidebar_selected -= 1;
+            }
+            return;
+        }
+        KeyCode::Down if app.sidebar_focus => {
+            app.sidebar_selected = (app.sidebar_selected + 1) % Screen::ALL.len();
+            return;
+        }
+        KeyCode::Enter if app.sidebar_focus => {
+            app.navigate(Screen::ALL[app.sidebar_selected]);
             return;
         }
         _ => {}

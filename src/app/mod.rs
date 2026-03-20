@@ -91,8 +91,12 @@ pub struct App {
     // Which element is focused in input popups (field, submit, or cancel)
     pub popup_focus: PopupFocus,
 
-    // Sidebar state
-    pub sidebar_collapsed: bool,
+    // Sidebar state — collapsed by default, temporarily expanded on hover/keyboard
+    pub sidebar_open: bool,
+    pub sidebar_focus: bool, // keyboard focus: Up/Down navigate, Enter selects
+    pub sidebar_selected: usize, // highlighted screen index while focused
+    pub sidebar_width: u16,  // current animated width
+    pub sidebar_rect: ratatui::layout::Rect, // full sidebar area for hover detection
     pub sidebar_areas: Vec<ratatui::layout::Rect>,
     // Clickable action hint areas in the status bar: (rect, action_id)
     pub hint_areas: Vec<(ratatui::layout::Rect, &'static str)>,
@@ -221,7 +225,11 @@ impl App {
             popup_scroll: 0,
             popup_focus: PopupFocus::Fields,
 
-            sidebar_collapsed: crate::wallet::load_sidebar_collapsed(),
+            sidebar_open: false,
+            sidebar_focus: false,
+            sidebar_selected: 0,
+            sidebar_width: crate::ui::common::SIDEBAR_COLLAPSED_WIDTH,
+            sidebar_rect: ratatui::layout::Rect::default(),
             sidebar_areas: vec![],
             hint_areas: vec![],
             action_menu_selected: 0,
@@ -631,8 +639,15 @@ impl App {
         self.explorer.refresh_explorer(&self.cmd_tx);
     }
 
+    /// Whether the sidebar is currently shown in collapsed (narrow) mode.
+    pub fn sidebar_collapsed(&self) -> bool {
+        !self.sidebar_open
+    }
+
     pub fn navigate(&mut self, screen: Screen) {
         self.screen = screen;
+        self.sidebar_open = false;
+        self.sidebar_focus = false;
         self.input_mode = InputMode::Normal;
         self.popup = None;
         self.popup_scroll = 0;

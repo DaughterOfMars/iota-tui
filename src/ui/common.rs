@@ -63,15 +63,6 @@ pub const SIDEBAR_WIDTH: u16 = 18;
 /// Width of the sidebar in collapsed mode (just number + padding).
 pub const SIDEBAR_COLLAPSED_WIDTH: u16 = 4;
 
-/// Returns the current sidebar width based on collapsed state.
-pub fn sidebar_width(collapsed: bool) -> u16 {
-    if collapsed {
-        SIDEBAR_COLLAPSED_WIDTH
-    } else {
-        SIDEBAR_WIDTH
-    }
-}
-
 /// Draw the left sidebar showing all screens.
 pub fn draw_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
     app.sidebar_areas.clear();
@@ -103,6 +94,7 @@ pub fn draw_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
         app.sidebar_areas.push(row_area);
 
         let is_active = *screen == app.screen;
+        let is_focused = app.sidebar_focus && i == app.sidebar_selected;
         let num = if i < 9 {
             format!("{}", i + 1)
         } else {
@@ -115,7 +107,7 @@ pub fn draw_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
             String::new()
         };
 
-        let label = if app.sidebar_collapsed {
+        let label = if inner_width <= SIDEBAR_COLLAPSED_WIDTH {
             if *screen == Screen::ActivityFeed && app.feed_unread_count > 0 {
                 format!(" {}*", num)
             } else {
@@ -132,7 +124,9 @@ pub fn draw_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
             )
         };
 
-        let style = if is_active {
+        let style = if is_focused {
+            Style::default().fg(Color::Black).bg(Color::White).bold()
+        } else if is_active {
             Style::default()
                 .fg(Color::Black)
                 .bg(color_at(i as u32))
