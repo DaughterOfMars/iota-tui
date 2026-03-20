@@ -21,7 +21,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
 fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
     if app.objects.is_empty() {
         let block = Block::default()
-            .title(" Objects ")
+            .title(common::sparkle_text(" Objects "))
             .title_style(common::header_style())
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
@@ -127,7 +127,7 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
-        .title(" Object Details ")
+        .title(common::sparkle_text(" Object Details "))
         .title_style(common::header_style())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)

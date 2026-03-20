@@ -21,20 +21,41 @@ pub fn sync_color_phase(phase: u32) {
     COLOR_PHASE.store(phase, Ordering::Relaxed);
 }
 
-fn dynamic_accent() -> Color {
+const PALETTE: [Color; 6] = [
+    Color::Red,
+    Color::Rgb(255, 165, 0),
+    Color::Yellow,
+    Color::Green,
+    Color::Rgb(80, 120, 255),
+    Color::Magenta,
+];
+
+const SPARKLES: [char; 4] = ['✦', '✧', '⋆', '˚'];
+
+pub fn color_at(offset: u32) -> Color {
     let phase = COLOR_PHASE.load(Ordering::Relaxed);
     if phase == 0 {
         return ACCENT;
     }
-    const COLORS: [Color; 6] = [
-        Color::Red,
-        Color::Rgb(255, 165, 0),
-        Color::Yellow,
-        Color::Green,
-        Color::Blue,
-        Color::Magenta,
-    ];
-    COLORS[((phase / 3) as usize) % COLORS.len()]
+    PALETTE[((phase / 3 + offset) as usize) % PALETTE.len()]
+}
+
+pub fn dim_at(offset: u32) -> Color {
+    let phase = COLOR_PHASE.load(Ordering::Relaxed);
+    if phase == 0 {
+        return DIM;
+    }
+    PALETTE[((phase / 4 + offset + 3) as usize) % PALETTE.len()]
+}
+
+pub fn sparkle_text(text: &str) -> String {
+    let phase = COLOR_PHASE.load(Ordering::Relaxed);
+    if phase == 0 {
+        return text.to_string();
+    }
+    let idx = (phase / 5) as usize;
+    let s = SPARKLES[idx % SPARKLES.len()];
+    format!("{s} {text} {s}")
 }
 
 /// Draw the top tab bar showing all screens.
@@ -45,18 +66,25 @@ pub fn draw_tabs(frame: &mut Frame, app: &mut App, area: Rect) {
         .iter()
         .enumerate()
         .flat_map(|(i, screen)| {
-            let label = format!(" {} {} ", i + 1, screen.title());
+            let label = if *screen == app.screen {
+                sparkle_text(&format!("{} {}", i + 1, screen.title()))
+            } else {
+                format!(" {} {} ", i + 1, screen.title())
+            };
             let style = if *screen == app.screen {
                 Style::default()
                     .fg(Color::Black)
-                    .bg(dynamic_accent())
+                    .bg(color_at(i as u32))
                     .bold()
             } else {
-                Style::default().fg(DIM)
+                Style::default().fg(dim_at(i as u32))
             };
             let mut spans = vec![Span::styled(label, style)];
             if i < Screen::ALL.len() - 1 {
-                spans.push(Span::styled(" │ ", Style::default().fg(DIM)));
+                spans.push(Span::styled(
+                    " │ ",
+                    Style::default().fg(dim_at(i as u32 + 1)),
+                ));
             }
             spans
         })
@@ -65,7 +93,11 @@ pub fn draw_tabs(frame: &mut Frame, app: &mut App, area: Rect) {
     // Calculate tab areas for mouse hit-testing
     let mut x = area.x;
     for (i, screen) in Screen::ALL.iter().enumerate() {
-        let label = format!(" {} {} ", i + 1, screen.title());
+        let label = if *screen == app.screen {
+            sparkle_text(&format!("{} {}", i + 1, screen.title()))
+        } else {
+            format!(" {} {} ", i + 1, screen.title())
+        };
         let width = label.len() as u16;
         app.tab_areas.push(Rect::new(x, area.y, width, 1));
         x += width;
@@ -81,7 +113,26 @@ pub fn draw_tabs(frame: &mut Frame, app: &mut App, area: Rect) {
 
 /// Draw a horizontal separator line.
 pub fn draw_separator(frame: &mut Frame, area: Rect) {
-    let sep = Paragraph::new("─".repeat(area.width as usize)).style(Style::default().fg(DIM));
+    let phase = COLOR_PHASE.load(Ordering::Relaxed);
+    let sep_text = if phase > 0 {
+        let w = area.width as usize;
+        let spans: Vec<Span> = (0..w)
+            .map(|i| {
+                Span::styled(
+                    "─",
+                    Style::default().fg(PALETTE[((phase / 3) as usize + i / 4) % PALETTE.len()]),
+                )
+            })
+            .collect();
+        Line::from(spans)
+    } else {
+        Line::from("─".repeat(area.width as usize))
+    };
+    let sep = Paragraph::new(sep_text).style(if phase > 0 {
+        Style::default()
+    } else {
+        Style::default().fg(DIM)
+    });
     frame.render_widget(sep, area);
 }
 
@@ -137,13 +188,13 @@ pub fn draw_status_bar(frame: &mut Frame, app: &mut App, area: Rect) {
     ));
 
     let right_line = Line::from(vec![
-        Span::styled(button_text, Style::default().fg(ACCENT).bold()),
+        Span::styled(button_text, Style::default().fg(color_at(0)).bold()),
         Span::raw(" "),
         Span::styled(
             " addr ",
-            Style::default().fg(Color::Black).bg(ACCENT).bold(),
+            Style::default().fg(Color::Black).bg(color_at(1)).bold(),
         ),
-        Span::styled(addr_text, Style::default().fg(ACCENT)),
+        Span::styled(addr_text, Style::default().fg(color_at(2))),
     ]);
     frame.render_widget(
         Paragraph::new(right_line).alignment(Alignment::Right),
@@ -255,20 +306,20 @@ pub fn truncate_address(addr: &str, max_width: usize) -> String {
 pub fn selected_style() -> Style {
     Style::default()
         .bg(Color::Indexed(236))
-        .fg(dynamic_accent())
+        .fg(color_at(0))
         .bold()
 }
 
 pub fn header_style() -> Style {
-    Style::default().fg(dynamic_accent()).bold()
+    Style::default().fg(color_at(1)).bold()
 }
 
 pub fn dim_style() -> Style {
-    Style::default().fg(DIM)
+    Style::default().fg(dim_at(0))
 }
 
 pub fn accent_style() -> Style {
-    Style::default().fg(dynamic_accent())
+    Style::default().fg(color_at(2))
 }
 
 /// Create a detail line with a fixed-width label and styled value.
@@ -303,8 +354,8 @@ pub fn render_popup_scrollbar(
         return;
     }
     let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
-        .thumb_style(Style::default().fg(ACCENT))
-        .track_style(Style::default().fg(DIM));
+        .thumb_style(Style::default().fg(color_at(0)))
+        .track_style(Style::default().fg(dim_at(0)));
     let mut state = ScrollbarState::new(content_len.saturating_sub(visible)).position(scroll);
     let inner = Rect::new(area.x + 1, area.y + 1, area.width - 2, area.height - 2);
     frame.render_stateful_widget(scrollbar, inner, &mut state);

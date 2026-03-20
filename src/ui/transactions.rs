@@ -7,7 +7,9 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Cell, Row, Table},
 };
 
-use super::common::{accent_style, dim_style, header_style, selected_style, truncate_address};
+use super::common::{
+    accent_style, dim_style, header_style, selected_style, sparkle_text, truncate_address,
+};
 use crate::app::App;
 
 pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
@@ -62,7 +64,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     };
 
     let block = Block::default()
-        .title(title)
+        .title(sparkle_text(&title))
         .title_style(header_style())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)

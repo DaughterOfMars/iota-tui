@@ -26,7 +26,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_summary(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
-        .title(" Portfolio ")
+        .title(common::sparkle_text(" Portfolio "))
         .title_style(common::header_style())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -49,7 +49,7 @@ fn draw_summary(frame: &mut Frame, app: &App, area: Rect) {
 fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
     if app.coins.is_empty() {
         let block = Block::default()
-            .title(" Coins ")
+            .title(common::sparkle_text(" Coins "))
             .title_style(common::header_style())
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
@@ -156,7 +156,7 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
-        .title(" Details ")
+        .title(common::sparkle_text(" Details "))
         .title_style(common::header_style())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)

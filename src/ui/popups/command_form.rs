@@ -10,7 +10,9 @@ use ratatui::{
 
 use crate::app::{AddCommandType, App};
 
-use super::super::common::{ACCENT, DIM, clamp_scroll, render_popup_scrollbar, truncate_address};
+use super::super::common::{
+    clamp_scroll, color_at, dim_at, render_popup_scrollbar, sparkle_text, truncate_address,
+};
 
 pub(super) fn draw_add_command_popup(frame: &mut Frame, area: Rect) {
     let text = vec![
@@ -21,46 +23,46 @@ pub(super) fn draw_add_command_popup(frame: &mut Frame, area: Rect) {
         )]),
         Line::from(""),
         Line::from(vec![
-            Span::styled("  [1/t] ", Style::default().fg(ACCENT).bold()),
+            Span::styled("  [1/t] ", Style::default().fg(color_at(0)).bold()),
             Span::raw("Transfer IOTA"),
         ]),
         Line::from(vec![
-            Span::styled("  [2/o] ", Style::default().fg(ACCENT).bold()),
+            Span::styled("  [2/o] ", Style::default().fg(color_at(0)).bold()),
             Span::raw("Transfer Objects"),
         ]),
         Line::from(vec![
-            Span::styled("  [3/m] ", Style::default().fg(ACCENT).bold()),
+            Span::styled("  [3/m] ", Style::default().fg(color_at(0)).bold()),
             Span::raw("Move Call"),
         ]),
         Line::from(vec![
-            Span::styled("  [4/s] ", Style::default().fg(ACCENT).bold()),
+            Span::styled("  [4/s] ", Style::default().fg(color_at(0)).bold()),
             Span::raw("Split Coins"),
         ]),
         Line::from(vec![
-            Span::styled("  [5/r] ", Style::default().fg(ACCENT).bold()),
+            Span::styled("  [5/r] ", Style::default().fg(color_at(0)).bold()),
             Span::raw("Merge Coins"),
         ]),
         Line::from(vec![
-            Span::styled("  [6/k] ", Style::default().fg(ACCENT).bold()),
+            Span::styled("  [6/k] ", Style::default().fg(color_at(0)).bold()),
             Span::raw("Stake"),
         ]),
         Line::from(vec![
-            Span::styled("  [7/u] ", Style::default().fg(ACCENT).bold()),
+            Span::styled("  [7/u] ", Style::default().fg(color_at(0)).bold()),
             Span::raw("Unstake"),
         ]),
         Line::from(""),
         Line::from(vec![Span::styled(
             "  Esc to cancel",
-            Style::default().fg(DIM),
+            Style::default().fg(dim_at(0)),
         )]),
     ];
 
     let block = Block::default()
-        .title(" Add Command ")
-        .title_style(Style::default().fg(ACCENT).bold())
+        .title(sparkle_text(" Add Command "))
+        .title_style(Style::default().fg(color_at(1)).bold())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(ACCENT));
+        .border_style(Style::default().fg(color_at(2)));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
 }
@@ -98,7 +100,7 @@ pub(super) fn draw_add_command_form(frame: &mut Frame, app: &mut App, area: Rect
         };
 
         let label_style = if is_active {
-            Style::default().fg(ACCENT).bold()
+            Style::default().fg(color_at(0)).bold()
         } else {
             Style::default().fg(Color::White)
         };
@@ -131,7 +133,7 @@ pub(super) fn draw_add_command_form(frame: &mut Frame, app: &mut App, area: Rect
                 .fg(Color::White)
                 .add_modifier(Modifier::UNDERLINED)
         } else {
-            Style::default().fg(DIM)
+            Style::default().fg(dim_at(0))
         };
 
         if is_multi(i) {
@@ -144,7 +146,7 @@ pub(super) fn draw_add_command_form(frame: &mut Frame, app: &mut App, area: Rect
             } else if app.tx.multi_values.is_empty() {
                 lines.push(Line::from(vec![Span::styled(
                     "  (none)".to_string(),
-                    Style::default().fg(DIM),
+                    Style::default().fg(dim_at(0)),
                 )]));
             }
         } else {
@@ -167,9 +169,9 @@ pub(super) fn draw_add_command_form(frame: &mut Frame, app: &mut App, area: Rect
                 let is_sel = app.autocomplete_idx == Some(j);
                 let trunc = truncate_address(addr, 24);
                 let style = if is_sel {
-                    Style::default().fg(ACCENT).bold()
+                    Style::default().fg(color_at(0)).bold()
                 } else {
-                    Style::default().fg(DIM)
+                    Style::default().fg(dim_at(0))
                 };
                 let prefix = if is_sel { "▸ " } else { "  " };
                 lines.push(Line::from(vec![Span::styled(
@@ -185,12 +187,12 @@ pub(super) fn draw_add_command_form(frame: &mut Frame, app: &mut App, area: Rect
     if app.tx.is_multi_value_field() {
         lines.push(Line::from(vec![Span::styled(
             "  Tab/Enter: add  Backspace: undo",
-            Style::default().fg(DIM),
+            Style::default().fg(dim_at(0)),
         )]));
     } else {
         lines.push(Line::from(vec![Span::styled(
             "  Tab: next field",
-            Style::default().fg(DIM),
+            Style::default().fg(dim_at(0)),
         )]));
     }
     lines.push(super::button_line("Add", app.popup_focus, "  "));
@@ -200,11 +202,11 @@ pub(super) fn draw_add_command_form(frame: &mut Frame, app: &mut App, area: Rect
     clamp_scroll(&mut app.popup_scroll, content_len, inner_height);
 
     let block = Block::default()
-        .title(format!(" {} ", ct.label()))
-        .title_style(Style::default().fg(ACCENT).bold())
+        .title(sparkle_text(&format!(" {} ", ct.label())))
+        .title_style(Style::default().fg(color_at(1)).bold())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(ACCENT));
+        .border_style(Style::default().fg(color_at(2)));
 
     frame.render_widget(
         Paragraph::new(lines)

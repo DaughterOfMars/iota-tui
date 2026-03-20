@@ -34,7 +34,10 @@ fn draw_sub_tabs(frame: &mut Frame, app: &App, area: Rect) {
         .flat_map(|view| {
             let label = format!(" {} ", view.title());
             let style = if *view == app.explorer.view {
-                Style::default().fg(Color::Black).bg(common::ACCENT).bold()
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(common::color_at(0))
+                    .bold()
             } else {
                 Style::default().fg(Color::White).dim()
             };
@@ -43,7 +46,7 @@ fn draw_sub_tabs(frame: &mut Frame, app: &App, area: Rect) {
         .collect();
 
     let block = Block::default()
-        .title(" Explorer ")
+        .title(common::sparkle_text(" Explorer "))
         .title_style(common::header_style())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -55,7 +58,7 @@ fn draw_sub_tabs(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_overview(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
-        .title(" Network Overview ")
+        .title(common::sparkle_text(" Network Overview "))
         .title_style(common::header_style())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -79,7 +82,7 @@ fn draw_overview(frame: &mut Frame, app: &App, area: Rect) {
 fn draw_checkpoints(frame: &mut Frame, app: &mut App, area: Rect) {
     if app.explorer.checkpoints.is_empty() {
         let block = Block::default()
-            .title(" Checkpoints ")
+            .title(common::sparkle_text(" Checkpoints "))
             .title_style(common::header_style())
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
@@ -104,9 +107,9 @@ fn draw_checkpoints(frame: &mut Frame, app: &mut App, area: Rect) {
     if let Some(fa) = filter_area {
         let q = app.explorer.checkpoints_filter.as_deref().unwrap_or("");
         let line = Line::from(vec![
-            Span::styled(" Search: ", Style::default().fg(common::ACCENT).bold()),
+            Span::styled(" Search: ", Style::default().fg(common::color_at(0)).bold()),
             Span::styled(q, Style::default().fg(Color::White)),
-            Span::styled("_", Style::default().fg(common::DIM)),
+            Span::styled("_", Style::default().fg(common::dim_at(0))),
         ]);
         frame.render_widget(Paragraph::new(line), fa);
     }
@@ -235,7 +238,7 @@ fn draw_checkpoints(frame: &mut Frame, app: &mut App, area: Rect) {
 fn draw_validators(frame: &mut Frame, app: &mut App, area: Rect) {
     if app.explorer.validators.is_empty() {
         let block = Block::default()
-            .title(" Validators ")
+            .title(common::sparkle_text(" Validators "))
             .title_style(common::header_style())
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
@@ -349,7 +352,7 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
 
     // Result area
     let result_block = Block::default()
-        .title(" Result ")
+        .title(common::sparkle_text(" Result "))
         .title_style(common::header_style())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -529,7 +532,7 @@ fn draw_lookup_sections(
     area: Rect,
 ) -> usize {
     let block = Block::default()
-        .title(title.unwrap_or(" Result "))
+        .title(common::sparkle_text(title.unwrap_or(" Result ")))
         .title_style(common::header_style())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -604,14 +607,14 @@ fn render_pagination_row(frame: &mut Frame, area: Rect, has_prev: bool, has_next
     if has_prev {
         spans.push(Span::styled(
             "[ \u{25C0} Prev ]",
-            Style::default().fg(common::ACCENT).bold(),
+            Style::default().fg(common::color_at(0)).bold(),
         ));
         spans.push(Span::raw("  "));
     }
     if has_next {
         spans.push(Span::styled(
             "[ Next \u{25B6} ]",
-            Style::default().fg(common::ACCENT).bold(),
+            Style::default().fg(common::color_at(0)).bold(),
         ));
     }
     frame.render_widget(Paragraph::new(Line::from(spans)), area);

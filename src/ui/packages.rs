@@ -16,7 +16,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
 
     if packages.is_empty() {
         let block = Block::default()
-            .title(" Packages ")
+            .title(common::sparkle_text(" Packages "))
             .title_style(common::header_style())
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)

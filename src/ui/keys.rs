@@ -21,7 +21,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
 fn draw_key_table(frame: &mut Frame, app: &App, area: Rect) {
     if app.keys.is_empty() {
         let block = Block::default()
-            .title(" Keys (0) ")
+            .title(common::sparkle_text(" Keys (0) "))
             .title_style(common::header_style())
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
@@ -93,7 +93,10 @@ fn draw_key_table(frame: &mut Frame, app: &App, area: Rect) {
 
     let table = Table::new(rows, widths).header(header).block(
         Block::default()
-            .title(format!(" Keys ({}) ", app.keys.len()))
+            .title(common::sparkle_text(&format!(
+                " Keys ({}) ",
+                app.keys.len()
+            )))
             .title_style(common::header_style())
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
@@ -105,7 +108,7 @@ fn draw_key_table(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
-        .title(" Key Details ")
+        .title(common::sparkle_text(" Key Details "))
         .title_style(common::header_style())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)

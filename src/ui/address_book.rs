@@ -69,7 +69,7 @@ fn draw_address_table(frame: &mut Frame, app: &App, area: Rect) {
 
     let table = Table::new(rows, widths).header(header).block(
         Block::default()
-            .title(title)
+            .title(common::sparkle_text(&title))
             .title_style(common::header_style())
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
@@ -81,7 +81,7 @@ fn draw_address_table(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
-        .title(" Address Details ")
+        .title(common::sparkle_text(" Address Details "))
         .title_style(common::header_style())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)

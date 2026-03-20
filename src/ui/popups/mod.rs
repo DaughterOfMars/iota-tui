@@ -14,24 +14,24 @@ use ratatui::{
 use crate::app::{App, Popup, PopupFocus};
 
 use super::common::{
-    ACCENT, DIM, centered_rect_min, clamp_scroll, render_popup_scrollbar, screen_hints,
-    selected_style,
+    centered_rect_min, clamp_scroll, color_at, dim_at, render_popup_scrollbar, screen_hints,
+    selected_style, sparkle_text,
 };
 
 /// Build a button line with focus highlighting.
 fn button_line(submit_label: &str, focus: PopupFocus, prefix: &str) -> Line<'static> {
     let submit_style = if focus == PopupFocus::Submit {
-        Style::default().fg(Color::Black).bg(ACCENT).bold()
+        Style::default().fg(Color::Black).bg(color_at(0)).bold()
     } else {
-        Style::default().fg(ACCENT).bold()
+        Style::default().fg(color_at(0)).bold()
     };
     let cancel_style = if focus == PopupFocus::Cancel {
         Style::default().fg(Color::Black).bg(Color::Red).bold()
     } else {
-        Style::default().fg(DIM)
+        Style::default().fg(dim_at(0))
     };
     Line::from(vec![
-        Span::styled(prefix.to_string(), Style::default().fg(DIM)),
+        Span::styled(prefix.to_string(), Style::default().fg(dim_at(0))),
         Span::styled(format!("[ {} ]", submit_label), submit_style),
         Span::raw("  "),
         Span::styled("[ Cancel ]".to_string(), cancel_style),
@@ -143,7 +143,7 @@ fn draw_help_popup(frame: &mut Frame, app: &mut App, area: Rect) {
     let text = vec![
         Line::from(vec![Span::styled(
             "IOTA Wallet TUI",
-            Style::default().fg(ACCENT).bold(),
+            Style::default().fg(color_at(0)).bold(),
         )]),
         Line::from(""),
         Line::from(vec![Span::styled(
@@ -187,7 +187,7 @@ fn draw_help_popup(frame: &mut Frame, app: &mut App, area: Rect) {
         Line::from(""),
         Line::from(vec![Span::styled(
             "Press Esc to close",
-            Style::default().fg(DIM),
+            Style::default().fg(dim_at(0)),
         )]),
     ];
 
@@ -196,11 +196,11 @@ fn draw_help_popup(frame: &mut Frame, app: &mut App, area: Rect) {
     clamp_scroll(&mut app.popup_scroll, content_len, inner_height);
 
     let block = Block::default()
-        .title(" Help ")
-        .title_style(Style::default().fg(ACCENT).bold())
+        .title(sparkle_text(" Help "))
+        .title_style(Style::default().fg(color_at(1)).bold())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(ACCENT));
+        .border_style(Style::default().fg(color_at(2)));
 
     let paragraph = Paragraph::new(text)
         .block(block)
@@ -224,7 +224,7 @@ fn draw_address_form(frame: &mut Frame, app: &App, area: Rect, title: &str) {
         };
 
         let label_style = if is_active {
-            Style::default().fg(ACCENT).bold()
+            Style::default().fg(color_at(0)).bold()
         } else {
             Style::default().fg(Color::White)
         };
@@ -239,7 +239,7 @@ fn draw_address_form(frame: &mut Frame, app: &App, area: Rect, title: &str) {
                 .fg(Color::White)
                 .add_modifier(Modifier::UNDERLINED)
         } else {
-            Style::default().fg(DIM)
+            Style::default().fg(dim_at(0))
         };
 
         let display = if value.is_empty() && !is_active {
@@ -260,11 +260,11 @@ fn draw_address_form(frame: &mut Frame, app: &App, area: Rect, title: &str) {
     lines.push(button_line("Save", app.popup_focus, "  Tab: next  "));
 
     let block = Block::default()
-        .title(format!(" {} ", title))
-        .title_style(Style::default().fg(ACCENT).bold())
+        .title(sparkle_text(&format!(" {} ", title)))
+        .title_style(Style::default().fg(color_at(1)).bold())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(ACCENT));
+        .border_style(Style::default().fg(color_at(2)));
 
     frame.render_widget(Paragraph::new(lines).block(block), area);
 }
@@ -278,30 +278,30 @@ fn draw_generate_key_popup(frame: &mut Frame, area: Rect) {
         )]),
         Line::from(""),
         Line::from(vec![
-            Span::styled("  [1/e] ", Style::default().fg(ACCENT).bold()),
+            Span::styled("  [1/e] ", Style::default().fg(color_at(0)).bold()),
             Span::raw("Ed25519"),
         ]),
         Line::from(vec![
-            Span::styled("  [2/s] ", Style::default().fg(ACCENT).bold()),
+            Span::styled("  [2/s] ", Style::default().fg(color_at(0)).bold()),
             Span::raw("Secp256k1"),
         ]),
         Line::from(vec![
-            Span::styled("  [3/r] ", Style::default().fg(ACCENT).bold()),
+            Span::styled("  [3/r] ", Style::default().fg(color_at(0)).bold()),
             Span::raw("Secp256r1"),
         ]),
         Line::from(""),
         Line::from(vec![Span::styled(
             "  Esc to cancel",
-            Style::default().fg(DIM),
+            Style::default().fg(dim_at(0)),
         )]),
     ];
 
     let block = Block::default()
-        .title(" Generate Key ")
-        .title_style(Style::default().fg(ACCENT).bold())
+        .title(sparkle_text(" Generate Key "))
+        .title_style(Style::default().fg(color_at(1)).bold())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(ACCENT));
+        .border_style(Style::default().fg(color_at(2)));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
 }
@@ -326,11 +326,11 @@ fn draw_generate_key_alias_popup(frame: &mut Frame, app: &App, area: Rect) {
     ];
 
     let block = Block::default()
-        .title(" Key Alias ")
-        .title_style(Style::default().fg(ACCENT).bold())
+        .title(sparkle_text(" Key Alias "))
+        .title_style(Style::default().fg(color_at(1)).bold())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(ACCENT));
+        .border_style(Style::default().fg(color_at(2)));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
 }
@@ -344,7 +344,7 @@ fn draw_import_key_popup(frame: &mut Frame, app: &App, area: Rect) {
         )]),
         Line::from(vec![Span::styled(
             "  (hex, base64, or bech32 iotaprivkey1...)",
-            Style::default().fg(DIM),
+            Style::default().fg(dim_at(0)),
         )]),
         Line::from(""),
         Line::from(vec![Span::styled(
@@ -358,11 +358,11 @@ fn draw_import_key_popup(frame: &mut Frame, app: &App, area: Rect) {
     ];
 
     let block = Block::default()
-        .title(" Import Key ")
-        .title_style(Style::default().fg(ACCENT).bold())
+        .title(sparkle_text(" Import Key "))
+        .title_style(Style::default().fg(color_at(1)).bold())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(ACCENT));
+        .border_style(Style::default().fg(color_at(2)));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
 }
@@ -383,11 +383,11 @@ fn draw_rename_key_popup(frame: &mut Frame, app: &App, area: Rect) {
     ];
 
     let block = Block::default()
-        .title(" Rename Key ")
-        .title_style(Style::default().fg(ACCENT).bold())
+        .title(sparkle_text(" Rename Key "))
+        .title_style(Style::default().fg(color_at(1)).bold())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(ACCENT));
+        .border_style(Style::default().fg(color_at(2)));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
 }
@@ -401,30 +401,30 @@ fn draw_switch_network_popup(frame: &mut Frame, area: Rect) {
         )]),
         Line::from(""),
         Line::from(vec![
-            Span::styled("  [1/m] ", Style::default().fg(ACCENT).bold()),
+            Span::styled("  [1/m] ", Style::default().fg(color_at(0)).bold()),
             Span::raw("Mainnet"),
         ]),
         Line::from(vec![
-            Span::styled("  [2/t] ", Style::default().fg(ACCENT).bold()),
+            Span::styled("  [2/t] ", Style::default().fg(color_at(0)).bold()),
             Span::raw("Testnet"),
         ]),
         Line::from(vec![
-            Span::styled("  [3/d] ", Style::default().fg(ACCENT).bold()),
+            Span::styled("  [3/d] ", Style::default().fg(color_at(0)).bold()),
             Span::raw("Devnet"),
         ]),
         Line::from(""),
         Line::from(vec![Span::styled(
             "  Esc to cancel",
-            Style::default().fg(DIM),
+            Style::default().fg(dim_at(0)),
         )]),
     ];
 
     let block = Block::default()
-        .title(" Switch Network ")
-        .title_style(Style::default().fg(ACCENT).bold())
+        .title(sparkle_text(" Switch Network "))
+        .title_style(Style::default().fg(color_at(1)).bold())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(ACCENT));
+        .border_style(Style::default().fg(color_at(2)));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
 }
@@ -449,15 +449,15 @@ fn draw_confirm_delete_address(frame: &mut Frame, app: &App, area: Rect) {
         )]),
         Line::from(""),
         Line::from(vec![
-            Span::styled("  Enter/y", Style::default().fg(ACCENT).bold()),
+            Span::styled("  Enter/y", Style::default().fg(color_at(0)).bold()),
             Span::raw(" confirm   "),
-            Span::styled("Esc/n", Style::default().fg(ACCENT).bold()),
+            Span::styled("Esc/n", Style::default().fg(color_at(0)).bold()),
             Span::raw(" cancel"),
         ]),
     ];
 
     let block = Block::default()
-        .title(" Confirm Delete ")
+        .title(sparkle_text(" Confirm Delete "))
         .title_style(Style::default().fg(Color::Red).bold())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -486,15 +486,15 @@ fn draw_confirm_delete_key(frame: &mut Frame, app: &App, area: Rect) {
         )]),
         Line::from(""),
         Line::from(vec![
-            Span::styled("  Enter/y", Style::default().fg(ACCENT).bold()),
+            Span::styled("  Enter/y", Style::default().fg(color_at(0)).bold()),
             Span::raw(" confirm   "),
-            Span::styled("Esc/n", Style::default().fg(ACCENT).bold()),
+            Span::styled("Esc/n", Style::default().fg(color_at(0)).bold()),
             Span::raw(" cancel"),
         ]),
     ];
 
     let block = Block::default()
-        .title(" Confirm Delete ")
+        .title(sparkle_text(" Confirm Delete "))
         .title_style(Style::default().fg(Color::Red).bold())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -512,15 +512,15 @@ fn draw_confirm_clear_tx(frame: &mut Frame, area: Rect) {
         )]),
         Line::from(""),
         Line::from(vec![
-            Span::styled("  Enter/y", Style::default().fg(ACCENT).bold()),
+            Span::styled("  Enter/y", Style::default().fg(color_at(0)).bold()),
             Span::raw(" confirm   "),
-            Span::styled("Esc/n", Style::default().fg(ACCENT).bold()),
+            Span::styled("Esc/n", Style::default().fg(color_at(0)).bold()),
             Span::raw(" cancel"),
         ]),
     ];
 
     let block = Block::default()
-        .title(" Confirm Clear ")
+        .title(sparkle_text(" Confirm Clear "))
         .title_style(Style::default().fg(Color::Yellow).bold())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -548,11 +548,11 @@ fn draw_iota_name_lookup(frame: &mut Frame, app: &App, area: Rect) {
     ];
 
     let block = Block::default()
-        .title(" IOTA-Name Lookup ")
-        .title_style(Style::default().fg(ACCENT).bold())
+        .title(sparkle_text(" IOTA-Name Lookup "))
+        .title_style(Style::default().fg(color_at(1)).bold())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(ACCENT));
+        .border_style(Style::default().fg(color_at(2)));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
 }
@@ -563,7 +563,7 @@ fn draw_error_log_popup(frame: &mut Frame, app: &mut App, area: Rect) {
             Line::from(""),
             Line::from(vec![Span::styled(
                 "  No errors logged.",
-                Style::default().fg(DIM),
+                Style::default().fg(dim_at(0)),
             )]),
         ]
     } else {
@@ -578,7 +578,7 @@ fn draw_error_log_popup(frame: &mut Frame, app: &mut App, area: Rect) {
     clamp_scroll(&mut app.popup_scroll, content_len, inner_height);
 
     let block = Block::default()
-        .title(" Error Log (newest first) ")
+        .title(sparkle_text(" Error Log (newest first) "))
         .title_style(Style::default().fg(Color::Red).bold())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -635,18 +635,21 @@ fn draw_actions_menu(frame: &mut Frame, app: &App, area: Rect) {
         // Capitalize description for display
         let desc = capitalize(description);
         let line = Line::from(vec![
-            Span::styled(format!(" [{}]", key_label), style.fg(ACCENT).bold()),
+            Span::styled(
+                format!(" [{}]", key_label),
+                style.fg(color_at(i as u32)).bold(),
+            ),
             Span::styled(format!(" {} ", desc), style),
         ]);
         lines.push(line);
     }
 
     let block = Block::default()
-        .title(" Actions ")
-        .title_style(Style::default().fg(ACCENT).bold())
+        .title(sparkle_text(" Actions "))
+        .title_style(Style::default().fg(color_at(1)).bold())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(ACCENT));
+        .border_style(Style::default().fg(color_at(2)));
 
     frame.render_widget(Paragraph::new(lines).block(block), area);
 }
@@ -668,15 +671,15 @@ fn draw_confirm_quit(frame: &mut Frame, area: Rect) {
         )]),
         Line::from(""),
         Line::from(vec![
-            Span::styled("  Enter/y", Style::default().fg(ACCENT).bold()),
+            Span::styled("  Enter/y", Style::default().fg(color_at(0)).bold()),
             Span::raw(" quit   "),
-            Span::styled("Esc/n", Style::default().fg(ACCENT).bold()),
+            Span::styled("Esc/n", Style::default().fg(color_at(0)).bold()),
             Span::raw(" cancel"),
         ]),
     ];
 
     let block = Block::default()
-        .title(" Confirm Quit ")
+        .title(sparkle_text(" Confirm Quit "))
         .title_style(Style::default().fg(Color::Yellow).bold())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)

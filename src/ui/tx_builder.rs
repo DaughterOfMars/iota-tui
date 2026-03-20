@@ -62,7 +62,7 @@ fn draw_step_indicator(frame: &mut Frame, app: &App, area: Rect) {
         .collect();
 
     let block = Block::default()
-        .title(" Transaction Builder ")
+        .title(common::sparkle_text(" Transaction Builder "))
         .title_style(common::header_style())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -73,7 +73,7 @@ fn draw_step_indicator(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_select_sender(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
-        .title(" Select Sender ")
+        .title(common::sparkle_text(" Select Sender "))
         .title_style(common::header_style())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -124,7 +124,10 @@ fn draw_select_sender(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_commands(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
-        .title(format!(" Commands ({}) ", app.tx.commands.len()))
+        .title(common::sparkle_text(&format!(
+            " Commands ({}) ",
+            app.tx.commands.len()
+        )))
         .title_style(common::header_style())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -190,7 +193,7 @@ fn draw_commands(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_gas(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
-        .title(" Gas Budget ")
+        .title(common::sparkle_text(" Gas Budget "))
         .title_style(common::header_style())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -245,7 +248,7 @@ fn draw_gas(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_review(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
-        .title(" Review Transaction ")
+        .title(common::sparkle_text(" Review Transaction "))
         .title_style(common::header_style())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)

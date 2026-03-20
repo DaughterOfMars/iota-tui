@@ -10,7 +10,9 @@ use ratatui::{
 
 use crate::app::App;
 
-use super::super::common::{ACCENT, DIM, accent_style, clamp_scroll, render_popup_scrollbar};
+use super::super::common::{
+    accent_style, clamp_scroll, color_at, dim_at, render_popup_scrollbar, sparkle_text,
+};
 
 pub(super) fn draw_detail_popup(frame: &mut Frame, app: &mut App, area: Rect) {
     let (title, fields) = app.detail_info();
@@ -19,7 +21,7 @@ pub(super) fn draw_detail_popup(frame: &mut Frame, app: &mut App, area: Rect) {
     if fields.is_empty() {
         lines.push(Line::from(vec![Span::styled(
             "  No item selected",
-            Style::default().fg(DIM),
+            Style::default().fg(dim_at(0)),
         )]));
     } else {
         for (label, value) in &fields {
@@ -31,7 +33,7 @@ pub(super) fn draw_detail_popup(frame: &mut Frame, app: &mut App, area: Rect) {
             if value.is_empty() {
                 lines.push(Line::from(vec![Span::styled(
                     "  (empty)",
-                    Style::default().fg(DIM),
+                    Style::default().fg(dim_at(0)),
                 )]));
             } else if value.len() <= max_w {
                 lines.push(Line::from(format!("  {}", value)));
@@ -46,7 +48,7 @@ pub(super) fn draw_detail_popup(frame: &mut Frame, app: &mut App, area: Rect) {
     }
     lines.push(Line::from(vec![Span::styled(
         "  Esc to close",
-        Style::default().fg(DIM),
+        Style::default().fg(dim_at(0)),
     )]));
 
     let content_len = lines.len();
@@ -54,11 +56,11 @@ pub(super) fn draw_detail_popup(frame: &mut Frame, app: &mut App, area: Rect) {
     clamp_scroll(&mut app.popup_scroll, content_len, inner_height);
 
     let block = Block::default()
-        .title(format!(" {} ", title))
-        .title_style(Style::default().fg(ACCENT).bold())
+        .title(sparkle_text(&format!(" {} ", title)))
+        .title_style(Style::default().fg(color_at(1)).bold())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(ACCENT));
+        .border_style(Style::default().fg(color_at(2)));
 
     let paragraph = Paragraph::new(lines)
         .block(block)
