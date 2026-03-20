@@ -8,6 +8,7 @@ mod keys;
 mod objects;
 mod packages;
 pub(crate) mod popups;
+mod staking;
 mod transactions;
 mod tx_builder;
 
@@ -50,6 +51,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         Screen::Coins => coins::draw(frame, app, layout[0]),
         Screen::Objects => objects::draw(frame, app, layout[0]),
         Screen::Transactions => transactions::draw(frame, app, layout[0]),
+        Screen::Staking => staking::draw(frame, app, layout[0]),
         Screen::Packages => packages::draw(frame, app, layout[0]),
         Screen::AddressBook => address_book::draw(frame, app, layout[0]),
         Screen::Keys => keys::draw(frame, app, layout[0]),

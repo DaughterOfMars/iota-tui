@@ -323,6 +323,45 @@ pub fn handle_transactions_key(app: &mut App, key: KeyEvent) {
     }
 }
 
+pub fn handle_staking_key(app: &mut App, key: KeyEvent) {
+    let mut nav = ListNav {
+        selected: &mut app.stakes_selected,
+        offset: &mut app.stakes_offset,
+        len: app.stakes.len(),
+        visible_rows: app.content_visible_rows,
+    };
+    if nav.handle_key(key.code) {
+        return;
+    }
+    match key.code {
+        KeyCode::Enter => {
+            if let Some(stake) = app.stakes.get(app.stakes_selected) {
+                let id = stake.object_id.clone();
+                app.explore_item(id);
+            }
+        }
+        KeyCode::Char('u') => {
+            // Pre-fill TxBuilder with Unstake command
+            if let Some(stake) = app.stakes.get(app.stakes_selected) {
+                let staked_id = stake.object_id.clone();
+                app.tx.reset();
+                app.tx.commands.push(crate::app::PtbCommand::Unstake {
+                    staked_iota_id: staked_id,
+                });
+                app.tx.step = crate::app::TxBuilderStep::Review;
+                app.navigate(crate::app::Screen::TxBuilder);
+                app.send_cmd(WalletCmd::DryRun {
+                    sender_idx: app.tx.sender,
+                    commands: app.tx.commands.clone(),
+                });
+                app.tx.dry_running = true;
+                app.tx.dry_run_dirty = false;
+            }
+        }
+        _ => {}
+    }
+}
+
 pub fn handle_packages_key(app: &mut App, key: KeyEvent) {
     let packages = app.package_indices();
     let mut nav = ListNav {

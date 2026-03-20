@@ -240,6 +240,13 @@ pub fn screen_hints(screen: Screen) -> Vec<(&'static str, &'static str, &'static
             ("r", "refresh", "refresh"),
             ("?", "help", "help"),
         ],
+        Screen::Staking => vec![
+            ("Enter", "explore", "explore"),
+            ("u", "unstake", "unstake"),
+            ("c", "copy", "copy"),
+            ("r", "refresh", "refresh"),
+            ("?", "help", "help"),
+        ],
         Screen::Packages => vec![
             ("Enter", "explore", "explore"),
             ("c", "copy", "copy"),

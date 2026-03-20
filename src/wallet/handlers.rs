@@ -705,6 +705,74 @@ impl WalletBackend {
         }
     }
 
+    pub(super) async fn handle_stakes(
+        &self,
+        addr: Address,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let client = self.client.as_ref().ok_or("Not connected")?;
+
+        let filter = ObjectFilter {
+            owner: Some(addr),
+            type_: Some("0x3::staking_pool::StakedIota".to_string()),
+            object_ids: None,
+        };
+
+        let page = client.objects(filter, PaginationFilter::default()).await?;
+        let mut stakes: Vec<crate::app::StakeDisplay> = Vec::new();
+
+        for obj in page.data() {
+            let object_id = obj.object_id().to_string();
+            let obj_id = obj.object_id();
+
+            let (principal, validator_address, activation_epoch) =
+                if let Ok(Some(json)) = client.move_object_contents(obj_id, None).await {
+                    let principal = json
+                        .get("principal")
+                        .and_then(|v| {
+                            v.as_str()
+                                .map(String::from)
+                                .or_else(|| v.as_u64().map(|n| n.to_string()))
+                        })
+                        .unwrap_or_else(|| "?".into());
+                    let pool_id = json
+                        .get("pool_id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("?")
+                        .to_string();
+                    let epoch = json
+                        .get("stake_activation_epoch")
+                        .and_then(|v| {
+                            v.as_str()
+                                .map(String::from)
+                                .or_else(|| v.as_u64().map(|n| n.to_string()))
+                        })
+                        .unwrap_or_else(|| "?".into());
+                    (principal, pool_id, epoch)
+                } else {
+                    ("?".into(), "?".into(), "?".into())
+                };
+
+            let principal_nanos: u128 = principal.parse().unwrap_or(0);
+            let principal_display = if principal_nanos > 0 {
+                format_gas(principal_nanos as u64)
+            } else {
+                principal.clone()
+            };
+
+            stakes.push(crate::app::StakeDisplay {
+                object_id,
+                principal,
+                principal_display,
+                validator_address,
+                activation_epoch,
+                status: "Active".into(),
+            });
+        }
+
+        self.event_tx.send(WalletEvent::Stakes(stakes)).await?;
+        Ok(())
+    }
+
     pub(super) fn save_keys(&self) {
         if let Some(parent) = self.keystore_path.parent() {
             let _ = std::fs::create_dir_all(parent);

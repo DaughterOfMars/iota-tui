@@ -125,22 +125,26 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             return;
         }
         KeyCode::Char('4') => {
-            app.navigate(Screen::Packages);
+            app.navigate(Screen::Staking);
             return;
         }
         KeyCode::Char('5') => {
-            app.navigate(Screen::AddressBook);
+            app.navigate(Screen::Packages);
             return;
         }
         KeyCode::Char('6') => {
-            app.navigate(Screen::Keys);
+            app.navigate(Screen::AddressBook);
             return;
         }
         KeyCode::Char('7') => {
-            app.navigate(Screen::TxBuilder);
+            app.navigate(Screen::Keys);
             return;
         }
         KeyCode::Char('8') => {
+            app.navigate(Screen::TxBuilder);
+            return;
+        }
+        KeyCode::Char('9') => {
             app.navigate(Screen::Explorer);
             return;
         }
@@ -186,6 +190,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         Screen::Coins => screen::handle_coins_key(app, key),
         Screen::Objects => screen::handle_objects_key(app, key),
         Screen::Transactions => screen::handle_transactions_key(app, key),
+        Screen::Staking => screen::handle_staking_key(app, key),
         Screen::Packages => screen::handle_packages_key(app, key),
         Screen::AddressBook => screen::handle_address_key(app, key),
         Screen::Keys => screen::handle_keys_key(app, key),

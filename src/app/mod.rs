@@ -49,6 +49,10 @@ pub struct App {
     pub packages_selected: usize,
     pub packages_offset: usize,
 
+    pub stakes: Vec<StakeDisplay>,
+    pub stakes_selected: usize,
+    pub stakes_offset: usize,
+
     pub address_book: Vec<AddressEntry>,
     pub address_selected: usize,
     pub address_offset: usize,
@@ -161,6 +165,10 @@ impl App {
 
             packages_selected: 0,
             packages_offset: 0,
+
+            stakes: vec![],
+            stakes_selected: 0,
+            stakes_offset: 0,
 
             address_book,
             address_selected: 0,
@@ -445,6 +453,12 @@ impl App {
                 self.explorer.search_has_next = has_next_page;
                 self.explorer.search_cursor = end_cursor;
             }
+            WalletEvent::Stakes(stakes) => {
+                self.stakes = stakes;
+                if self.stakes_selected >= self.stakes.len() {
+                    self.stakes_selected = self.stakes.len().saturating_sub(1);
+                }
+            }
             WalletEvent::Error(_e) => {}
         }
     }
@@ -491,6 +505,7 @@ impl App {
                 && let Some(addr) = parse_address(&key.address)
             {
                 self.send_cmd(WalletCmd::RefreshTransactions(addr));
+                self.send_cmd(WalletCmd::RefreshStakes(addr));
             }
         } else if let Some(key) = visible_keys.first().or(self.active_key()).cloned()
             && let Some(addr) = parse_address(&key.address)
@@ -505,6 +520,7 @@ impl App {
             });
             self.send_cmd(WalletCmd::RefreshBalances(addr));
             self.send_cmd(WalletCmd::RefreshTransactions(addr));
+            self.send_cmd(WalletCmd::RefreshStakes(addr));
         }
     }
 
@@ -1116,6 +1132,22 @@ impl App {
                     ("Transaction Details", vec![])
                 }
             }
+            Screen::Staking => {
+                if let Some(s) = self.stakes.get(self.stakes_selected) {
+                    (
+                        "Stake Details",
+                        vec![
+                            ("Object ID", s.object_id.clone()),
+                            ("Principal", s.principal_display.clone()),
+                            ("Validator", s.validator_address.clone()),
+                            ("Activation Epoch", s.activation_epoch.clone()),
+                            ("Status", s.status.clone()),
+                        ],
+                    )
+                } else {
+                    ("Stake Details", vec![])
+                }
+            }
             Screen::Keys => {
                 if let Some(k) = self.keys.get(self.keys_selected) {
                     let mut fields = vec![
@@ -1206,6 +1238,10 @@ impl App {
                 .transactions
                 .get(self.transactions_selected)
                 .map(|t| t.digest.clone()),
+            Screen::Staking => self
+                .stakes
+                .get(self.stakes_selected)
+                .map(|s| s.object_id.clone()),
             Screen::Packages => {
                 let indices = self.package_indices();
                 indices
@@ -1290,6 +1326,20 @@ impl App {
                     csv.push_str(&format!(
                         "{},{},{},{}\n",
                         t.digest, t.status, t.gas_used, t.epoch
+                    ));
+                }
+                csv
+            }
+            Screen::Staking => {
+                let mut csv = "Object ID,Principal,Validator,Epoch,Status\n".to_string();
+                for s in &self.stakes {
+                    csv.push_str(&format!(
+                        "{},{},{},{},{}\n",
+                        s.object_id,
+                        s.principal_display,
+                        s.validator_address,
+                        s.activation_epoch,
+                        s.status
                     ));
                 }
                 csv

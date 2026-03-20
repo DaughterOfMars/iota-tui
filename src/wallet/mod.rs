@@ -212,6 +212,7 @@ pub enum WalletCmd {
         obj_cursor: Option<String>,
         tx_cursor: Option<String>,
     },
+    RefreshStakes(iota_sdk::types::Address),
 }
 
 /// Events sent from the wallet backend back to the UI.
@@ -276,6 +277,7 @@ pub enum WalletEvent {
         has_next_page: bool,
         end_cursor: Option<String>,
     },
+    Stakes(Vec<crate::app::StakeDisplay>),
     Error(String),
 }
 
@@ -365,6 +367,7 @@ impl WalletBackend {
                     self.handle_search_objects_by_type(&type_filter, cursor)
                         .await
                 }
+                WalletCmd::RefreshStakes(addr) => self.handle_stakes(addr).await,
             };
 
             if let Err(e) = result {

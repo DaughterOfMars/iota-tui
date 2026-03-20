@@ -6,6 +6,7 @@ pub enum Screen {
     Coins,
     Objects,
     Transactions,
+    Staking,
     Packages,
     AddressBook,
     Keys,
@@ -14,10 +15,11 @@ pub enum Screen {
 }
 
 impl Screen {
-    pub const ALL: [Screen; 8] = [
+    pub const ALL: [Screen; 9] = [
         Screen::Coins,
         Screen::Objects,
         Screen::Transactions,
+        Screen::Staking,
         Screen::Packages,
         Screen::AddressBook,
         Screen::Keys,
@@ -30,6 +32,7 @@ impl Screen {
             Screen::Coins => "Coins",
             Screen::Objects => "Objects",
             Screen::Transactions => "Transactions",
+            Screen::Staking => "Staking",
             Screen::Packages => "Packages",
             Screen::AddressBook => "Address Book",
             Screen::Keys => "Keys",
@@ -88,6 +91,17 @@ pub struct TransactionDisplay {
     pub gas_storage: String,
     pub gas_rebate: String,
     pub changed_objects: usize,
+}
+
+/// A staked IOTA object displayed in the Staking screen.
+#[derive(Debug, Clone)]
+pub struct StakeDisplay {
+    pub object_id: String,
+    pub principal: String,
+    pub principal_display: String,
+    pub validator_address: String,
+    pub activation_epoch: String,
+    pub status: String,
 }
 
 /// Result of a dry-run simulation for the transaction builder.

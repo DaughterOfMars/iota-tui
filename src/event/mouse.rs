@@ -88,6 +88,15 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                         }
                     }
                 }
+                Screen::Staking => {
+                    let data_start = cy + 1 + 1;
+                    if row >= data_start {
+                        let idx = app.stakes_offset + (row - data_start) as usize;
+                        if idx < app.stakes.len() {
+                            app.stakes_selected = idx;
+                        }
+                    }
+                }
                 // Packages: border(1)+header(1)+margin(1) = data at cy+3
                 Screen::Packages => {
                     let data_start = cy + 1 + 1 + 1;
@@ -346,6 +355,14 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
                 app.content_visible_rows,
             );
         }
+        Screen::Staking => {
+            app.stakes_selected = apply_delta(app.stakes_selected, delta, app.stakes.len());
+            App::scroll_into_view(
+                app.stakes_selected,
+                &mut app.stakes_offset,
+                app.content_visible_rows,
+            );
+        }
         Screen::AddressBook => {
             let combined_len = app.key_entry_count() + app.address_book.len();
             app.address_selected = apply_delta(app.address_selected, delta, combined_len);
@@ -459,6 +476,12 @@ pub(crate) fn handle_hint_click(app: &mut App, action_id: &str) {
             Screen::Coins => app.activate_selected_coin(),
             Screen::Objects => app.activate_selected_object(),
             Screen::Transactions => app.activate_selected_transaction(),
+            Screen::Staking => {
+                if let Some(stake) = app.stakes.get(app.stakes_selected) {
+                    let id = stake.object_id.clone();
+                    app.explore_item(id);
+                }
+            }
             Screen::Packages => app.activate_selected_package(),
             Screen::AddressBook => app.activate_selected_address(),
             Screen::Keys => {
@@ -618,6 +641,23 @@ pub(crate) fn handle_hint_click(app: &mut App, action_id: &str) {
                 app.quick_transfer_buffers = [String::new(), String::new()];
                 app.open_popup(Popup::QuickTransfer);
                 app.start_input("");
+            }
+        }
+        "unstake" => {
+            if let Some(stake) = app.stakes.get(app.stakes_selected) {
+                let staked_id = stake.object_id.clone();
+                app.tx.reset();
+                app.tx.commands.push(crate::app::PtbCommand::Unstake {
+                    staked_iota_id: staked_id,
+                });
+                app.tx.step = crate::app::TxBuilderStep::Review;
+                app.navigate(crate::app::Screen::TxBuilder);
+                app.send_cmd(WalletCmd::DryRun {
+                    sender_idx: app.tx.sender,
+                    commands: app.tx.commands.clone(),
+                });
+                app.tx.dry_running = true;
+                app.tx.dry_run_dirty = false;
             }
         }
         "explorer_search" => {
