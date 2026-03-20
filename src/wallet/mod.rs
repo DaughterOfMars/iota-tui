@@ -220,6 +220,7 @@ pub enum WalletCmd {
         package_addr: String,
         module_name: String,
     },
+    PollTransactions(iota_sdk::types::Address),
 }
 
 /// Events sent from the wallet backend back to the UI.
@@ -293,6 +294,7 @@ pub enum WalletEvent {
         module_name: String,
         functions: Vec<crate::app::ModuleFunctionDisplay>,
     },
+    PollTransactionsResult(Vec<crate::app::TransactionDisplay>),
     Error(String),
 }
 
@@ -383,6 +385,7 @@ impl WalletBackend {
                         .await
                 }
                 WalletCmd::RefreshStakes(addr) => self.handle_stakes(addr).await,
+                WalletCmd::PollTransactions(addr) => self.handle_poll_transactions(addr).await,
                 WalletCmd::FetchPackageModules { package_addr } => {
                     self.handle_fetch_package_modules(&package_addr).await
                 }

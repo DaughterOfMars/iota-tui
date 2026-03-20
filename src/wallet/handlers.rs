@@ -880,6 +880,74 @@ impl WalletBackend {
         Ok(())
     }
 
+    pub(super) async fn handle_poll_transactions(
+        &self,
+        addr: Address,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        use iota_sdk::graphql_client::query_types::TransactionsFilter;
+
+        let client = self.client.as_ref().ok_or("Not connected")?;
+
+        let filter = TransactionsFilter {
+            sign_address: Some(addr),
+            ..Default::default()
+        };
+
+        let page = client
+            .transactions_effects(
+                filter,
+                PaginationFilter {
+                    direction: Direction::Backward,
+                    ..PaginationFilter::default()
+                },
+            )
+            .await?;
+
+        let txs: Vec<crate::app::TransactionDisplay> = page
+            .data()
+            .iter()
+            .map(|effects| match effects {
+                iota_sdk::types::TransactionEffects::V1(v1) => {
+                    let status = match &v1.status {
+                        iota_sdk::types::ExecutionStatus::Success => "Success".to_string(),
+                        iota_sdk::types::ExecutionStatus::Failure { error, .. } => {
+                            format!("Failed: {:?}", error)
+                        }
+                        _ => "Unknown".to_string(),
+                    };
+                    let gas = &v1.gas_used;
+                    let total_gas = gas.computation_cost + gas.storage_cost
+                        - gas.storage_rebate.min(gas.storage_cost);
+                    crate::app::TransactionDisplay {
+                        digest: v1.transaction_digest.to_string(),
+                        status,
+                        gas_used: format_gas(total_gas),
+                        epoch: format!("{}", v1.epoch),
+                        gas_computation: format_gas(gas.computation_cost),
+                        gas_storage: format_gas(gas.storage_cost),
+                        gas_rebate: format_gas(gas.storage_rebate),
+                        changed_objects: v1.changed_objects.len(),
+                    }
+                }
+                _ => crate::app::TransactionDisplay {
+                    digest: "?".into(),
+                    status: "Unknown".into(),
+                    gas_used: "?".into(),
+                    epoch: "?".into(),
+                    gas_computation: "?".into(),
+                    gas_storage: "?".into(),
+                    gas_rebate: "?".into(),
+                    changed_objects: 0,
+                },
+            })
+            .collect();
+
+        self.event_tx
+            .send(WalletEvent::PollTransactionsResult(txs))
+            .await?;
+        Ok(())
+    }
+
     pub(super) fn save_keys(&self) {
         if let Some(parent) = self.keystore_path.parent() {
             let _ = std::fs::create_dir_all(parent);

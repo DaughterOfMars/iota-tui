@@ -141,6 +141,21 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                         }
                     }
                 }
+                Screen::ActivityFeed => {
+                    let data_start = cy + 1 + 1 + 1;
+                    if row >= data_start {
+                        let idx = app.feed_offset + (row - data_start) as usize;
+                        if idx < app.activity_feed.len() {
+                            app.feed_selected = idx;
+                            if is_icon_click(app, col)
+                                && let Some(event) = app.activity_feed.get(app.feed_selected)
+                            {
+                                let digest = event.digest.clone();
+                                app.explore_item(digest);
+                            }
+                        }
+                    }
+                }
                 Screen::TxBuilder => {
                     // Step indicator: 3-row block at cy..cy+3, text on row cy+1
                     let step_end = cy + 3;
@@ -403,6 +418,14 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
                 app.content_visible_rows,
             );
         }
+        Screen::ActivityFeed => {
+            app.feed_selected = apply_delta(app.feed_selected, delta, app.activity_feed.len());
+            App::scroll_into_view(
+                app.feed_selected,
+                &mut app.feed_offset,
+                app.content_visible_rows,
+            );
+        }
         Screen::Explorer => {
             // Explorer sub-view scroll: checkpoints, validators, search results
             use crate::app::ExplorerView;
@@ -483,6 +506,12 @@ pub(crate) fn handle_hint_click(app: &mut App, action_id: &str) {
                 }
             }
             Screen::Packages => app.activate_selected_package(),
+            Screen::ActivityFeed => {
+                if let Some(event) = app.activity_feed.get(app.feed_selected) {
+                    let digest = event.digest.clone();
+                    app.explore_item(digest);
+                }
+            }
             Screen::AddressBook => app.activate_selected_address(),
             Screen::Keys => {
                 if let Some(key) = app.keys.get(app.keys_selected) {

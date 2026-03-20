@@ -620,3 +620,21 @@ pub fn handle_tx_key(app: &mut App, key: KeyEvent) {
         },
     }
 }
+
+pub fn handle_activity_feed_key(app: &mut App, key: KeyEvent) {
+    let mut nav = ListNav {
+        selected: &mut app.feed_selected,
+        offset: &mut app.feed_offset,
+        len: app.activity_feed.len(),
+        visible_rows: app.content_visible_rows,
+    };
+    if nav.handle_key(key.code) {
+        return;
+    }
+    if key.code == KeyCode::Enter
+        && let Some(event) = app.activity_feed.get(app.feed_selected)
+    {
+        let digest = event.digest.clone();
+        app.explore_item(digest);
+    }
+}

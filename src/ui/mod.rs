@@ -1,5 +1,6 @@
 //! UI rendering — draws all screens, popups, and shared components.
 
+mod activity_feed;
 mod address_book;
 mod coins;
 pub(crate) mod common;
@@ -57,6 +58,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         Screen::Keys => keys::draw(frame, app, layout[0]),
         Screen::TxBuilder => tx_builder::draw(frame, app, layout[0]),
         Screen::Explorer => explorer::draw(frame, app, layout[0]),
+        Screen::ActivityFeed => activity_feed::draw(frame, app, layout[0]),
     }
 
     common::draw_status_bar(frame, app, layout[1]);

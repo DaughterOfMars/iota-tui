@@ -148,6 +148,10 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             app.navigate(Screen::Explorer);
             return;
         }
+        KeyCode::Char('0') => {
+            app.navigate(Screen::ActivityFeed);
+            return;
+        }
         KeyCode::Tab => {
             let idx = app.screen.index();
             let next = (idx + 1) % Screen::ALL.len();
@@ -196,6 +200,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         Screen::Keys => screen::handle_keys_key(app, key),
         Screen::TxBuilder => screen::handle_tx_key(app, key),
         Screen::Explorer => explorer::handle_explorer_key(app, key),
+        Screen::ActivityFeed => screen::handle_activity_feed_key(app, key),
     }
 }
 

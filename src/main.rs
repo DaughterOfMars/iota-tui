@@ -87,6 +87,18 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> colo
                 {
                     app.clipboard_toast = None;
                 }
+                // Poll for new transactions every 30 seconds (300 ticks)
+                if app.connected {
+                    app.poll_tick_counter += 1;
+                    if app.poll_tick_counter >= 300 {
+                        app.poll_tick_counter = 0;
+                        if let Some(key) = app.active_key()
+                            && let Ok(addr) = iota_sdk::types::Address::from_hex(&key.address)
+                        {
+                            let _ = cmd_tx.send(WalletCmd::PollTransactions(addr)).await;
+                        }
+                    }
+                }
             }
         }
 

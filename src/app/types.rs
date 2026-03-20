@@ -12,10 +12,11 @@ pub enum Screen {
     Keys,
     TxBuilder,
     Explorer,
+    ActivityFeed,
 }
 
 impl Screen {
-    pub const ALL: [Screen; 9] = [
+    pub const ALL: [Screen; 10] = [
         Screen::Coins,
         Screen::Objects,
         Screen::Transactions,
@@ -25,6 +26,7 @@ impl Screen {
         Screen::Keys,
         Screen::TxBuilder,
         Screen::Explorer,
+        Screen::ActivityFeed,
     ];
 
     pub fn title(self) -> &'static str {
@@ -38,6 +40,7 @@ impl Screen {
             Screen::Keys => "Keys",
             Screen::TxBuilder => "Tx Builder",
             Screen::Explorer => "Explorer",
+            Screen::ActivityFeed => "Activity",
         }
     }
 
@@ -129,6 +132,29 @@ pub struct ModuleFunctionDisplay {
     pub type_param_count: usize,
     pub param_types: Vec<String>,
     pub return_types: Vec<String>,
+}
+
+/// Kind of activity event in the feed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActivityKind {
+    OutgoingTx,
+}
+
+impl ActivityKind {
+    pub fn icon(self) -> &'static str {
+        match self {
+            ActivityKind::OutgoingTx => ">>",
+        }
+    }
+}
+
+/// An event in the activity feed.
+#[derive(Debug, Clone)]
+pub struct ActivityEvent {
+    pub kind: ActivityKind,
+    pub summary: String,
+    pub digest: String,
+    pub timestamp: String,
 }
 
 /// Result of a dry-run simulation for the transaction builder.

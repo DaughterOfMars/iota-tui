@@ -109,14 +109,26 @@ pub fn draw_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
             "0".to_string()
         };
 
+        let unread = if *screen == Screen::ActivityFeed && app.feed_unread_count > 0 {
+            format!(" ({})", app.feed_unread_count)
+        } else {
+            String::new()
+        };
+
         let label = if app.sidebar_collapsed {
-            format!(" {} ", num)
+            if *screen == Screen::ActivityFeed && app.feed_unread_count > 0 {
+                format!(" {}*", num)
+            } else {
+                format!(" {} ", num)
+            }
         } else {
             format!(
-                " {} {:<width$}",
+                " {} {}{:<width$}",
                 num,
                 screen.title(),
-                width = (inner_width as usize).saturating_sub(4)
+                unread,
+                width =
+                    (inner_width as usize).saturating_sub(4 + screen.title().len() + unread.len())
             )
         };
 
@@ -286,6 +298,12 @@ pub fn screen_hints(screen: Screen) -> Vec<(&'static str, &'static str, &'static
         Screen::Explorer => vec![
             ("Enter", "search", "explore"),
             ("r", "refresh", "refresh"),
+            ("?", "help", "help"),
+        ],
+        Screen::ActivityFeed => vec![
+            ("Enter", "explore", "explore"),
+            ("c", "copy", "copy"),
+            ("C", "export", "export"),
             ("?", "help", "help"),
         ],
     }

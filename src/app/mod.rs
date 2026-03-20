@@ -118,6 +118,15 @@ pub struct App {
     pub quick_transfer_field: usize, // 0 = recipient, 1 = amount
     pub quick_transfer_buffers: [String; 2],
 
+    // Activity feed
+    pub activity_feed: Vec<ActivityEvent>,
+    pub feed_selected: usize,
+    pub feed_offset: usize,
+    pub feed_unread_count: usize,
+    pub last_known_tx_digests: std::collections::HashSet<String>,
+    pub poll_tick_counter: u32,
+    pub poll_seeded: bool,
+
     // Portfolio summary mode (aggregated view)
     pub coins_summary_mode: bool,
     pub portfolio_summary: Vec<PortfolioSummary>,
@@ -230,6 +239,14 @@ impl App {
             quick_transfer_field: 0,
             quick_transfer_buffers: [String::new(), String::new()],
 
+            activity_feed: vec![],
+            feed_selected: 0,
+            feed_offset: 0,
+            feed_unread_count: 0,
+            last_known_tx_digests: std::collections::HashSet::new(),
+            poll_tick_counter: 0,
+            poll_seeded: false,
+
             coins_summary_mode: false,
             portfolio_summary: vec![],
             portfolio_selected: 0,
@@ -267,6 +284,13 @@ impl App {
                             cursor: None,
                         });
                     }
+                }
+                // Seed the activity feed with current transactions
+                self.poll_seeded = false;
+                if let Some(key) = self.active_key()
+                    && let Ok(addr) = iota_sdk::types::Address::from_hex(&key.address)
+                {
+                    self.send_cmd(WalletCmd::PollTransactions(addr));
                 }
             }
             WalletEvent::Balances(balances) => {
@@ -497,6 +521,46 @@ impl App {
                 self.pkg_functions_offset = 0;
                 self.pkg_view = PackageBrowserView::Functions;
             }
+            WalletEvent::PollTransactionsResult(txs) => {
+                if !self.poll_seeded {
+                    // First poll: seed known digests, no notifications
+                    self.last_known_tx_digests = txs.iter().map(|t| t.digest.clone()).collect();
+                    self.poll_seeded = true;
+                } else {
+                    // Detect new transactions
+                    let secs = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+                    let now = format!(
+                        "{:02}:{:02}:{:02}",
+                        (secs / 3600) % 24,
+                        (secs / 60) % 60,
+                        secs % 60
+                    );
+                    for tx in &txs {
+                        if !self.last_known_tx_digests.contains(&tx.digest) {
+                            self.last_known_tx_digests.insert(tx.digest.clone());
+                            self.activity_feed.insert(
+                                0,
+                                ActivityEvent {
+                                    kind: ActivityKind::OutgoingTx,
+                                    summary: format!("{} ({})", tx.status, tx.gas_used),
+                                    digest: tx.digest.clone(),
+                                    timestamp: now.clone(),
+                                },
+                            );
+                            if self.screen != Screen::ActivityFeed {
+                                self.feed_unread_count += 1;
+                            }
+                        }
+                    }
+                    // Cap feed at 50 entries
+                    if self.activity_feed.len() > 50 {
+                        self.activity_feed.truncate(50);
+                    }
+                }
+            }
             WalletEvent::Error(_e) => {}
         }
     }
@@ -585,6 +649,9 @@ impl App {
             if self.explorer.validators.is_empty() {
                 self.send_cmd(WalletCmd::RefreshValidators);
             }
+        }
+        if screen == Screen::ActivityFeed {
+            self.feed_unread_count = 0;
         }
     }
 
@@ -1294,6 +1361,21 @@ impl App {
                 }
                 _ => ("Details", vec![]),
             },
+            Screen::ActivityFeed => {
+                if let Some(e) = self.activity_feed.get(self.feed_selected) {
+                    (
+                        "Activity Details",
+                        vec![
+                            ("Timestamp", e.timestamp.clone()),
+                            ("Kind", e.kind.icon().to_string()),
+                            ("Summary", e.summary.clone()),
+                            ("Digest", e.digest.clone()),
+                        ],
+                    )
+                } else {
+                    ("Activity Details", vec![])
+                }
+            }
             _ => ("Details", vec![]),
         }
     }
@@ -1341,6 +1423,10 @@ impl App {
                     None
                 }
             }
+            Screen::ActivityFeed => self
+                .activity_feed
+                .get(self.feed_selected)
+                .map(|e| e.digest.clone()),
             Screen::TxBuilder => None,
         };
 
@@ -1434,6 +1520,19 @@ impl App {
                 let mut csv = "Label,Address,Notes\n".to_string();
                 for e in &self.address_book {
                     csv.push_str(&format!("{},{},{}\n", e.label, e.address, e.notes));
+                }
+                csv
+            }
+            Screen::ActivityFeed => {
+                let mut csv = "Timestamp,Kind,Summary,Digest\n".to_string();
+                for e in &self.activity_feed {
+                    csv.push_str(&format!(
+                        "{},{},{},{}\n",
+                        e.timestamp,
+                        e.kind.icon(),
+                        e.summary,
+                        e.digest
+                    ));
                 }
                 csv
             }
