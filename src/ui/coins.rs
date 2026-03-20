@@ -12,16 +12,20 @@ use super::common;
 use crate::app::App;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
-    let layout = Layout::vertical([
-        Constraint::Length(3), // balance summary
-        Constraint::Min(5),    // coin table
-        Constraint::Length(5), // selected coin detail
-    ])
-    .split(area);
+    if app.coins_summary_mode && app.show_multiple_owners() {
+        draw_portfolio(frame, app, area);
+    } else {
+        let layout = Layout::vertical([
+            Constraint::Length(3), // balance summary
+            Constraint::Min(5),    // coin table
+            Constraint::Length(5), // selected coin detail
+        ])
+        .split(area);
 
-    draw_summary(frame, app, layout[0]);
-    draw_coin_table(frame, app, layout[1]);
-    draw_detail(frame, app, layout[2]);
+        draw_summary(frame, app, layout[0]);
+        draw_coin_table(frame, app, layout[1]);
+        draw_detail(frame, app, layout[2]);
+    }
 }
 
 fn draw_summary(frame: &mut Frame, app: &App, area: Rect) {
@@ -205,6 +209,96 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
     };
 
     frame.render_widget(Paragraph::new(content).block(block), area);
+}
+
+fn draw_portfolio(frame: &mut Frame, app: &App, area: Rect) {
+    let layout = Layout::vertical([
+        Constraint::Length(3), // summary
+        Constraint::Min(5),    // portfolio table
+    ])
+    .split(area);
+
+    draw_summary(frame, app, layout[0]);
+
+    let table_area = layout[1];
+    let visible_rows = table_area.height.saturating_sub(4) as usize;
+
+    let header = Row::new(vec!["Symbol", "Type", "Total Balance", "# Accounts"])
+        .style(common::header_style())
+        .bottom_margin(1);
+
+    let mut rows: Vec<Row> = Vec::new();
+    let mut display_idx = 0;
+
+    for (i, summary) in app.portfolio_summary.iter().enumerate() {
+        if display_idx >= app.portfolio_offset + visible_rows {
+            break;
+        }
+
+        let is_expanded = app.portfolio_expanded == Some(i);
+
+        if display_idx >= app.portfolio_offset {
+            let style = if i == app.portfolio_selected {
+                common::selected_style()
+            } else {
+                Style::default()
+            };
+            let expand_icon = if is_expanded { "▼" } else { "▶" };
+            rows.push(
+                Row::new(vec![
+                    Cell::from(format!("{} {}", expand_icon, summary.symbol)),
+                    Cell::from(common::truncate_type(&summary.coin_type, 30)),
+                    Cell::from(summary.total_balance_display.clone()),
+                    Cell::from(format!("{}", summary.per_account.len())),
+                ])
+                .style(style),
+            );
+        }
+        display_idx += 1;
+
+        if is_expanded {
+            for (alias, display) in &summary.per_account {
+                if display_idx >= app.portfolio_offset + visible_rows {
+                    break;
+                }
+                if display_idx >= app.portfolio_offset {
+                    rows.push(
+                        Row::new(vec![
+                            Cell::from(format!("  └ {}", alias)),
+                            Cell::from(""),
+                            Cell::from(display.clone()),
+                            Cell::from(""),
+                        ])
+                        .style(common::dim_style()),
+                    );
+                }
+                display_idx += 1;
+            }
+        }
+    }
+
+    let title = format!(
+        " Portfolio Summary ({} types) ",
+        app.portfolio_summary.len()
+    );
+
+    let widths = [
+        Constraint::Length(14),
+        Constraint::Min(20),
+        Constraint::Length(22),
+        Constraint::Length(12),
+    ];
+
+    let table = Table::new(rows, widths).header(header).block(
+        Block::default()
+            .title(common::sparkle_text(&title))
+            .title_style(common::header_style())
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(common::dim_style()),
+    );
+
+    frame.render_widget(table, table_area);
 }
 
 fn format_nanos(nanos: u128) -> String {

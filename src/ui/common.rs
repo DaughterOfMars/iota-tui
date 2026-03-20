@@ -215,6 +215,7 @@ pub fn screen_hints(screen: Screen) -> Vec<(&'static str, &'static str, &'static
             ("m", "merge", "merge"),
             ("s", "split", "split"),
             ("x", "transfer", "quick_transfer"),
+            ("p", "portfolio", "portfolio"),
             ("/", "search", "filter"),
             ("c", "copy", "copy"),
             ("C", "export", "export"),

@@ -104,6 +104,13 @@ pub struct App {
     // Coin management popup state
     pub quick_transfer_field: usize, // 0 = recipient, 1 = amount
     pub quick_transfer_buffers: [String; 2],
+
+    // Portfolio summary mode (aggregated view)
+    pub coins_summary_mode: bool,
+    pub portfolio_summary: Vec<PortfolioSummary>,
+    pub portfolio_selected: usize,
+    pub portfolio_offset: usize,
+    pub portfolio_expanded: Option<usize>,
 }
 
 impl App {
@@ -196,6 +203,12 @@ impl App {
 
             quick_transfer_field: 0,
             quick_transfer_buffers: [String::new(), String::new()],
+
+            coins_summary_mode: false,
+            portfolio_summary: vec![],
+            portfolio_selected: 0,
+            portfolio_offset: 0,
+            portfolio_expanded: None,
         }
     }
 
@@ -260,6 +273,9 @@ impl App {
                 }
                 if self.coins_selected >= self.coins.len() {
                     self.coins_selected = self.coins.len().saturating_sub(1);
+                }
+                if self.coins_summary_mode {
+                    self.compute_portfolio_summary();
                 }
             }
             WalletEvent::Transactions(txs) => {
@@ -834,6 +850,56 @@ impl App {
             })
             .map(|(i, _)| i)
             .collect()
+    }
+
+    /// Compute portfolio summary: aggregate coins by type across all accounts.
+    pub fn compute_portfolio_summary(&mut self) {
+        use std::collections::BTreeMap;
+
+        struct Agg {
+            symbol: String,
+            total: u128,
+            per_account: Vec<(String, u128)>,
+        }
+
+        let mut by_type: BTreeMap<String, Agg> = BTreeMap::new();
+        for coin in &self.coins {
+            let entry = by_type
+                .entry(coin.coin_type.clone())
+                .or_insert_with(|| Agg {
+                    symbol: coin.symbol.clone(),
+                    total: 0,
+                    per_account: vec![],
+                });
+            entry.total += coin.balance;
+            if let Some(acct) = entry
+                .per_account
+                .iter_mut()
+                .find(|(a, _)| *a == coin.owner_alias)
+            {
+                acct.1 += coin.balance;
+            } else {
+                entry
+                    .per_account
+                    .push((coin.owner_alias.clone(), coin.balance));
+            }
+        }
+        self.portfolio_summary = by_type
+            .into_iter()
+            .map(|(coin_type, agg)| PortfolioSummary {
+                coin_type,
+                symbol: agg.symbol,
+                total_balance_display: format_balance(agg.total, 9),
+                per_account: agg
+                    .per_account
+                    .into_iter()
+                    .map(|(alias, bal)| (alias, format_balance(bal, 9)))
+                    .collect(),
+            })
+            .collect();
+        if self.portfolio_selected >= self.portfolio_summary.len() {
+            self.portfolio_selected = self.portfolio_summary.len().saturating_sub(1);
+        }
     }
 
     pub fn key_entry_count(&self) -> usize {

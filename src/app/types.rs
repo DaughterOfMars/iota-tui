@@ -56,6 +56,15 @@ pub struct CoinDisplay {
     pub owner_alias: String,
 }
 
+/// Aggregated portfolio summary row (one per coin type across all accounts).
+#[derive(Debug, Clone)]
+pub struct PortfolioSummary {
+    pub coin_type: String,
+    pub symbol: String,
+    pub total_balance_display: String,
+    pub per_account: Vec<(String, String)>, // (alias, balance_display)
+}
+
 /// An object row displayed in the Objects screen.
 #[derive(Debug, Clone)]
 pub struct ObjectDisplay {

@@ -69,6 +69,34 @@ pub fn handle_coins_key(app: &mut App, key: KeyEvent) {
         return;
     }
 
+    // Portfolio summary mode with multiple owners
+    if app.coins_summary_mode && app.show_multiple_owners() {
+        let mut nav = ListNav {
+            selected: &mut app.portfolio_selected,
+            offset: &mut app.portfolio_offset,
+            len: app.portfolio_summary.len(),
+            visible_rows: app.content_visible_rows,
+        };
+        if nav.handle_key(key.code) {
+            return;
+        }
+        match key.code {
+            KeyCode::Enter => {
+                // Toggle expand/collapse
+                if app.portfolio_expanded == Some(app.portfolio_selected) {
+                    app.portfolio_expanded = None;
+                } else {
+                    app.portfolio_expanded = Some(app.portfolio_selected);
+                }
+            }
+            KeyCode::Char('p') => {
+                app.coins_summary_mode = false;
+            }
+            _ => {}
+        }
+        return;
+    }
+
     let mut nav = ListNav {
         selected: &mut app.coins_selected,
         offset: &mut app.coins_offset,
@@ -110,6 +138,12 @@ pub fn handle_coins_key(app: &mut App, key: KeyEvent) {
                 app.quick_transfer_buffers = [String::new(), String::new()];
                 app.open_popup(Popup::QuickTransfer);
                 app.start_input("");
+            }
+        }
+        KeyCode::Char('p') => {
+            if app.show_multiple_owners() {
+                app.coins_summary_mode = true;
+                app.compute_portfolio_summary();
             }
         }
         KeyCode::Char('/') => {

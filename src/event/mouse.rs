@@ -595,6 +595,14 @@ pub(crate) fn handle_hint_click(app: &mut App, action_id: &str) {
                 app.open_popup(Popup::ConfirmClearTx);
             }
         }
+        "portfolio" => {
+            if app.coins_summary_mode {
+                app.coins_summary_mode = false;
+            } else if app.show_multiple_owners() {
+                app.coins_summary_mode = true;
+                app.compute_portfolio_summary();
+            }
+        }
         "merge" => {
             app.merge_coins_for_selected();
         }
