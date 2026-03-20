@@ -104,6 +104,33 @@ pub struct StakeDisplay {
     pub status: String,
 }
 
+/// Which sub-view of the Package Browser is active.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PackageBrowserView {
+    List,
+    Modules,
+    Functions,
+}
+
+/// A module within a published package.
+#[derive(Debug, Clone)]
+pub struct PackageModuleDisplay {
+    pub name: String,
+    pub function_count: usize,
+    pub struct_count: usize,
+}
+
+/// A function within a module.
+#[derive(Debug, Clone)]
+pub struct ModuleFunctionDisplay {
+    pub name: String,
+    pub visibility: String,
+    pub is_entry: bool,
+    pub type_param_count: usize,
+    pub param_types: Vec<String>,
+    pub return_types: Vec<String>,
+}
+
 /// Result of a dry-run simulation for the transaction builder.
 #[derive(Debug, Clone)]
 pub struct DryRunInfo {

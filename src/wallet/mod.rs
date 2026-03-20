@@ -213,6 +213,13 @@ pub enum WalletCmd {
         tx_cursor: Option<String>,
     },
     RefreshStakes(iota_sdk::types::Address),
+    FetchPackageModules {
+        package_addr: String,
+    },
+    FetchModuleFunctions {
+        package_addr: String,
+        module_name: String,
+    },
 }
 
 /// Events sent from the wallet backend back to the UI.
@@ -278,6 +285,14 @@ pub enum WalletEvent {
         end_cursor: Option<String>,
     },
     Stakes(Vec<crate::app::StakeDisplay>),
+    PackageModules {
+        package_addr: String,
+        modules: Vec<crate::app::PackageModuleDisplay>,
+    },
+    ModuleFunctions {
+        module_name: String,
+        functions: Vec<crate::app::ModuleFunctionDisplay>,
+    },
     Error(String),
 }
 
@@ -368,6 +383,16 @@ impl WalletBackend {
                         .await
                 }
                 WalletCmd::RefreshStakes(addr) => self.handle_stakes(addr).await,
+                WalletCmd::FetchPackageModules { package_addr } => {
+                    self.handle_fetch_package_modules(&package_addr).await
+                }
+                WalletCmd::FetchModuleFunctions {
+                    package_addr,
+                    module_name,
+                } => {
+                    self.handle_fetch_module_functions(&package_addr, &module_name)
+                        .await
+                }
             };
 
             if let Err(e) = result {

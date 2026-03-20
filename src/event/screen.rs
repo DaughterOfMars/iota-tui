@@ -363,18 +363,60 @@ pub fn handle_staking_key(app: &mut App, key: KeyEvent) {
 }
 
 pub fn handle_packages_key(app: &mut App, key: KeyEvent) {
-    let packages = app.package_indices();
-    let mut nav = ListNav {
-        selected: &mut app.packages_selected,
-        offset: &mut app.packages_offset,
-        len: packages.len(),
-        visible_rows: app.content_visible_rows,
-    };
-    if nav.handle_key(key.code) {
-        return;
-    }
-    if key.code == KeyCode::Enter {
-        app.activate_selected_package();
+    match app.pkg_view {
+        crate::app::PackageBrowserView::List => {
+            let packages = app.package_indices();
+            let mut nav = ListNav {
+                selected: &mut app.packages_selected,
+                offset: &mut app.packages_offset,
+                len: packages.len(),
+                visible_rows: app.content_visible_rows,
+            };
+            if nav.handle_key(key.code) {
+                return;
+            }
+            match key.code {
+                KeyCode::Enter => app.browse_selected_package(),
+                KeyCode::Char('e') => app.activate_selected_package(),
+                _ => {}
+            }
+        }
+        crate::app::PackageBrowserView::Modules => {
+            let mut nav = ListNav {
+                selected: &mut app.pkg_modules_selected,
+                offset: &mut app.pkg_modules_offset,
+                len: app.pkg_modules.len(),
+                visible_rows: app.content_visible_rows,
+            };
+            if nav.handle_key(key.code) {
+                return;
+            }
+            match key.code {
+                KeyCode::Enter => app.browse_selected_module(),
+                KeyCode::Esc | KeyCode::Left => {
+                    app.pkg_view = crate::app::PackageBrowserView::List;
+                }
+                _ => {}
+            }
+        }
+        crate::app::PackageBrowserView::Functions => {
+            let mut nav = ListNav {
+                selected: &mut app.pkg_functions_selected,
+                offset: &mut app.pkg_functions_offset,
+                len: app.pkg_functions.len(),
+                visible_rows: app.content_visible_rows,
+            };
+            if nav.handle_key(key.code) {
+                return;
+            }
+            match key.code {
+                KeyCode::Enter => app.jump_to_move_call(),
+                KeyCode::Esc | KeyCode::Left => {
+                    app.pkg_view = crate::app::PackageBrowserView::Modules;
+                }
+                _ => {}
+            }
+        }
     }
 }
 

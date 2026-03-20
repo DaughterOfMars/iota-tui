@@ -48,6 +48,15 @@ pub struct App {
 
     pub packages_selected: usize,
     pub packages_offset: usize,
+    pub pkg_view: PackageBrowserView,
+    pub pkg_selected_id: String,
+    pub pkg_selected_module: String,
+    pub pkg_modules: Vec<PackageModuleDisplay>,
+    pub pkg_modules_selected: usize,
+    pub pkg_modules_offset: usize,
+    pub pkg_functions: Vec<ModuleFunctionDisplay>,
+    pub pkg_functions_selected: usize,
+    pub pkg_functions_offset: usize,
 
     pub stakes: Vec<StakeDisplay>,
     pub stakes_selected: usize,
@@ -165,6 +174,15 @@ impl App {
 
             packages_selected: 0,
             packages_offset: 0,
+            pkg_view: PackageBrowserView::List,
+            pkg_selected_id: String::new(),
+            pkg_selected_module: String::new(),
+            pkg_modules: vec![],
+            pkg_modules_selected: 0,
+            pkg_modules_offset: 0,
+            pkg_functions: vec![],
+            pkg_functions_selected: 0,
+            pkg_functions_offset: 0,
 
             stakes: vec![],
             stakes_selected: 0,
@@ -459,6 +477,26 @@ impl App {
                     self.stakes_selected = self.stakes.len().saturating_sub(1);
                 }
             }
+            WalletEvent::PackageModules {
+                package_addr,
+                modules,
+            } => {
+                self.pkg_selected_id = package_addr;
+                self.pkg_modules = modules;
+                self.pkg_modules_selected = 0;
+                self.pkg_modules_offset = 0;
+                self.pkg_view = PackageBrowserView::Modules;
+            }
+            WalletEvent::ModuleFunctions {
+                module_name,
+                functions,
+            } => {
+                self.pkg_selected_module = module_name;
+                self.pkg_functions = functions;
+                self.pkg_functions_selected = 0;
+                self.pkg_functions_offset = 0;
+                self.pkg_view = PackageBrowserView::Functions;
+            }
             WalletEvent::Error(_e) => {}
         }
     }
@@ -630,6 +668,44 @@ impl App {
         if let Some(&obj_idx) = packages.get(self.packages_selected) {
             let id = self.objects[obj_idx].object_id.clone();
             self.explore_item(id);
+        }
+    }
+
+    /// Browse modules of the currently selected package.
+    pub fn browse_selected_package(&mut self) {
+        let packages = self.package_indices();
+        if let Some(&obj_idx) = packages.get(self.packages_selected) {
+            let id = self.objects[obj_idx].object_id.clone();
+            self.loading = true;
+            self.send_cmd(WalletCmd::FetchPackageModules { package_addr: id });
+        }
+    }
+
+    /// Browse functions of the currently selected module.
+    pub fn browse_selected_module(&mut self) {
+        if let Some(module) = self.pkg_modules.get(self.pkg_modules_selected) {
+            let module_name = module.name.clone();
+            self.loading = true;
+            self.send_cmd(WalletCmd::FetchModuleFunctions {
+                package_addr: self.pkg_selected_id.clone(),
+                module_name,
+            });
+        }
+    }
+
+    /// Jump to TxBuilder with a MoveCall pre-filled from the selected function.
+    pub fn jump_to_move_call(&mut self) {
+        if let Some(func) = self.pkg_functions.get(self.pkg_functions_selected) {
+            self.tx.reset();
+            self.tx.commands.push(PtbCommand::MoveCall {
+                package: self.pkg_selected_id.clone(),
+                module: self.pkg_selected_module.clone(),
+                function: func.name.clone(),
+                type_args: vec!["".to_string(); func.type_param_count],
+                args: vec!["".to_string(); func.param_types.len()],
+            });
+            self.tx.step = TxBuilderStep::EditCommands;
+            self.navigate(Screen::TxBuilder);
         }
     }
 

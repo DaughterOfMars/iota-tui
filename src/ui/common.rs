@@ -248,7 +248,9 @@ pub fn screen_hints(screen: Screen) -> Vec<(&'static str, &'static str, &'static
             ("?", "help", "help"),
         ],
         Screen::Packages => vec![
-            ("Enter", "explore", "explore"),
+            ("Enter", "browse", "pkg_browse"),
+            ("e", "explore", "explore"),
+            ("Esc", "back", "pkg_back"),
             ("c", "copy", "copy"),
             ("r", "refresh", "refresh"),
             ("?", "help", "help"),

@@ -773,6 +773,113 @@ impl WalletBackend {
         Ok(())
     }
 
+    pub(super) async fn handle_fetch_package_modules(
+        &self,
+        package_addr: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let client = self.client.as_ref().ok_or("Not connected")?;
+        let addr: iota_sdk::types::Address = package_addr.parse()?;
+
+        let pkg = client
+            .package(addr, None)
+            .await?
+            .ok_or("Package not found")?;
+
+        let mut modules: Vec<crate::app::PackageModuleDisplay> = Vec::new();
+        for module_name in pkg.modules.keys() {
+            let name = module_name.to_string();
+            // Fetch normalized module to get function/struct counts
+            let pf = iota_sdk::graphql_client::PaginationFilter::default;
+            let (fn_count, struct_count) = if let Ok(Some(module)) = client
+                .normalized_move_module(addr, &name, None, pf(), pf(), pf(), pf())
+                .await
+            {
+                let fc = module
+                    .functions
+                    .as_ref()
+                    .map(|c| c.nodes.len())
+                    .unwrap_or(0);
+                let sc = module.structs.as_ref().map(|c| c.nodes.len()).unwrap_or(0);
+                (fc, sc)
+            } else {
+                (0, 0)
+            };
+            modules.push(crate::app::PackageModuleDisplay {
+                name,
+                function_count: fn_count,
+                struct_count,
+            });
+        }
+        modules.sort_by(|a, b| a.name.cmp(&b.name));
+
+        self.event_tx
+            .send(WalletEvent::PackageModules {
+                package_addr: package_addr.to_string(),
+                modules,
+            })
+            .await?;
+        Ok(())
+    }
+
+    pub(super) async fn handle_fetch_module_functions(
+        &self,
+        package_addr: &str,
+        module_name: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let client = self.client.as_ref().ok_or("Not connected")?;
+        let addr: iota_sdk::types::Address = package_addr.parse()?;
+
+        let pf = iota_sdk::graphql_client::PaginationFilter::default;
+        let module = client
+            .normalized_move_module(addr, module_name, None, pf(), pf(), pf(), pf())
+            .await?
+            .ok_or("Module not found")?;
+
+        let functions: Vec<crate::app::ModuleFunctionDisplay> = module
+            .functions
+            .map(|conn| {
+                conn.nodes
+                    .into_iter()
+                    .map(|f| {
+                        let visibility = f
+                            .visibility
+                            .map(|v| v.to_string())
+                            .unwrap_or_else(|| "private".into());
+                        let is_entry = f.is_entry.unwrap_or(false);
+                        let type_param_count =
+                            f.type_parameters.as_ref().map(|v| v.len()).unwrap_or(0);
+                        let param_types = f
+                            .parameters
+                            .as_ref()
+                            .map(|ps| ps.iter().map(|p| p.repr.clone()).collect())
+                            .unwrap_or_default();
+                        let return_types = f
+                            .return_
+                            .as_ref()
+                            .map(|rs| rs.iter().map(|r| r.repr.clone()).collect())
+                            .unwrap_or_default();
+                        crate::app::ModuleFunctionDisplay {
+                            name: f.name,
+                            visibility,
+                            is_entry,
+                            type_param_count,
+                            param_types,
+                            return_types,
+                        }
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        self.event_tx
+            .send(WalletEvent::ModuleFunctions {
+                module_name: module_name.to_string(),
+                functions,
+            })
+            .await?;
+        Ok(())
+    }
+
     pub(super) fn save_keys(&self) {
         if let Some(parent) = self.keystore_path.parent() {
             let _ = std::fs::create_dir_all(parent);

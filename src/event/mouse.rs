@@ -660,6 +660,20 @@ pub(crate) fn handle_hint_click(app: &mut App, action_id: &str) {
                 app.tx.dry_run_dirty = false;
             }
         }
+        "pkg_browse" => match app.pkg_view {
+            crate::app::PackageBrowserView::List => app.browse_selected_package(),
+            crate::app::PackageBrowserView::Modules => app.browse_selected_module(),
+            crate::app::PackageBrowserView::Functions => app.jump_to_move_call(),
+        },
+        "pkg_back" => match app.pkg_view {
+            crate::app::PackageBrowserView::Functions => {
+                app.pkg_view = crate::app::PackageBrowserView::Modules;
+            }
+            crate::app::PackageBrowserView::Modules => {
+                app.pkg_view = crate::app::PackageBrowserView::List;
+            }
+            _ => {}
+        },
         "explorer_search" => {
             app.start_input("");
         }
