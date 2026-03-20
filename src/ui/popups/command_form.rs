@@ -193,12 +193,7 @@ pub(super) fn draw_add_command_form(frame: &mut Frame, app: &mut App, area: Rect
             Style::default().fg(DIM),
         )]));
     }
-    lines.push(Line::from(vec![
-        Span::styled("  ", Style::default()),
-        Span::styled("[ Add ]", Style::default().fg(ACCENT).bold()),
-        Span::raw("  "),
-        Span::styled("[ Cancel ]", Style::default().fg(DIM)),
-    ]));
+    lines.push(super::button_line("Add", app.popup_focus, "  "));
 
     let content_len = lines.len();
     let inner_height = area.height.saturating_sub(2) as usize;

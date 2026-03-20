@@ -96,7 +96,8 @@ pub fn draw_status_bar(frame: &mut Frame, app: &mut App, area: Rect) {
     ])
     .split(area);
 
-    // Network indicator (left)
+    // Network indicator (left) — clickable to switch network
+    app.hint_areas.push((cols[0], "network"));
     frame.render_widget(Paragraph::new(Line::from(vec![net_indicator])), cols[0]);
 
     // Actions button + active address (right)
@@ -133,26 +134,22 @@ pub fn screen_hints(screen: Screen) -> Vec<(&'static str, &'static str, &'static
             ("t", "type-search", "type_search"),
             ("f", "faucet", "faucet"),
             ("r", "refresh", "refresh"),
-            ("n", "network", "network"),
             ("?", "help", "help"),
         ],
         Screen::Objects => vec![
             ("Enter", "explore", "explore"),
             ("t", "type-search", "type_search"),
             ("r", "refresh", "refresh"),
-            ("n", "network", "network"),
             ("?", "help", "help"),
         ],
         Screen::Transactions => vec![
             ("Enter", "explore", "explore"),
             ("r", "refresh", "refresh"),
-            ("n", "network", "network"),
             ("?", "help", "help"),
         ],
         Screen::Packages => vec![
             ("Enter", "explore", "explore"),
             ("r", "refresh", "refresh"),
-            ("n", "network", "network"),
             ("?", "help", "help"),
         ],
         Screen::AddressBook => vec![
@@ -161,7 +158,6 @@ pub fn screen_hints(screen: Screen) -> Vec<(&'static str, &'static str, &'static
             ("e", "edit", "addr_edit"),
             ("d", "delete", "addr_delete"),
             ("l", "iota-name", "iota_name"),
-            ("n", "network", "network"),
             ("?", "help", "help"),
         ],
         Screen::Keys => vec![
@@ -172,19 +168,17 @@ pub fn screen_hints(screen: Screen) -> Vec<(&'static str, &'static str, &'static
             ("i", "import", "key_import"),
             ("e", "rename", "key_rename"),
             ("d", "delete", "key_delete"),
-            ("n", "network", "network"),
             ("?", "help", "help"),
         ],
         Screen::TxBuilder => vec![
             ("a", "add", "tx_add"),
+            ("d", "delete", "tx_delete"),
             ("c", "clear", "tx_clear"),
-            ("n", "network", "network"),
             ("?", "help", "help"),
         ],
         Screen::Explorer => vec![
             ("Enter", "search", "explore"),
             ("r", "refresh", "refresh"),
-            ("n", "network", "network"),
             ("?", "help", "help"),
         ],
     }

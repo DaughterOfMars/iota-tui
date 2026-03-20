@@ -3,7 +3,8 @@
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
 use crate::app::{
-    AddCommandType, App, ExplorerView, InputMode, LookupAction, Popup, Screen, TxBuilderStep,
+    AddCommandType, App, ExplorerView, InputMode, LookupAction, Popup, PopupFocus, Screen,
+    TxBuilderStep,
 };
 use crate::ui::common::{centered_rect_min, screen_hints};
 use crate::ui::popups::actions_menu_area;
@@ -554,6 +555,15 @@ pub(crate) fn handle_hint_click(app: &mut App, action_id: &str) {
             }
         }
         "tx_add" => app.open_popup(Popup::AddCommand),
+        "tx_delete" => {
+            if !app.tx.commands.is_empty() {
+                app.tx.commands.remove(app.tx.cmd_selected);
+                app.tx.dry_run_dirty = true;
+                if app.tx.cmd_selected >= app.tx.commands.len() && app.tx.cmd_selected > 0 {
+                    app.tx.cmd_selected -= 1;
+                }
+            }
+        }
         "tx_clear" => {
             if app.tx.commands.is_empty() {
                 app.tx.reset();
@@ -748,16 +758,29 @@ fn handle_popup_click(app: &mut App, col: u16, row: u16) {
         ) => {
             let button_row = (popup_area.height.saturating_sub(2)) as usize;
             if inner_row == button_row {
-                // Button layout: "  [ Submit ]  [ Cancel ]"
-                // Submit button starts at popup_area.x + 3, Cancel after a gap
                 let inner_col = col.saturating_sub(popup_area.x + 1) as usize;
-                if (2..14).contains(&inner_col) {
-                    // Submit button region — simulate Enter key
+
+                // Compute submit button region from the rendered text layout.
+                // AddAddress/EditAddress have "  Tab: next  [ Save ]  [ Cancel ]"
+                // Others have "  [ Label ]  [ Cancel ]"
+                let (submit_start, submit_end) = match app.popup {
+                    Some(Popup::AddAddress | Popup::EditAddress) => (13, 21),
+                    Some(Popup::GenerateKeyAlias) => (2, 13),
+                    Some(Popup::ImportKey | Popup::LookupIotaName) => (2, 12),
+                    Some(Popup::RenameKey) => (2, 10),
+                    Some(Popup::AddCommandForm) => (2, 9),
+                    _ => (2, 14),
+                };
+                let cancel_start = submit_end + 2;
+
+                if (submit_start..submit_end).contains(&inner_col) {
                     submit_input_popup(app);
-                } else if inner_col >= 16 {
-                    // Cancel button region — simulate Esc key
+                } else if inner_col >= cancel_start {
                     cancel_input_popup(app);
                 }
+            } else {
+                // Click on a field row → focus that field
+                click_popup_field(app, inner_row);
             }
         }
         Some(Popup::ActionsMenu) => {
@@ -771,6 +794,61 @@ fn handle_popup_click(app: &mut App, col: u16, row: u16) {
             }
         }
         // Scroll-only popups (Help, Detail, ErrorLog): click inside does nothing
+        _ => {}
+    }
+}
+
+/// Handle clicking on a field row inside an input popup.
+/// Maps the inner_row to a field index and switches focus to it.
+fn click_popup_field(app: &mut App, inner_row: usize) {
+    match app.popup {
+        Some(Popup::AddAddress | Popup::EditAddress) => {
+            // Layout: row 0=blank, then per field: label, value, blank
+            // Field i value is at inner_row 2 + i*3, label at 1 + i*3
+            let field = match inner_row {
+                1 | 2 => Some(0), // Label
+                4 | 5 => Some(1), // Address
+                7 | 8 => Some(2), // Notes
+                _ => None,
+            };
+            if let Some(f) = field {
+                if app.popup_focus != PopupFocus::Fields {
+                    // Save current input to the current field buffer before switching
+                    app.address_edit_buffers[app.address_edit_field] = app.input_buffer.clone();
+                }
+                app.popup_focus = PopupFocus::Fields;
+                app.address_edit_field = f;
+                let val = app.address_edit_buffers[f].clone();
+                app.start_input(&val);
+            }
+        }
+        Some(Popup::AddCommandForm) => {
+            // Command form fields: each field takes 2 rows (label + input) + blank
+            // Row 0=blank, field i: label at 1+i*3, value at 2+i*3, blank at 3+i*3
+            let field_count = app.tx.edit_buffers.len();
+            let field = (0..field_count).find(|&i| {
+                let label_row = 1 + i * 3;
+                inner_row == label_row || inner_row == label_row + 1
+            });
+            if let Some(f) = field {
+                if app.popup_focus != PopupFocus::Fields {
+                    app.tx.edit_buffers[app.tx.edit_field] = app.input_buffer.clone();
+                }
+                app.popup_focus = PopupFocus::Fields;
+                app.tx.edit_field = f;
+                let val = app.tx.edit_buffers[f].clone();
+                app.start_input(&val);
+                app.update_autocomplete();
+            }
+        }
+        Some(
+            Popup::GenerateKeyAlias | Popup::ImportKey | Popup::RenameKey | Popup::LookupIotaName,
+        ) => {
+            // Single-field popups: input is at inner_row 3 (or nearby rows)
+            if inner_row <= 4 {
+                app.popup_focus = PopupFocus::Fields;
+            }
+        }
         _ => {}
     }
 }

@@ -72,6 +72,8 @@ pub struct App {
 
     // Popup scroll state
     pub popup_scroll: usize,
+    // Which element is focused in input popups (field, submit, or cancel)
+    pub popup_focus: PopupFocus,
 
     // Layout state for mouse hit-testing
     pub tab_areas: Vec<ratatui::layout::Rect>,
@@ -158,6 +160,7 @@ impl App {
             error_log_lines: vec![],
 
             popup_scroll: 0,
+            popup_focus: PopupFocus::Fields,
 
             tab_areas: vec![],
             hint_areas: vec![],
@@ -592,6 +595,7 @@ impl App {
     pub fn open_popup(&mut self, popup: Popup) {
         self.popup = Some(popup);
         self.popup_scroll = 0;
+        self.popup_focus = PopupFocus::Fields;
     }
 
     /// Validate that available balance covers transfers + gas.

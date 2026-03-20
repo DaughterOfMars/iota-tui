@@ -256,6 +256,17 @@ pub enum InputMode {
     Editing,
 }
 
+/// Which element is focused within an input popup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PopupFocus {
+    /// An input field is focused (typing goes to the input buffer).
+    Fields,
+    /// The submit/save button is focused.
+    Submit,
+    /// The cancel button is focused.
+    Cancel,
+}
+
 /// Which popup overlay is currently shown.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Popup {

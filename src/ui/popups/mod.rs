@@ -11,12 +11,32 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Paragraph, Wrap},
 };
 
-use crate::app::{App, Popup};
+use crate::app::{App, Popup, PopupFocus};
 
 use super::common::{
     ACCENT, DIM, centered_rect_min, clamp_scroll, render_popup_scrollbar, screen_hints,
     selected_style,
 };
+
+/// Build a button line with focus highlighting.
+fn button_line(submit_label: &str, focus: PopupFocus, prefix: &str) -> Line<'static> {
+    let submit_style = if focus == PopupFocus::Submit {
+        Style::default().fg(Color::Black).bg(ACCENT).bold()
+    } else {
+        Style::default().fg(ACCENT).bold()
+    };
+    let cancel_style = if focus == PopupFocus::Cancel {
+        Style::default().fg(Color::Black).bg(Color::Red).bold()
+    } else {
+        Style::default().fg(DIM)
+    };
+    Line::from(vec![
+        Span::styled(prefix.to_string(), Style::default().fg(DIM)),
+        Span::styled(format!("[ {} ]", submit_label), submit_style),
+        Span::raw("  "),
+        Span::styled("[ Cancel ]".to_string(), cancel_style),
+    ])
+}
 
 /// Dispatch popup drawing to the appropriate function.
 pub fn draw_popup(frame: &mut Frame, app: &mut App) {
@@ -237,12 +257,7 @@ fn draw_address_form(frame: &mut Frame, app: &App, area: Rect, title: &str) {
         lines.push(Line::from(""));
     }
 
-    lines.push(Line::from(vec![
-        Span::styled("  Tab: next  ", Style::default().fg(DIM)),
-        Span::styled("[ Save ]", Style::default().fg(ACCENT).bold()),
-        Span::raw("  "),
-        Span::styled("[ Cancel ]", Style::default().fg(DIM)),
-    ]));
+    lines.push(button_line("Save", app.popup_focus, "  Tab: next  "));
 
     let block = Block::default()
         .title(format!(" {} ", title))
@@ -307,12 +322,7 @@ fn draw_generate_key_alias_popup(frame: &mut Frame, app: &App, area: Rect) {
                 .add_modifier(Modifier::UNDERLINED),
         )]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("  ", Style::default()),
-            Span::styled("[ Confirm ]", Style::default().fg(ACCENT).bold()),
-            Span::raw("  "),
-            Span::styled("[ Cancel ]", Style::default().fg(DIM)),
-        ]),
+        button_line("Confirm", app.popup_focus, "  "),
     ];
 
     let block = Block::default()
@@ -344,12 +354,7 @@ fn draw_import_key_popup(frame: &mut Frame, app: &App, area: Rect) {
                 .add_modifier(Modifier::UNDERLINED),
         )]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("  ", Style::default()),
-            Span::styled("[ Import ]", Style::default().fg(ACCENT).bold()),
-            Span::raw("  "),
-            Span::styled("[ Cancel ]", Style::default().fg(DIM)),
-        ]),
+        button_line("Import", app.popup_focus, "  "),
     ];
 
     let block = Block::default()
@@ -374,12 +379,7 @@ fn draw_rename_key_popup(frame: &mut Frame, app: &App, area: Rect) {
                 .add_modifier(Modifier::UNDERLINED),
         )]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("  ", Style::default()),
-            Span::styled("[ Save ]", Style::default().fg(ACCENT).bold()),
-            Span::raw("  "),
-            Span::styled("[ Cancel ]", Style::default().fg(DIM)),
-        ]),
+        button_line("Save", app.popup_focus, "  "),
     ];
 
     let block = Block::default()
@@ -544,12 +544,7 @@ fn draw_iota_name_lookup(frame: &mut Frame, app: &App, area: Rect) {
                 .add_modifier(Modifier::UNDERLINED),
         )]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("  ", Style::default()),
-            Span::styled("[ Lookup ]", Style::default().fg(ACCENT).bold()),
-            Span::raw("  "),
-            Span::styled("[ Cancel ]", Style::default().fg(DIM)),
-        ]),
+        button_line("Lookup", app.popup_focus, "  "),
     ];
 
     let block = Block::default()
@@ -607,7 +602,12 @@ pub fn actions_menu_area(app: &App, frame_area: Rect) -> Rect {
     let height = row_count + 2; // +2 for borders
 
     // Anchor x to the Actions button position, or fallback to left edge
-    let button_x = app.hint_areas.first().map(|(r, _)| r.x).unwrap_or(0);
+    let button_x = app
+        .hint_areas
+        .iter()
+        .find(|(_, id)| *id == "open_menu")
+        .map(|(r, _)| r.x)
+        .unwrap_or(0);
     let x = button_x.min(frame_area.width.saturating_sub(width));
     // Place just above the status bar (last row of frame)
     let status_bar_y = frame_area.y + frame_area.height.saturating_sub(1);

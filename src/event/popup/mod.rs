@@ -5,12 +5,38 @@ pub(crate) use command_form::build_command_from_form as command_form_build_comma
 
 use crossterm::event::{KeyCode, KeyEvent};
 
-use crate::app::{AddCommandType, App, InputMode, Popup, save_address_book};
+use crate::app::{AddCommandType, App, InputMode, Popup, PopupFocus, save_address_book};
 use crate::ui::common::screen_hints;
 use crate::wallet::WalletCmd;
 
 use super::input::handle_input_key;
 use super::mouse::handle_hint_click;
+
+/// Handle key events when focus is on Submit or Cancel buttons.
+/// Returns `true` if the key was consumed (caller should not process further).
+/// Handle Left/Right arrow keys to move between Submit and Cancel buttons.
+/// Returns `true` if the key was consumed. Does NOT handle Tab (popup-specific
+/// Tab handlers need to manage field-to-button transitions themselves).
+pub(super) fn handle_button_focus_key(app: &mut App, key: KeyEvent) -> bool {
+    if app.popup_focus == PopupFocus::Fields {
+        return false;
+    }
+    match key.code {
+        KeyCode::Right => {
+            if app.popup_focus == PopupFocus::Submit {
+                app.popup_focus = PopupFocus::Cancel;
+            }
+            true
+        }
+        KeyCode::Left => {
+            if app.popup_focus == PopupFocus::Cancel {
+                app.popup_focus = PopupFocus::Submit;
+            }
+            true
+        }
+        _ => false,
+    }
+}
 
 /// Dispatch keyboard events when a popup is open.
 pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
@@ -47,54 +73,120 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
             }
             _ => {}
         },
-        Some(Popup::AddAddress | Popup::EditAddress) => match key.code {
-            KeyCode::Esc => {
-                app.popup = None;
-                app.input_mode = InputMode::Normal;
-                app.input_clear();
+        Some(Popup::AddAddress | Popup::EditAddress) => {
+            if handle_button_focus_key(app, key) {
+                return;
             }
-            KeyCode::Tab => {
-                let val = app.input_buffer.clone();
-                app.address_edit_buffers[app.address_edit_field] = val;
-                app.address_edit_field = (app.address_edit_field + 1) % 3;
-                let next_val = app.address_edit_buffers[app.address_edit_field].clone();
-                app.start_input(&next_val);
-            }
-            KeyCode::Enter => {
-                app.address_edit_buffers[app.address_edit_field] = app.input_buffer.clone();
-                let [label, address, notes] = app.address_edit_buffers.clone();
-                if !label.is_empty() && !address.is_empty() {
-                    if app.popup == Some(Popup::AddAddress) {
-                        // Auto-detect IOTA name: if address doesn't start with 0x, resolve it
-                        if !address.starts_with("0x") {
-                            app.send_cmd(WalletCmd::LookupIotaName {
-                                name: address,
-                                label,
-                                notes,
-                            });
-                        } else {
-                            app.address_book.push(crate::app::AddressEntry {
-                                label,
-                                address,
-                                notes,
-                            });
-                            save_address_book(&app.address_book);
-                        }
-                    } else if let Some(user_idx) = app.user_address_index(app.address_selected) {
-                        if let Some(entry) = app.address_book.get_mut(user_idx) {
-                            entry.label = label;
-                            entry.address = address;
-                            entry.notes = notes;
-                        }
-                        save_address_book(&app.address_book);
+            match key.code {
+                KeyCode::Esc => {
+                    if app.popup_focus != PopupFocus::Fields {
+                        app.popup_focus = PopupFocus::Fields;
+                    } else {
+                        app.popup = None;
+                        app.input_mode = InputMode::Normal;
+                        app.input_clear();
                     }
                 }
-                app.popup = None;
-                app.input_mode = InputMode::Normal;
-                app.input_clear();
+                KeyCode::Tab => match app.popup_focus {
+                    PopupFocus::Fields => {
+                        let val = app.input_buffer.clone();
+                        app.address_edit_buffers[app.address_edit_field] = val;
+                        if app.address_edit_field < 2 {
+                            app.address_edit_field += 1;
+                            let next_val = app.address_edit_buffers[app.address_edit_field].clone();
+                            app.start_input(&next_val);
+                        } else {
+                            app.popup_focus = PopupFocus::Submit;
+                        }
+                    }
+                    PopupFocus::Submit => app.popup_focus = PopupFocus::Cancel,
+                    PopupFocus::Cancel => {
+                        app.address_edit_field = 0;
+                        let val = app.address_edit_buffers[0].clone();
+                        app.start_input(&val);
+                        app.popup_focus = PopupFocus::Fields;
+                    }
+                },
+                KeyCode::BackTab => match app.popup_focus {
+                    PopupFocus::Fields => {
+                        if app.address_edit_field > 0 {
+                            let val = app.input_buffer.clone();
+                            app.address_edit_buffers[app.address_edit_field] = val;
+                            app.address_edit_field -= 1;
+                            let next_val = app.address_edit_buffers[app.address_edit_field].clone();
+                            app.start_input(&next_val);
+                        } else {
+                            app.popup_focus = PopupFocus::Cancel;
+                        }
+                    }
+                    PopupFocus::Submit => {
+                        let val = app.address_edit_buffers[2].clone();
+                        app.address_edit_field = 2;
+                        app.start_input(&val);
+                        app.popup_focus = PopupFocus::Fields;
+                    }
+                    PopupFocus::Cancel => app.popup_focus = PopupFocus::Submit,
+                },
+                KeyCode::Enter => match app.popup_focus {
+                    PopupFocus::Fields => {
+                        // Advance to next field, or to Submit on last field
+                        let val = app.input_buffer.clone();
+                        app.address_edit_buffers[app.address_edit_field] = val;
+                        if app.address_edit_field < 2 {
+                            app.address_edit_field += 1;
+                            let next_val = app.address_edit_buffers[app.address_edit_field].clone();
+                            app.start_input(&next_val);
+                        } else {
+                            app.popup_focus = PopupFocus::Submit;
+                        }
+                    }
+                    PopupFocus::Submit => {
+                        app.address_edit_buffers[app.address_edit_field] = app.input_buffer.clone();
+                        let [label, address, notes] = app.address_edit_buffers.clone();
+                        if !label.is_empty() && !address.is_empty() {
+                            if app.popup == Some(Popup::AddAddress) {
+                                if !address.starts_with("0x") {
+                                    app.send_cmd(WalletCmd::LookupIotaName {
+                                        name: address,
+                                        label,
+                                        notes,
+                                    });
+                                } else {
+                                    app.address_book.push(crate::app::AddressEntry {
+                                        label,
+                                        address,
+                                        notes,
+                                    });
+                                    save_address_book(&app.address_book);
+                                }
+                            } else if let Some(user_idx) =
+                                app.user_address_index(app.address_selected)
+                            {
+                                if let Some(entry) = app.address_book.get_mut(user_idx) {
+                                    entry.label = label;
+                                    entry.address = address;
+                                    entry.notes = notes;
+                                }
+                                save_address_book(&app.address_book);
+                            }
+                        }
+                        app.popup = None;
+                        app.input_mode = InputMode::Normal;
+                        app.input_clear();
+                    }
+                    PopupFocus::Cancel => {
+                        app.popup = None;
+                        app.input_mode = InputMode::Normal;
+                        app.input_clear();
+                    }
+                },
+                _ => {
+                    if app.popup_focus == PopupFocus::Fields {
+                        handle_input_key(app, key);
+                    }
+                }
             }
-            _ => handle_input_key(app, key),
-        },
+        }
         Some(Popup::AddCommand) => {
             let cmd_type = match key.code {
                 KeyCode::Char('1') | KeyCode::Char('t') => Some(AddCommandType::TransferIota),
@@ -147,69 +239,181 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                 app.start_input(&default_alias);
             }
         }
-        Some(Popup::GenerateKeyAlias) => match key.code {
-            KeyCode::Esc => {
-                app.popup = None;
-                app.keys_gen_scheme = None;
-                app.input_mode = InputMode::Normal;
-                app.input_clear();
+        Some(Popup::GenerateKeyAlias) => {
+            if handle_button_focus_key(app, key) {
+                return;
             }
-            KeyCode::Enter => {
-                let alias = app.stop_input();
-                if let Some(scheme) = app.keys_gen_scheme.take() {
-                    let alias = if alias.is_empty() {
-                        format!("key-{}", app.keys.len())
+            match key.code {
+                KeyCode::Esc => {
+                    if app.popup_focus != PopupFocus::Fields {
+                        app.popup_focus = PopupFocus::Fields;
                     } else {
-                        alias
-                    };
-                    app.send_cmd(WalletCmd::GenerateKey {
-                        scheme: scheme.clone(),
-                        alias,
-                    });
-                }
-                app.popup = None;
-            }
-            _ => handle_input_key(app, key),
-        },
-        Some(Popup::ImportKey) => match key.code {
-            KeyCode::Esc => {
-                app.popup = None;
-                app.input_mode = InputMode::Normal;
-                app.input_clear();
-            }
-            KeyCode::Enter => {
-                let val = app.stop_input();
-                if !val.is_empty() {
-                    let alias = format!("imported-{}", app.keys.len());
-                    app.send_cmd(WalletCmd::ImportKey {
-                        scheme: "ed25519".to_string(),
-                        private_key_hex: val,
-                        alias,
-                    });
-                }
-                app.popup = None;
-            }
-            _ => handle_input_key(app, key),
-        },
-        Some(Popup::RenameKey) => match key.code {
-            KeyCode::Esc => {
-                app.popup = None;
-                app.input_mode = InputMode::Normal;
-                app.input_clear();
-            }
-            KeyCode::Enter => {
-                let new_alias = app.stop_input();
-                if !new_alias.is_empty() {
-                    let idx = app.keys_selected;
-                    if let Some(k) = app.keys.get_mut(idx) {
-                        k.alias = new_alias.clone();
+                        app.popup = None;
+                        app.keys_gen_scheme = None;
+                        app.input_mode = InputMode::Normal;
+                        app.input_clear();
                     }
-                    app.send_cmd(WalletCmd::RenameKey { idx, new_alias });
                 }
-                app.popup = None;
+                KeyCode::Tab => {
+                    app.popup_focus = match app.popup_focus {
+                        PopupFocus::Fields => PopupFocus::Submit,
+                        PopupFocus::Submit => PopupFocus::Cancel,
+                        PopupFocus::Cancel => PopupFocus::Fields,
+                    };
+                }
+                KeyCode::BackTab => {
+                    app.popup_focus = match app.popup_focus {
+                        PopupFocus::Fields => PopupFocus::Cancel,
+                        PopupFocus::Submit => PopupFocus::Fields,
+                        PopupFocus::Cancel => PopupFocus::Submit,
+                    };
+                }
+                KeyCode::Enter => match app.popup_focus {
+                    PopupFocus::Fields => {
+                        app.popup_focus = PopupFocus::Submit;
+                    }
+                    PopupFocus::Submit => {
+                        let alias = app.stop_input();
+                        if let Some(scheme) = app.keys_gen_scheme.take() {
+                            let alias = if alias.is_empty() {
+                                format!("key-{}", app.keys.len())
+                            } else {
+                                alias
+                            };
+                            app.send_cmd(WalletCmd::GenerateKey {
+                                scheme: scheme.clone(),
+                                alias,
+                            });
+                        }
+                        app.popup = None;
+                    }
+                    PopupFocus::Cancel => {
+                        app.popup = None;
+                        app.keys_gen_scheme = None;
+                        app.input_mode = InputMode::Normal;
+                        app.input_clear();
+                    }
+                },
+                _ => {
+                    if app.popup_focus == PopupFocus::Fields {
+                        handle_input_key(app, key);
+                    }
+                }
             }
-            _ => handle_input_key(app, key),
-        },
+        }
+        Some(Popup::ImportKey) => {
+            if handle_button_focus_key(app, key) {
+                return;
+            }
+            match key.code {
+                KeyCode::Esc => {
+                    if app.popup_focus != PopupFocus::Fields {
+                        app.popup_focus = PopupFocus::Fields;
+                    } else {
+                        app.popup = None;
+                        app.input_mode = InputMode::Normal;
+                        app.input_clear();
+                    }
+                }
+                KeyCode::Tab => {
+                    app.popup_focus = match app.popup_focus {
+                        PopupFocus::Fields => PopupFocus::Submit,
+                        PopupFocus::Submit => PopupFocus::Cancel,
+                        PopupFocus::Cancel => PopupFocus::Fields,
+                    };
+                }
+                KeyCode::BackTab => {
+                    app.popup_focus = match app.popup_focus {
+                        PopupFocus::Fields => PopupFocus::Cancel,
+                        PopupFocus::Submit => PopupFocus::Fields,
+                        PopupFocus::Cancel => PopupFocus::Submit,
+                    };
+                }
+                KeyCode::Enter => match app.popup_focus {
+                    PopupFocus::Fields => {
+                        app.popup_focus = PopupFocus::Submit;
+                    }
+                    PopupFocus::Submit => {
+                        let val = app.stop_input();
+                        if !val.is_empty() {
+                            let alias = format!("imported-{}", app.keys.len());
+                            app.send_cmd(WalletCmd::ImportKey {
+                                scheme: "ed25519".to_string(),
+                                private_key_hex: val,
+                                alias,
+                            });
+                        }
+                        app.popup = None;
+                    }
+                    PopupFocus::Cancel => {
+                        app.popup = None;
+                        app.input_mode = InputMode::Normal;
+                        app.input_clear();
+                    }
+                },
+                _ => {
+                    if app.popup_focus == PopupFocus::Fields {
+                        handle_input_key(app, key);
+                    }
+                }
+            }
+        }
+        Some(Popup::RenameKey) => {
+            if handle_button_focus_key(app, key) {
+                return;
+            }
+            match key.code {
+                KeyCode::Esc => {
+                    if app.popup_focus != PopupFocus::Fields {
+                        app.popup_focus = PopupFocus::Fields;
+                    } else {
+                        app.popup = None;
+                        app.input_mode = InputMode::Normal;
+                        app.input_clear();
+                    }
+                }
+                KeyCode::Tab => {
+                    app.popup_focus = match app.popup_focus {
+                        PopupFocus::Fields => PopupFocus::Submit,
+                        PopupFocus::Submit => PopupFocus::Cancel,
+                        PopupFocus::Cancel => PopupFocus::Fields,
+                    };
+                }
+                KeyCode::BackTab => {
+                    app.popup_focus = match app.popup_focus {
+                        PopupFocus::Fields => PopupFocus::Cancel,
+                        PopupFocus::Submit => PopupFocus::Fields,
+                        PopupFocus::Cancel => PopupFocus::Submit,
+                    };
+                }
+                KeyCode::Enter => match app.popup_focus {
+                    PopupFocus::Fields => {
+                        app.popup_focus = PopupFocus::Submit;
+                    }
+                    PopupFocus::Submit => {
+                        let new_alias = app.stop_input();
+                        if !new_alias.is_empty() {
+                            let idx = app.keys_selected;
+                            if let Some(k) = app.keys.get_mut(idx) {
+                                k.alias = new_alias.clone();
+                            }
+                            app.send_cmd(WalletCmd::RenameKey { idx, new_alias });
+                        }
+                        app.popup = None;
+                    }
+                    PopupFocus::Cancel => {
+                        app.popup = None;
+                        app.input_mode = InputMode::Normal;
+                        app.input_clear();
+                    }
+                },
+                _ => {
+                    if app.popup_focus == PopupFocus::Fields {
+                        handle_input_key(app, key);
+                    }
+                }
+            }
+        }
         Some(Popup::SwitchNetwork) => {
             use crate::wallet::Network;
             let network = match key.code {
@@ -272,25 +476,62 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
             }
             _ => {}
         },
-        Some(Popup::LookupIotaName) => match key.code {
-            KeyCode::Esc => {
-                app.popup = None;
-                app.input_mode = InputMode::Normal;
-                app.input_clear();
+        Some(Popup::LookupIotaName) => {
+            if handle_button_focus_key(app, key) {
+                return;
             }
-            KeyCode::Enter => {
-                let name = app.stop_input();
-                if !name.is_empty() {
-                    app.send_cmd(WalletCmd::LookupIotaName {
-                        name,
-                        label: String::new(),
-                        notes: String::new(),
-                    });
+            match key.code {
+                KeyCode::Esc => {
+                    if app.popup_focus != PopupFocus::Fields {
+                        app.popup_focus = PopupFocus::Fields;
+                    } else {
+                        app.popup = None;
+                        app.input_mode = InputMode::Normal;
+                        app.input_clear();
+                    }
                 }
-                app.popup = None;
+                KeyCode::Tab => {
+                    app.popup_focus = match app.popup_focus {
+                        PopupFocus::Fields => PopupFocus::Submit,
+                        PopupFocus::Submit => PopupFocus::Cancel,
+                        PopupFocus::Cancel => PopupFocus::Fields,
+                    };
+                }
+                KeyCode::BackTab => {
+                    app.popup_focus = match app.popup_focus {
+                        PopupFocus::Fields => PopupFocus::Cancel,
+                        PopupFocus::Submit => PopupFocus::Fields,
+                        PopupFocus::Cancel => PopupFocus::Submit,
+                    };
+                }
+                KeyCode::Enter => match app.popup_focus {
+                    PopupFocus::Fields => {
+                        app.popup_focus = PopupFocus::Submit;
+                    }
+                    PopupFocus::Submit => {
+                        let name = app.stop_input();
+                        if !name.is_empty() {
+                            app.send_cmd(WalletCmd::LookupIotaName {
+                                name,
+                                label: String::new(),
+                                notes: String::new(),
+                            });
+                        }
+                        app.popup = None;
+                    }
+                    PopupFocus::Cancel => {
+                        app.popup = None;
+                        app.input_mode = InputMode::Normal;
+                        app.input_clear();
+                    }
+                },
+                _ => {
+                    if app.popup_focus == PopupFocus::Fields {
+                        handle_input_key(app, key);
+                    }
+                }
             }
-            _ => handle_input_key(app, key),
-        },
+        }
         Some(Popup::ErrorLog) => match key.code {
             KeyCode::Esc | KeyCode::Char('q') => app.popup = None,
             KeyCode::Down => {
