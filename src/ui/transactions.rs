@@ -9,7 +9,8 @@ use ratatui::{
 };
 
 use super::common::{
-    accent_style, dim_style, header_style, selected_style, sparkle_text, truncate_address,
+    accent_style, detail_line, dim_style, header_style, selected_style, sparkle_text,
+    truncate_address,
 };
 use crate::app::App;
 
@@ -17,7 +18,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let filtering = app.transactions_filter.is_some();
     let filtered = app.filtered_transactions();
 
-    let table_area = if filtering {
+    let filter_split = if filtering {
         let split = Layout::vertical([Constraint::Length(1), Constraint::Min(3)]).split(area);
         let query = app.transactions_filter.as_deref().unwrap_or("");
         let bar = Line::from(vec![
@@ -31,6 +32,22 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         area
     };
 
+    // Split into table + detail pane
+    let layout = Layout::vertical([Constraint::Min(8), Constraint::Length(7)]).split(filter_split);
+    let table_area = layout[0];
+    let detail_area = layout[1];
+
+    draw_table(frame, app, table_area, &filtered, filtering);
+    draw_detail(frame, app, detail_area, &filtered);
+}
+
+fn draw_table(
+    frame: &mut Frame,
+    app: &mut App,
+    table_area: Rect,
+    filtered: &[usize],
+    filtering: bool,
+) {
     let header = Row::new(vec![
         Cell::from("Digest").style(header_style()),
         Cell::from("Status").style(header_style()),
@@ -104,6 +121,50 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     ];
 
     let table = Table::new(rows, widths).header(header).block(block);
-
     frame.render_widget(table, table_area);
+}
+
+fn draw_detail(frame: &mut Frame, app: &App, area: Rect, filtered: &[usize]) {
+    let block = Block::default()
+        .title(sparkle_text(" Details "))
+        .title_style(header_style())
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(dim_style());
+
+    let real_idx = filtered.get(app.transactions_selected).copied();
+    let content = if let Some(tx) = real_idx.and_then(|i| app.transactions.get(i)) {
+        let id_width = area.width.saturating_sub(16) as usize;
+        let status_style = if tx.status == "Success" {
+            accent_style()
+        } else {
+            Style::default().fg(Color::Red)
+        };
+        vec![
+            detail_line(
+                "Digest",
+                &truncate_address(&tx.digest, id_width),
+                accent_style(),
+            ),
+            detail_line("Status", &tx.status, status_style),
+            detail_line("Epoch", &tx.epoch, Style::default()),
+            detail_line(
+                "Gas",
+                &format!(
+                    "{} (compute: {}, storage: {}, rebate: {})",
+                    tx.gas_used, tx.gas_computation, tx.gas_storage, tx.gas_rebate
+                ),
+                dim_style(),
+            ),
+            detail_line(
+                "Changed",
+                &format!("{} objects", tx.changed_objects),
+                dim_style(),
+            ),
+        ]
+    } else {
+        vec![Line::from("  No transaction selected")]
+    };
+
+    frame.render_widget(Paragraph::new(content).block(block), area);
 }

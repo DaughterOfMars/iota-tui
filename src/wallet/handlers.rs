@@ -161,11 +161,16 @@ impl WalletBackend {
                     let gas = &v1.gas_used;
                     let total_gas = gas.computation_cost + gas.storage_cost
                         - gas.storage_rebate.min(gas.storage_cost);
+                    let changed = v1.changed_objects.len();
                     crate::app::TransactionDisplay {
                         digest: v1.transaction_digest.to_string(),
                         status,
                         gas_used: format_gas(total_gas),
                         epoch: format!("{}", v1.epoch),
+                        gas_computation: format_gas(gas.computation_cost),
+                        gas_storage: format_gas(gas.storage_cost),
+                        gas_rebate: format_gas(gas.storage_rebate),
+                        changed_objects: changed,
                     }
                 }
                 _ => crate::app::TransactionDisplay {
@@ -173,6 +178,10 @@ impl WalletBackend {
                     status: "Unsupported effects version".into(),
                     gas_used: "?".into(),
                     epoch: "?".into(),
+                    gas_computation: "?".into(),
+                    gas_storage: "?".into(),
+                    gas_rebate: "?".into(),
+                    changed_objects: 0,
                 },
             })
             .collect();

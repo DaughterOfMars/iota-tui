@@ -74,6 +74,11 @@ pub struct TransactionDisplay {
     pub status: String,
     pub gas_used: String,
     pub epoch: String,
+    // Extended fields for detail pane
+    pub gas_computation: String,
+    pub gas_storage: String,
+    pub gas_rebate: String,
+    pub changed_objects: usize,
 }
 
 /// Result of a dry-run simulation for the transaction builder.
