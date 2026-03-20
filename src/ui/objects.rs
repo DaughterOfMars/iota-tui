@@ -3,8 +3,8 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::{Color, Style},
-    text::Line,
+    style::{Color, Style, Stylize},
+    text::{Line, Span},
     widgets::{Block, BorderType, Borders, Cell, Paragraph, Row, Table},
 };
 
@@ -19,6 +19,24 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
+    let filtering = app.objects_filter.is_some();
+    let filtered = app.filtered_objects();
+
+    let (filter_area, table_area) = if filtering {
+        let split = Layout::vertical([Constraint::Length(1), Constraint::Min(3)]).split(area);
+        let query = app.objects_filter.as_deref().unwrap_or("");
+        let bar = Line::from(vec![
+            Span::styled(" Search: ", Style::default().fg(Color::Yellow).bold()),
+            Span::styled(query, common::accent_style()),
+            Span::styled("_", common::dim_style()),
+        ]);
+        frame.render_widget(Paragraph::new(bar), split[0]);
+        (Some(split[0]), split[1])
+    } else {
+        (None, area)
+    };
+    let _ = filter_area;
+
     if app.objects.is_empty() {
         let block = Block::default()
             .title(common::sparkle_text(" Objects "))
@@ -35,11 +53,11 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
             "  No objects found for this address."
         };
 
-        frame.render_widget(Paragraph::new(msg).block(block), area);
+        frame.render_widget(Paragraph::new(msg).block(block), table_area);
         return;
     }
 
-    let visible_rows = area.height.saturating_sub(4) as usize;
+    let visible_rows = table_area.height.saturating_sub(4) as usize;
 
     let show_all = app.show_multiple_owners();
 
@@ -52,16 +70,18 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
         .style(common::header_style())
         .bottom_margin(1);
 
-    let max_type_width = area.width.saturating_sub(if show_all { 74 } else { 60 }) as usize;
+    let max_type_width = table_area
+        .width
+        .saturating_sub(if show_all { 74 } else { 60 }) as usize;
 
-    let rows: Vec<Row> = app
-        .objects
+    let rows: Vec<Row> = filtered
         .iter()
         .enumerate()
         .skip(app.objects_offset)
         .take(visible_rows)
-        .map(|(i, obj)| {
-            let style = if i == app.objects_selected {
+        .map(|(display_idx, &real_idx)| {
+            let obj = &app.objects[real_idx];
+            let style = if display_idx == app.objects_selected {
                 common::selected_style()
             } else {
                 Style::default()
@@ -101,16 +121,19 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
         ]
     };
 
-    let title = if app.objects.len() > visible_rows {
+    let display_len = filtered.len();
+    let title = if filtering {
+        format!(" Objects ({}/{}) ", display_len, app.objects.len())
+    } else if display_len > visible_rows {
         format!(
             " Objects ({}) [{}-{}/{}] ",
-            app.objects.len(),
+            display_len,
             app.objects_offset + 1,
-            (app.objects_offset + visible_rows).min(app.objects.len()),
-            app.objects.len()
+            (app.objects_offset + visible_rows).min(display_len),
+            display_len
         )
     } else {
-        format!(" Objects ({}) ", app.objects.len())
+        format!(" Objects ({}) ", display_len)
     };
 
     let table = Table::new(rows, widths).header(header).block(
@@ -122,7 +145,7 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
             .border_style(common::dim_style()),
     );
 
-    frame.render_widget(table, area);
+    frame.render_widget(table, table_area);
 }
 
 fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {

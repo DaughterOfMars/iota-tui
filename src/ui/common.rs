@@ -212,6 +212,7 @@ pub fn screen_hints(screen: Screen) -> Vec<(&'static str, &'static str, &'static
         Screen::Coins => vec![
             ("Enter", "explore", "explore"),
             ("t", "type-search", "type_search"),
+            ("/", "search", "filter"),
             ("f", "faucet", "faucet"),
             ("r", "refresh", "refresh"),
             ("?", "help", "help"),
@@ -219,11 +220,13 @@ pub fn screen_hints(screen: Screen) -> Vec<(&'static str, &'static str, &'static
         Screen::Objects => vec![
             ("Enter", "explore", "explore"),
             ("t", "type-search", "type_search"),
+            ("/", "search", "filter"),
             ("r", "refresh", "refresh"),
             ("?", "help", "help"),
         ],
         Screen::Transactions => vec![
             ("Enter", "explore", "explore"),
+            ("/", "search", "filter"),
             ("r", "refresh", "refresh"),
             ("?", "help", "help"),
         ],

@@ -10,6 +10,65 @@ use super::input::handle_input_key;
 use super::nav::ListNav;
 
 pub fn handle_coins_key(app: &mut App, key: KeyEvent) {
+    // Filter mode
+    if app.coins_filter.is_some() {
+        let filtered = app.filtered_coins();
+        match key.code {
+            KeyCode::Esc => {
+                app.coins_filter = None;
+                app.coins_selected = 0;
+                app.coins_offset = 0;
+            }
+            KeyCode::Backspace => {
+                if let Some(ref mut q) = app.coins_filter {
+                    q.pop();
+                    if q.is_empty() {
+                        app.coins_filter = None;
+                    }
+                }
+                app.coins_selected = 0;
+                app.coins_offset = 0;
+            }
+            KeyCode::Char(c) => {
+                if let Some(ref mut q) = app.coins_filter {
+                    q.push(c);
+                }
+                app.coins_selected = 0;
+                app.coins_offset = 0;
+            }
+            KeyCode::Up => {
+                if app.coins_selected > 0 {
+                    app.coins_selected -= 1;
+                }
+            }
+            KeyCode::Down => {
+                if app.coins_selected + 1 < filtered.len() {
+                    app.coins_selected += 1;
+                }
+            }
+            KeyCode::Enter => {
+                // Activate using the filtered index
+                if let Some(&real_idx) = filtered.get(app.coins_selected) {
+                    let old = app.coins_selected;
+                    app.coins_selected = real_idx;
+                    app.activate_selected_coin();
+                    app.coins_selected = old;
+                }
+            }
+            _ => {}
+        }
+        let filtered = app.filtered_coins();
+        if app.coins_selected >= filtered.len() {
+            app.coins_selected = filtered.len().saturating_sub(1);
+        }
+        App::scroll_into_view(
+            app.coins_selected,
+            &mut app.coins_offset,
+            app.content_visible_rows,
+        );
+        return;
+    }
+
     let mut nav = ListNav {
         selected: &mut app.coins_selected,
         offset: &mut app.coins_offset,
@@ -36,11 +95,74 @@ pub fn handle_coins_key(app: &mut App, key: KeyEvent) {
                 app.send_cmd(WalletCmd::RequestFaucet(addr));
             }
         }
+        KeyCode::Char('/') => {
+            app.coins_filter = Some(String::new());
+            app.coins_selected = 0;
+            app.coins_offset = 0;
+        }
         _ => {}
     }
 }
 
 pub fn handle_objects_key(app: &mut App, key: KeyEvent) {
+    // Filter mode
+    if app.objects_filter.is_some() {
+        let filtered = app.filtered_objects();
+        match key.code {
+            KeyCode::Esc => {
+                app.objects_filter = None;
+                app.objects_selected = 0;
+                app.objects_offset = 0;
+            }
+            KeyCode::Backspace => {
+                if let Some(ref mut q) = app.objects_filter {
+                    q.pop();
+                    if q.is_empty() {
+                        app.objects_filter = None;
+                    }
+                }
+                app.objects_selected = 0;
+                app.objects_offset = 0;
+            }
+            KeyCode::Char(c) => {
+                if let Some(ref mut q) = app.objects_filter {
+                    q.push(c);
+                }
+                app.objects_selected = 0;
+                app.objects_offset = 0;
+            }
+            KeyCode::Up => {
+                if app.objects_selected > 0 {
+                    app.objects_selected -= 1;
+                }
+            }
+            KeyCode::Down => {
+                if app.objects_selected + 1 < filtered.len() {
+                    app.objects_selected += 1;
+                }
+            }
+            KeyCode::Enter => {
+                if let Some(&real_idx) = filtered.get(app.objects_selected) {
+                    let old = app.objects_selected;
+                    app.objects_selected = real_idx;
+                    app.activate_selected_object();
+                    app.objects_selected = old;
+                }
+            }
+            _ => {}
+        }
+        let filtered = app.filtered_objects();
+        if app.objects_selected >= filtered.len() {
+            app.objects_selected = filtered.len().saturating_sub(1);
+        }
+        App::scroll_into_view(
+            app.objects_selected,
+            &mut app.objects_offset,
+            app.content_visible_rows,
+        );
+        return;
+    }
+
     let mut nav = ListNav {
         selected: &mut app.objects_selected,
         offset: &mut app.objects_offset,
@@ -60,11 +182,74 @@ pub fn handle_objects_key(app: &mut App, key: KeyEvent) {
                 app.explore_type(tn);
             }
         }
+        KeyCode::Char('/') => {
+            app.objects_filter = Some(String::new());
+            app.objects_selected = 0;
+            app.objects_offset = 0;
+        }
         _ => {}
     }
 }
 
 pub fn handle_transactions_key(app: &mut App, key: KeyEvent) {
+    // Filter mode
+    if app.transactions_filter.is_some() {
+        let filtered = app.filtered_transactions();
+        match key.code {
+            KeyCode::Esc => {
+                app.transactions_filter = None;
+                app.transactions_selected = 0;
+                app.transactions_offset = 0;
+            }
+            KeyCode::Backspace => {
+                if let Some(ref mut q) = app.transactions_filter {
+                    q.pop();
+                    if q.is_empty() {
+                        app.transactions_filter = None;
+                    }
+                }
+                app.transactions_selected = 0;
+                app.transactions_offset = 0;
+            }
+            KeyCode::Char(c) => {
+                if let Some(ref mut q) = app.transactions_filter {
+                    q.push(c);
+                }
+                app.transactions_selected = 0;
+                app.transactions_offset = 0;
+            }
+            KeyCode::Up => {
+                if app.transactions_selected > 0 {
+                    app.transactions_selected -= 1;
+                }
+            }
+            KeyCode::Down => {
+                if app.transactions_selected + 1 < filtered.len() {
+                    app.transactions_selected += 1;
+                }
+            }
+            KeyCode::Enter => {
+                if let Some(&real_idx) = filtered.get(app.transactions_selected) {
+                    let old = app.transactions_selected;
+                    app.transactions_selected = real_idx;
+                    app.activate_selected_transaction();
+                    app.transactions_selected = old;
+                }
+            }
+            _ => {}
+        }
+        let filtered = app.filtered_transactions();
+        if app.transactions_selected >= filtered.len() {
+            app.transactions_selected = filtered.len().saturating_sub(1);
+        }
+        App::scroll_into_view(
+            app.transactions_selected,
+            &mut app.transactions_offset,
+            app.content_visible_rows,
+        );
+        return;
+    }
+
     let mut nav = ListNav {
         selected: &mut app.transactions_selected,
         offset: &mut app.transactions_offset,
@@ -74,8 +259,16 @@ pub fn handle_transactions_key(app: &mut App, key: KeyEvent) {
     if nav.handle_key(key.code) {
         return;
     }
-    if key.code == KeyCode::Enter {
-        app.activate_selected_transaction();
+    match key.code {
+        KeyCode::Enter => {
+            app.activate_selected_transaction();
+        }
+        KeyCode::Char('/') => {
+            app.transactions_filter = Some(String::new());
+            app.transactions_selected = 0;
+            app.transactions_offset = 0;
+        }
+        _ => {}
     }
 }
 

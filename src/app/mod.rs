@@ -34,14 +34,17 @@ pub struct App {
     pub coins_selected: usize,
     pub coins_offset: usize,
     pub total_balance_iota: u128,
+    pub coins_filter: Option<String>,
 
     pub objects: Vec<ObjectDisplay>,
     pub objects_selected: usize,
     pub objects_offset: usize,
+    pub objects_filter: Option<String>,
 
     pub transactions: Vec<TransactionDisplay>,
     pub transactions_selected: usize,
     pub transactions_offset: usize,
+    pub transactions_filter: Option<String>,
 
     pub packages_selected: usize,
     pub packages_offset: usize,
@@ -130,14 +133,17 @@ impl App {
             coins_selected: 0,
             coins_offset: 0,
             total_balance_iota: 0,
+            coins_filter: None,
 
             objects: vec![],
             objects_selected: 0,
             objects_offset: 0,
+            objects_filter: None,
 
             transactions: vec![],
             transactions_selected: 0,
             transactions_offset: 0,
+            transactions_filter: None,
 
             packages_selected: 0,
             packages_offset: 0,
@@ -484,6 +490,10 @@ impl App {
         self.input_mode = InputMode::Normal;
         self.popup = None;
         self.popup_scroll = 0;
+        // Clear filters when switching screens
+        self.coins_filter = None;
+        self.objects_filter = None;
+        self.transactions_filter = None;
         if screen == Screen::Explorer {
             // Load all explorer data upfront so sub-views aren't empty
             self.send_cmd(WalletCmd::RefreshNetworkOverview);
@@ -650,6 +660,67 @@ impl App {
                 o.type_name.contains("package")
                     || o.type_name == "Package"
                     || o.type_name.is_empty()
+            })
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Returns indices into `self.coins` matching the current filter.
+    pub fn filtered_coins(&self) -> Vec<usize> {
+        let Some(ref q) = self.coins_filter else {
+            return (0..self.coins.len()).collect();
+        };
+        if q.is_empty() {
+            return (0..self.coins.len()).collect();
+        }
+        let q = q.to_lowercase();
+        self.coins
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| {
+                c.symbol.to_lowercase().contains(&q)
+                    || c.coin_type.to_lowercase().contains(&q)
+                    || c.balance_display.contains(&q)
+            })
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Returns indices into `self.objects` matching the current filter.
+    pub fn filtered_objects(&self) -> Vec<usize> {
+        let Some(ref q) = self.objects_filter else {
+            return (0..self.objects.len()).collect();
+        };
+        if q.is_empty() {
+            return (0..self.objects.len()).collect();
+        }
+        let q = q.to_lowercase();
+        self.objects
+            .iter()
+            .enumerate()
+            .filter(|(_, o)| {
+                o.type_name.to_lowercase().contains(&q) || o.object_id.to_lowercase().contains(&q)
+            })
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Returns indices into `self.transactions` matching the current filter.
+    pub fn filtered_transactions(&self) -> Vec<usize> {
+        let Some(ref q) = self.transactions_filter else {
+            return (0..self.transactions.len()).collect();
+        };
+        if q.is_empty() {
+            return (0..self.transactions.len()).collect();
+        }
+        let q = q.to_lowercase();
+        self.transactions
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| {
+                t.digest.to_lowercase().contains(&q)
+                    || t.status.to_lowercase().contains(&q)
+                    || t.epoch.contains(&q)
             })
             .map(|(i, _)| i)
             .collect()

@@ -500,6 +500,24 @@ pub(crate) fn handle_hint_click(app: &mut App, action_id: &str) {
                 _ => {}
             }
         }
+        "filter" => match app.screen {
+            Screen::Coins => {
+                app.coins_filter = Some(String::new());
+                app.coins_selected = 0;
+                app.coins_offset = 0;
+            }
+            Screen::Objects => {
+                app.objects_filter = Some(String::new());
+                app.objects_selected = 0;
+                app.objects_offset = 0;
+            }
+            Screen::Transactions => {
+                app.transactions_filter = Some(String::new());
+                app.transactions_selected = 0;
+                app.transactions_offset = 0;
+            }
+            _ => {}
+        },
         "addr_add" => {
             app.address_edit_field = 0;
             app.address_edit_buffers = [String::new(), String::new(), String::new()];

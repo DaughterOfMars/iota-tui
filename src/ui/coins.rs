@@ -47,6 +47,25 @@ fn draw_summary(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
+    let filtering = app.coins_filter.is_some();
+    let filtered = app.filtered_coins();
+
+    // Show filter bar if active
+    let (filter_area, table_area) = if filtering {
+        let split = Layout::vertical([Constraint::Length(1), Constraint::Min(3)]).split(area);
+        let query = app.coins_filter.as_deref().unwrap_or("");
+        let bar = Line::from(vec![
+            Span::styled(" Search: ", Style::default().fg(Color::Yellow).bold()),
+            Span::styled(query, common::accent_style()),
+            Span::styled("_", common::dim_style()),
+        ]);
+        frame.render_widget(Paragraph::new(bar), split[0]);
+        (Some(split[0]), split[1])
+    } else {
+        (None, area)
+    };
+    let _ = filter_area;
+
     if app.coins.is_empty() {
         let block = Block::default()
             .title(common::sparkle_text(" Coins "))
@@ -63,12 +82,12 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
             "  No coins found. Press 'f' to request from faucet (testnet/devnet)."
         };
 
-        frame.render_widget(Paragraph::new(msg).block(block), area);
+        frame.render_widget(Paragraph::new(msg).block(block), table_area);
         return;
     }
 
     // borders (2) + header (1) + header margin (1) = 4 rows overhead
-    let visible_rows = area.height.saturating_sub(4) as usize;
+    let visible_rows = table_area.height.saturating_sub(4) as usize;
 
     let show_all = app.show_multiple_owners();
 
@@ -81,14 +100,14 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
         .style(common::header_style())
         .bottom_margin(1);
 
-    let rows: Vec<Row> = app
-        .coins
+    let rows: Vec<Row> = filtered
         .iter()
         .enumerate()
         .skip(app.coins_offset)
         .take(visible_rows)
-        .map(|(i, coin)| {
-            let style = if i == app.coins_selected {
+        .map(|(display_idx, &real_idx)| {
+            let coin = &app.coins[real_idx];
+            let style = if display_idx == app.coins_selected {
                 common::selected_style()
             } else {
                 Style::default()
@@ -130,16 +149,19 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
         ]
     };
 
-    let title = if app.coins.len() > visible_rows {
+    let display_len = filtered.len();
+    let title = if filtering {
+        format!(" Coins ({}/{}) ", display_len, app.coins.len())
+    } else if display_len > visible_rows {
         format!(
             " Coins ({}) [{}-{}/{}] ",
-            app.coins.len(),
+            display_len,
             app.coins_offset + 1,
-            (app.coins_offset + visible_rows).min(app.coins.len()),
-            app.coins.len()
+            (app.coins_offset + visible_rows).min(display_len),
+            display_len
         )
     } else {
-        format!(" Coins ({}) ", app.coins.len())
+        format!(" Coins ({}) ", display_len)
     };
 
     let table = Table::new(rows, widths).header(header).block(
@@ -151,7 +173,7 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
             .border_style(common::dim_style()),
     );
 
-    frame.render_widget(table, area);
+    frame.render_widget(table, table_area);
 }
 
 fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {

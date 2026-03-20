@@ -2,9 +2,10 @@
 
 use ratatui::{
     Frame,
-    layout::{Constraint, Rect},
-    style::{Color, Style},
-    widgets::{Block, BorderType, Borders, Cell, Row, Table},
+    layout::{Constraint, Layout, Rect},
+    style::{Color, Style, Stylize},
+    text::{Line, Span},
+    widgets::{Block, BorderType, Borders, Cell, Paragraph, Row, Table},
 };
 
 use super::common::{
@@ -13,6 +14,23 @@ use super::common::{
 use crate::app::App;
 
 pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+    let filtering = app.transactions_filter.is_some();
+    let filtered = app.filtered_transactions();
+
+    let table_area = if filtering {
+        let split = Layout::vertical([Constraint::Length(1), Constraint::Min(3)]).split(area);
+        let query = app.transactions_filter.as_deref().unwrap_or("");
+        let bar = Line::from(vec![
+            Span::styled(" Search: ", Style::default().fg(Color::Yellow).bold()),
+            Span::styled(query, accent_style()),
+            Span::styled("_", dim_style()),
+        ]);
+        frame.render_widget(Paragraph::new(bar), split[0]);
+        split[1]
+    } else {
+        area
+    };
+
     let header = Row::new(vec![
         Cell::from("Digest").style(header_style()),
         Cell::from("Status").style(header_style()),
@@ -22,21 +40,21 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     ])
     .height(1);
 
-    let visible_rows = area.height.saturating_sub(4) as usize; // border + header + border-bottom
+    let visible_rows = table_area.height.saturating_sub(4) as usize;
     App::scroll_into_view(
         app.transactions_selected,
         &mut app.transactions_offset,
         visible_rows,
     );
 
-    let rows: Vec<Row> = app
-        .transactions
+    let rows: Vec<Row> = filtered
         .iter()
         .enumerate()
         .skip(app.transactions_offset)
         .take(visible_rows)
-        .map(|(i, tx)| {
-            let style = if i == app.transactions_selected {
+        .map(|(display_idx, &real_idx)| {
+            let tx = &app.transactions[real_idx];
+            let style = if display_idx == app.transactions_selected {
                 selected_style()
             } else {
                 Style::default()
@@ -57,10 +75,17 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         })
         .collect();
 
-    let title = if app.transactions.is_empty() {
+    let display_len = filtered.len();
+    let title = if filtering {
+        format!(
+            " Transactions ({}/{}) ",
+            display_len,
+            app.transactions.len()
+        )
+    } else if app.transactions.is_empty() {
         " Transactions ".to_string()
     } else {
-        format!(" Transactions ({}) ", app.transactions.len())
+        format!(" Transactions ({}) ", display_len)
     };
 
     let block = Block::default()
@@ -80,5 +105,5 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 
     let table = Table::new(rows, widths).header(header).block(block);
 
-    frame.render_widget(table, area);
+    frame.render_widget(table, table_area);
 }
