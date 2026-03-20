@@ -22,12 +22,12 @@ pub fn sync_color_phase(phase: u32) {
 }
 
 const PALETTE: [Color; 6] = [
-    Color::Red,
-    Color::Rgb(255, 165, 0),
-    Color::Yellow,
-    Color::Green,
-    Color::Rgb(80, 120, 255),
-    Color::Magenta,
+    Color::Rgb(255, 182, 193), // light pink
+    Color::Rgb(200, 170, 255), // lavender
+    Color::Rgb(160, 238, 200), // mint
+    Color::Rgb(255, 218, 170), // peach
+    Color::Rgb(150, 200, 255), // sky blue
+    Color::Rgb(255, 245, 170), // soft yellow
 ];
 
 const SPARKLES: [char; 4] = ['✦', '✧', '⋆', '˚'];
