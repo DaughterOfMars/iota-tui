@@ -163,6 +163,25 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         _ => {}
     }
 
+    // Global copy/export: 'c' copies selected, 'C' exports CSV
+    // Skip if a filter is active (chars feed the filter) or on TxBuilder (c = clear)
+    let filter_active = app.coins_filter.is_some()
+        || app.objects_filter.is_some()
+        || app.transactions_filter.is_some();
+    if !filter_active && app.screen != Screen::TxBuilder {
+        match key.code {
+            KeyCode::Char('c') => {
+                app.copy_selected();
+                return;
+            }
+            KeyCode::Char('C') => {
+                app.export_csv();
+                return;
+            }
+            _ => {}
+        }
+    }
+
     match app.screen {
         Screen::Coins => screen::handle_coins_key(app, key),
         Screen::Objects => screen::handle_objects_key(app, key),

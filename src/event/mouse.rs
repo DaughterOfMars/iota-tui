@@ -500,6 +500,12 @@ pub(crate) fn handle_hint_click(app: &mut App, action_id: &str) {
                 _ => {}
             }
         }
+        "copy" => {
+            app.copy_selected();
+        }
+        "export" => {
+            app.export_csv();
+        }
         "filter" => match app.screen {
             Screen::Coins => {
                 app.coins_filter = Some(String::new());

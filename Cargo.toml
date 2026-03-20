@@ -18,4 +18,6 @@ dirs = "5"
 hex = "0.4"
 base64ct = { version = "1.6", features = ["alloc"] }
 
+arboard = "3"
+
 iota-sdk = { git = "https://github.com/iotaledger/iota-rust-sdk", features = ["crypto", "bech32", "graphql", "txn-builder", "types"] }

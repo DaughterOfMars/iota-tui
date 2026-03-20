@@ -97,6 +97,9 @@ pub struct App {
 
     pub nav_idx: usize,
     pub color_phase: u32,
+
+    // Toast notification (auto-dismisses after 2s)
+    pub clipboard_toast: Option<(String, std::time::Instant)>,
 }
 
 impl App {
@@ -184,6 +187,8 @@ impl App {
 
             nav_idx: 0,
             color_phase: crate::wallet::load_theme(),
+
+            clipboard_toast: None,
         }
     }
 
@@ -1015,6 +1020,149 @@ impl App {
     }
 
     /// Adjust a scroll offset so that `selected` is visible within `visible_rows`.
+    /// Copy the primary field of the selected item to the system clipboard.
+    pub fn copy_selected(&mut self) {
+        let text = match self.screen {
+            Screen::Coins => self
+                .coins
+                .get(self.coins_selected)
+                .map(|c| c.object_id.clone()),
+            Screen::Objects => self
+                .objects
+                .get(self.objects_selected)
+                .map(|o| o.object_id.clone()),
+            Screen::Transactions => self
+                .transactions
+                .get(self.transactions_selected)
+                .map(|t| t.digest.clone()),
+            Screen::Packages => {
+                let indices = self.package_indices();
+                indices
+                    .get(self.packages_selected)
+                    .and_then(|&i| self.objects.get(i))
+                    .map(|o| o.object_id.clone())
+            }
+            Screen::AddressBook => {
+                let combined = self.combined_address_book();
+                combined
+                    .get(self.address_selected)
+                    .map(|e| e.address.clone())
+            }
+            Screen::Keys => self.keys.get(self.keys_selected).map(|k| k.address.clone()),
+            Screen::Explorer => {
+                if let Some(ref result) = self.explorer.lookup_result {
+                    result
+                        .field_at(self.explorer.lookup_selected)
+                        .map(|f| f.value.clone())
+                } else {
+                    None
+                }
+            }
+            Screen::TxBuilder => None,
+        };
+
+        if let Some(text) = text {
+            match arboard::Clipboard::new().and_then(|mut cb| cb.set_text(&text)) {
+                Ok(()) => {
+                    let display = if text.len() > 24 {
+                        format!("{}..{}", &text[..10], &text[text.len() - 10..])
+                    } else {
+                        text
+                    };
+                    self.clipboard_toast =
+                        Some((format!("Copied: {}", display), std::time::Instant::now()));
+                }
+                Err(e) => {
+                    self.clipboard_toast =
+                        Some((format!("Copy failed: {}", e), std::time::Instant::now()));
+                }
+            }
+        }
+    }
+
+    /// Export current screen data to a CSV file.
+    pub fn export_csv(&mut self) {
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let screen_name = self.screen.title().to_lowercase().replace(' ', "-");
+        let filename = format!("iota-export-{}-{}.csv", screen_name, timestamp);
+        let path = dirs::home_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join(&filename);
+
+        let content = match self.screen {
+            Screen::Coins => {
+                let mut csv = "Symbol,Type,Balance,Object ID,Owner\n".to_string();
+                for c in &self.coins {
+                    csv.push_str(&format!(
+                        "{},{},{},{},{}\n",
+                        c.symbol, c.coin_type, c.balance_display, c.object_id, c.owner_alias
+                    ));
+                }
+                csv
+            }
+            Screen::Objects => {
+                let mut csv = "Object ID,Type,Version,Digest,Owner\n".to_string();
+                for o in &self.objects {
+                    csv.push_str(&format!(
+                        "{},{},{},{},{}\n",
+                        o.object_id, o.type_name, o.version, o.digest, o.owner_alias
+                    ));
+                }
+                csv
+            }
+            Screen::Transactions => {
+                let mut csv = "Digest,Status,Gas Used,Epoch\n".to_string();
+                for t in &self.transactions {
+                    csv.push_str(&format!(
+                        "{},{},{},{}\n",
+                        t.digest, t.status, t.gas_used, t.epoch
+                    ));
+                }
+                csv
+            }
+            Screen::Keys => {
+                let mut csv = "Alias,Address,Scheme,Active\n".to_string();
+                for k in &self.keys {
+                    csv.push_str(&format!(
+                        "{},{},{},{}\n",
+                        k.alias, k.address, k.scheme, k.is_active
+                    ));
+                }
+                csv
+            }
+            Screen::AddressBook => {
+                let mut csv = "Label,Address,Notes\n".to_string();
+                for e in &self.address_book {
+                    csv.push_str(&format!("{},{},{}\n", e.label, e.address, e.notes));
+                }
+                csv
+            }
+            _ => {
+                self.clipboard_toast = Some((
+                    "Export not available for this screen".into(),
+                    std::time::Instant::now(),
+                ));
+                return;
+            }
+        };
+
+        match std::fs::write(&path, content) {
+            Ok(()) => {
+                self.clipboard_toast = Some((
+                    format!("Exported to ~/{}", filename),
+                    std::time::Instant::now(),
+                ));
+            }
+            Err(e) => {
+                self.clipboard_toast =
+                    Some((format!("Export failed: {}", e), std::time::Instant::now()));
+            }
+        }
+    }
+
     pub fn scroll_into_view(selected: usize, offset: &mut usize, visible_rows: usize) {
         if visible_rows == 0 {
             return;

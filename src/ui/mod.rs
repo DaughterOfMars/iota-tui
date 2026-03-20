@@ -63,4 +63,27 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     if app.popup.is_some() {
         popups::draw_popup(frame, app);
     }
+
+    // Draw toast notification overlay
+    if let Some((ref msg, ref instant)) = app.clipboard_toast
+        && instant.elapsed() < std::time::Duration::from_secs(2)
+    {
+        let msg_width = msg.len() as u16 + 4;
+        let toast_area = ratatui::layout::Rect::new(
+            area.width.saturating_sub(msg_width + 1),
+            area.height.saturating_sub(2),
+            msg_width.min(area.width),
+            1,
+        );
+        let toast = ratatui::widgets::Paragraph::new(ratatui::text::Line::from(vec![
+            ratatui::text::Span::styled(
+                format!("  {}  ", msg),
+                ratatui::style::Style::default()
+                    .fg(ratatui::style::Color::Black)
+                    .bg(ratatui::style::Color::Green),
+            ),
+        ]));
+        frame.render_widget(ratatui::widgets::Clear, toast_area);
+        frame.render_widget(toast, toast_area);
+    }
 }

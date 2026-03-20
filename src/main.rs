@@ -81,6 +81,12 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> colo
                 if app.color_phase > 0 {
                     app.color_phase = app.color_phase.wrapping_add(1);
                 }
+                // Auto-dismiss toast after 2 seconds
+                if let Some((_, ref instant)) = app.clipboard_toast
+                    && instant.elapsed() >= std::time::Duration::from_secs(2)
+                {
+                    app.clipboard_toast = None;
+                }
             }
         }
 
