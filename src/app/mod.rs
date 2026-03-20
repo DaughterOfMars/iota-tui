@@ -100,6 +100,10 @@ pub struct App {
 
     // Toast notification (auto-dismisses after 2s)
     pub clipboard_toast: Option<(String, std::time::Instant)>,
+
+    // Coin management popup state
+    pub quick_transfer_field: usize, // 0 = recipient, 1 = amount
+    pub quick_transfer_buffers: [String; 2],
 }
 
 impl App {
@@ -189,6 +193,9 @@ impl App {
             color_phase: crate::wallet::load_theme(),
 
             clipboard_toast: None,
+
+            quick_transfer_field: 0,
+            quick_transfer_buffers: [String::new(), String::new()],
         }
     }
 
@@ -613,6 +620,104 @@ impl App {
             self.send_cmd(WalletCmd::SetActiveKey(idx));
             self.request_refresh();
         }
+    }
+
+    /// Merge all coins of the same type as the selected coin into a single PTB command.
+    /// Navigates to TxBuilder at Review step, ready to execute.
+    pub fn merge_coins_for_selected(&mut self) {
+        let Some(coin) = self.coins.get(self.coins_selected) else {
+            return;
+        };
+        let coin_type = coin.coin_type.clone();
+        let coin_ids: Vec<String> = self
+            .coins
+            .iter()
+            .filter(|c| c.coin_type == coin_type)
+            .map(|c| c.object_id.clone())
+            .collect();
+        if coin_ids.len() < 2 {
+            self.clipboard_toast = Some((
+                "Only one coin of this type — nothing to merge".into(),
+                std::time::Instant::now(),
+            ));
+            return;
+        }
+        let primary = coin_ids[0].clone();
+        let sources = coin_ids[1..].to_vec();
+        self.tx.reset();
+        self.tx
+            .commands
+            .push(PtbCommand::MergeCoins { primary, sources });
+        self.tx.step = TxBuilderStep::Review;
+        self.navigate(Screen::TxBuilder);
+        self.send_cmd(WalletCmd::DryRun {
+            sender_idx: self.tx.sender,
+            commands: self.tx.commands.clone(),
+        });
+        self.tx.dry_running = true;
+        self.tx.dry_run_dirty = false;
+    }
+
+    /// Build a SplitCoins PTB from the selected coin, splitting into `n` equal parts.
+    pub fn split_selected_coin(&mut self, n: usize) {
+        let Some(coin) = self.coins.get(self.coins_selected) else {
+            return;
+        };
+        if n < 2 {
+            self.clipboard_toast = Some((
+                "Need at least 2 parts to split".into(),
+                std::time::Instant::now(),
+            ));
+            return;
+        }
+        let amount_per = coin.balance / n as u128;
+        if amount_per == 0 {
+            self.clipboard_toast = Some((
+                "Coin balance too small to split".into(),
+                std::time::Instant::now(),
+            ));
+            return;
+        }
+        let amounts: Vec<String> = (0..n - 1).map(|_| amount_per.to_string()).collect();
+        self.tx.reset();
+        self.tx.commands.push(PtbCommand::SplitCoins {
+            coin: coin.object_id.clone(),
+            amounts,
+        });
+        self.tx.step = TxBuilderStep::Review;
+        self.navigate(Screen::TxBuilder);
+        self.send_cmd(WalletCmd::DryRun {
+            sender_idx: self.tx.sender,
+            commands: self.tx.commands.clone(),
+        });
+        self.tx.dry_running = true;
+        self.tx.dry_run_dirty = false;
+    }
+
+    /// Build a TransferIota PTB from the quick transfer popup fields.
+    pub fn finalize_quick_transfer(&mut self) {
+        let [ref recipient, ref amount] = self.quick_transfer_buffers;
+        if recipient.is_empty() || amount.is_empty() {
+            return;
+        }
+        let resolved = self.resolve_address(recipient);
+        let Some(_nanos) = parse_iota_amount(amount) else {
+            self.clipboard_toast = Some(("Invalid amount".into(), std::time::Instant::now()));
+            return;
+        };
+        self.tx.reset();
+        self.tx.commands.push(PtbCommand::TransferIota {
+            recipient: resolved,
+            amount: amount.clone(),
+        });
+        self.tx.step = TxBuilderStep::Review;
+        self.navigate(Screen::TxBuilder);
+        self.send_cmd(WalletCmd::DryRun {
+            sender_idx: self.tx.sender,
+            commands: self.tx.commands.clone(),
+        });
+        self.tx.dry_running = true;
+        self.tx.dry_run_dirty = false;
     }
 
     pub fn open_popup(&mut self, popup: Popup) {

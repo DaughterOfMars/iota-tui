@@ -95,6 +95,23 @@ pub fn handle_coins_key(app: &mut App, key: KeyEvent) {
                 app.send_cmd(WalletCmd::RequestFaucet(addr));
             }
         }
+        KeyCode::Char('m') => {
+            app.merge_coins_for_selected();
+        }
+        KeyCode::Char('s') => {
+            if !app.coins.is_empty() {
+                app.open_popup(Popup::SplitCoin);
+                app.start_input("2");
+            }
+        }
+        KeyCode::Char('x') => {
+            if !app.coins.is_empty() {
+                app.quick_transfer_field = 0;
+                app.quick_transfer_buffers = [String::new(), String::new()];
+                app.open_popup(Popup::QuickTransfer);
+                app.start_input("");
+            }
+        }
         KeyCode::Char('/') => {
             app.coins_filter = Some(String::new());
             app.coins_selected = 0;

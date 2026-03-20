@@ -212,6 +212,9 @@ pub fn screen_hints(screen: Screen) -> Vec<(&'static str, &'static str, &'static
         Screen::Coins => vec![
             ("Enter", "explore", "explore"),
             ("t", "type-search", "type_search"),
+            ("m", "merge", "merge"),
+            ("s", "split", "split"),
+            ("x", "transfer", "quick_transfer"),
             ("/", "search", "filter"),
             ("c", "copy", "copy"),
             ("C", "export", "export"),

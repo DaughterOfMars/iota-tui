@@ -293,6 +293,8 @@ pub enum Popup {
     LookupIotaName,
     ErrorLog,
     ActionsMenu,
+    SplitCoin,
+    QuickTransfer,
 }
 
 // ── Explorer types ─────────────────────────────────────────────────

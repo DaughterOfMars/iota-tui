@@ -595,6 +595,23 @@ pub(crate) fn handle_hint_click(app: &mut App, action_id: &str) {
                 app.open_popup(Popup::ConfirmClearTx);
             }
         }
+        "merge" => {
+            app.merge_coins_for_selected();
+        }
+        "split" => {
+            if !app.coins.is_empty() {
+                app.open_popup(Popup::SplitCoin);
+                app.start_input("2");
+            }
+        }
+        "quick_transfer" => {
+            if !app.coins.is_empty() {
+                app.quick_transfer_field = 0;
+                app.quick_transfer_buffers = [String::new(), String::new()];
+                app.open_popup(Popup::QuickTransfer);
+                app.start_input("");
+            }
+        }
         "explorer_search" => {
             app.start_input("");
         }
@@ -625,6 +642,8 @@ fn handle_popup_click(app: &mut App, col: u16, row: u16) {
         Some(Popup::LookupIotaName) => centered_rect_min(60, 30, 48, 10, area),
         Some(Popup::ErrorLog) => centered_rect_min(80, 80, 60, 20, area),
         Some(Popup::ConfirmQuit) => centered_rect_min(50, 30, 40, 7, area),
+        Some(Popup::SplitCoin) => centered_rect_min(50, 30, 40, 9, area),
+        Some(Popup::QuickTransfer) => centered_rect_min(60, 50, 48, 13, area),
         Some(Popup::ActionsMenu) => actions_menu_area(app, area),
         None => return,
     };
@@ -778,7 +797,9 @@ fn handle_popup_click(app: &mut App, col: u16, row: u16) {
             | Popup::ImportKey
             | Popup::RenameKey
             | Popup::LookupIotaName
-            | Popup::AddCommandForm,
+            | Popup::AddCommandForm
+            | Popup::SplitCoin
+            | Popup::QuickTransfer,
         ) => {
             let button_row = (popup_area.height.saturating_sub(2)) as usize;
             if inner_row == button_row {
@@ -793,6 +814,8 @@ fn handle_popup_click(app: &mut App, col: u16, row: u16) {
                     Some(Popup::ImportKey | Popup::LookupIotaName) => (2, 12),
                     Some(Popup::RenameKey) => (2, 10),
                     Some(Popup::AddCommandForm) => (2, 9),
+                    Some(Popup::SplitCoin) => (2, 11),
+                    Some(Popup::QuickTransfer) => (13, 21),
                     _ => (2, 14),
                 };
                 let cancel_start = submit_end + 2;
@@ -866,11 +889,32 @@ fn click_popup_field(app: &mut App, inner_row: usize) {
             }
         }
         Some(
-            Popup::GenerateKeyAlias | Popup::ImportKey | Popup::RenameKey | Popup::LookupIotaName,
+            Popup::GenerateKeyAlias
+            | Popup::ImportKey
+            | Popup::RenameKey
+            | Popup::LookupIotaName
+            | Popup::SplitCoin,
         ) => {
             // Single-field popups: input is at inner_row 3 (or nearby rows)
             if inner_row <= 4 {
                 app.popup_focus = PopupFocus::Fields;
+            }
+        }
+        Some(Popup::QuickTransfer) => {
+            // Layout: row 0=blank, then per field: label, value, blank
+            let field = match inner_row {
+                1 | 2 => Some(0), // Recipient
+                4 | 5 => Some(1), // Amount
+                _ => None,
+            };
+            if let Some(f) = field {
+                if app.popup_focus != PopupFocus::Fields {
+                    app.quick_transfer_buffers[app.quick_transfer_field] = app.input_buffer.clone();
+                }
+                app.popup_focus = PopupFocus::Fields;
+                app.quick_transfer_field = f;
+                let val = app.quick_transfer_buffers[f].clone();
+                app.start_input(&val);
             }
         }
         _ => {}
@@ -1000,6 +1044,18 @@ fn submit_input_popup(app: &mut App) {
                     app.tx.multi_values.clear();
                 }
             }
+        }
+        Some(Popup::SplitCoin) => {
+            let val = app.stop_input();
+            let n: usize = val.parse().unwrap_or(0);
+            app.popup = None;
+            app.split_selected_coin(n);
+        }
+        Some(Popup::QuickTransfer) => {
+            app.quick_transfer_buffers[app.quick_transfer_field] = app.input_buffer.clone();
+            app.stop_input();
+            app.popup = None;
+            app.finalize_quick_transfer();
         }
         _ => {}
     }

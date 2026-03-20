@@ -130,6 +130,16 @@ pub fn draw_popup(frame: &mut Frame, app: &mut App) {
             frame.render_widget(Clear, popup_area);
             draw_confirm_quit(frame, popup_area);
         }
+        Some(Popup::SplitCoin) => {
+            let popup_area = centered_rect_min(50, 30, 40, 9, area);
+            frame.render_widget(Clear, popup_area);
+            draw_split_coin_popup(frame, app, popup_area);
+        }
+        Some(Popup::QuickTransfer) => {
+            let popup_area = centered_rect_min(60, 50, 48, 13, area);
+            frame.render_widget(Clear, popup_area);
+            draw_quick_transfer_popup(frame, app, popup_area);
+        }
         Some(Popup::ActionsMenu) => {
             let popup_area = actions_menu_area(app, area);
             frame.render_widget(Clear, popup_area);
@@ -660,6 +670,101 @@ fn capitalize(s: &str) -> String {
         None => String::new(),
         Some(c) => c.to_uppercase().to_string() + chars.as_str(),
     }
+}
+
+fn draw_split_coin_popup(frame: &mut Frame, app: &App, area: Rect) {
+    let coin_label = app
+        .coins
+        .get(app.coins_selected)
+        .map(|c| format!("{} ({})", c.symbol, c.balance_display))
+        .unwrap_or_default();
+
+    let text = vec![
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            format!("  Split: {}", coin_label),
+            Style::default().bold(),
+        )]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Number of parts: ", Style::default().fg(Color::White)),
+            Span::styled(
+                format!("{}|", &app.input_buffer),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::UNDERLINED),
+            ),
+        ]),
+        Line::from(""),
+        button_line("Split", app.popup_focus, "  "),
+    ];
+
+    let block = Block::default()
+        .title(sparkle_text(" Split Coin "))
+        .title_style(Style::default().fg(color_at(1)).bold())
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(color_at(2)));
+
+    frame.render_widget(Paragraph::new(text).block(block), area);
+}
+
+fn draw_quick_transfer_popup(frame: &mut Frame, app: &App, area: Rect) {
+    let fields = ["Recipient (address or alias)", "Amount (IOTA)"];
+    let mut lines = vec![Line::from("")];
+
+    for (i, field) in fields.iter().enumerate() {
+        let is_active = app.popup_focus == PopupFocus::Fields && i == app.quick_transfer_field;
+        let value = if is_active {
+            &app.input_buffer
+        } else {
+            &app.quick_transfer_buffers[i]
+        };
+
+        let label_style = if is_active {
+            Style::default().fg(color_at(0)).bold()
+        } else {
+            Style::default().fg(Color::White)
+        };
+
+        lines.push(Line::from(vec![Span::styled(
+            format!("  {}: ", field),
+            label_style,
+        )]));
+
+        let input_style = if is_active {
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::UNDERLINED)
+        } else {
+            Style::default().fg(dim_at(0))
+        };
+
+        let display = if value.is_empty() && !is_active {
+            "(empty)".to_string()
+        } else if is_active {
+            format!("{}|", value)
+        } else {
+            value.clone()
+        };
+
+        lines.push(Line::from(vec![Span::styled(
+            format!("  {}", display),
+            input_style,
+        )]));
+        lines.push(Line::from(""));
+    }
+
+    lines.push(button_line("Send", app.popup_focus, "  Tab: next  "));
+
+    let block = Block::default()
+        .title(sparkle_text(" Quick Transfer "))
+        .title_style(Style::default().fg(color_at(1)).bold())
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(color_at(2)));
+
+    frame.render_widget(Paragraph::new(lines).block(block), area);
 }
 
 fn draw_confirm_quit(frame: &mut Frame, area: Rect) {
