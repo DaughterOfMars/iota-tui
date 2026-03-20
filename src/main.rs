@@ -77,7 +77,11 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> colo
                 }
             }
             // Tick for periodic redraws
-            _ = tick_interval.tick() => {}
+            _ = tick_interval.tick() => {
+                if app.color_phase > 0 {
+                    app.color_phase = app.color_phase.wrapping_add(1);
+                }
+            }
         }
 
         if !app.running {

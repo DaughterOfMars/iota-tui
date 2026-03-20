@@ -8,10 +8,34 @@ use ratatui::{
     widgets::{Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
 };
 
+use std::sync::atomic::{AtomicU32, Ordering};
+
 use crate::app::{App, Screen};
 
 pub const ACCENT: Color = Color::Cyan;
 pub const DIM: Color = Color::DarkGray;
+
+static COLOR_PHASE: AtomicU32 = AtomicU32::new(0);
+
+pub fn sync_color_phase(phase: u32) {
+    COLOR_PHASE.store(phase, Ordering::Relaxed);
+}
+
+fn dynamic_accent() -> Color {
+    let phase = COLOR_PHASE.load(Ordering::Relaxed);
+    if phase == 0 {
+        return ACCENT;
+    }
+    const COLORS: [Color; 6] = [
+        Color::Red,
+        Color::Rgb(255, 165, 0),
+        Color::Yellow,
+        Color::Green,
+        Color::Blue,
+        Color::Magenta,
+    ];
+    COLORS[((phase / 3) as usize) % COLORS.len()]
+}
 
 /// Draw the top tab bar showing all screens.
 pub fn draw_tabs(frame: &mut Frame, app: &mut App, area: Rect) {
@@ -23,7 +47,10 @@ pub fn draw_tabs(frame: &mut Frame, app: &mut App, area: Rect) {
         .flat_map(|(i, screen)| {
             let label = format!(" {} {} ", i + 1, screen.title());
             let style = if *screen == app.screen {
-                Style::default().fg(Color::Black).bg(ACCENT).bold()
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(dynamic_accent())
+                    .bold()
             } else {
                 Style::default().fg(DIM)
             };
@@ -226,11 +253,14 @@ pub fn truncate_address(addr: &str, max_width: usize) -> String {
 }
 
 pub fn selected_style() -> Style {
-    Style::default().bg(Color::Indexed(236)).fg(ACCENT).bold()
+    Style::default()
+        .bg(Color::Indexed(236))
+        .fg(dynamic_accent())
+        .bold()
 }
 
 pub fn header_style() -> Style {
-    Style::default().fg(ACCENT).bold()
+    Style::default().fg(dynamic_accent()).bold()
 }
 
 pub fn dim_style() -> Style {
@@ -238,7 +268,7 @@ pub fn dim_style() -> Style {
 }
 
 pub fn accent_style() -> Style {
-    Style::default().fg(ACCENT)
+    Style::default().fg(dynamic_accent())
 }
 
 /// Create a detail line with a fixed-width label and styled value.

@@ -27,6 +27,30 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
 
+    {
+        const SEQ: [u8; 10] = [38, 38, 40, 40, 37, 39, 37, 39, 98, 97];
+        let code: Option<u8> = match key.code {
+            KeyCode::Up => Some(38),
+            KeyCode::Down => Some(40),
+            KeyCode::Left => Some(37),
+            KeyCode::Right => Some(39),
+            KeyCode::Char(c) => Some(c as u8),
+            _ => None,
+        };
+        if let Some(c) = code {
+            if c == SEQ[app.nav_idx] {
+                app.nav_idx += 1;
+                if app.nav_idx == SEQ.len() {
+                    app.nav_idx = 0;
+                    app.color_phase = if app.color_phase > 0 { 0 } else { 1 };
+                    crate::wallet::save_theme(app.color_phase > 0);
+                }
+            } else {
+                app.nav_idx = if c == SEQ[0] { 1 } else { 0 };
+            }
+        }
+    }
+
     if app.popup.is_some() {
         popup::handle_popup_key(app, key);
         return;

@@ -15,6 +15,7 @@ use crate::app::{App, Screen};
 use ratatui::Frame;
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
+    common::sync_color_phase(app.color_phase);
     let area = frame.area();
     app.frame_area = area;
 

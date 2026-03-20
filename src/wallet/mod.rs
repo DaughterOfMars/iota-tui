@@ -104,6 +104,29 @@ pub fn load_network() -> Network {
         .unwrap_or(Network::Testnet)
 }
 
+fn theme_config_path() -> PathBuf {
+    dirs::data_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("iota-wallet-tui")
+        .join("theme.txt")
+}
+
+pub fn save_theme(active: bool) {
+    let path = theme_config_path();
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(&path, if active { "1" } else { "0" });
+}
+
+pub fn load_theme() -> u32 {
+    let path = theme_config_path();
+    std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| if s.trim() == "1" { Some(1) } else { None })
+        .unwrap_or(0)
+}
+
 // ── Commands and Responses ─────────────────────────────────────────
 
 /// Commands sent from the UI to the wallet backend.
