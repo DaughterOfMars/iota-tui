@@ -22,7 +22,7 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                 return;
             }
 
-            for (i, area) in app.tab_areas.iter().enumerate() {
+            for (i, area) in app.sidebar_areas.iter().enumerate() {
                 if col >= area.x
                     && col < area.x + area.width
                     && row >= area.y

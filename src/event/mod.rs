@@ -27,6 +27,13 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
 
+    // Toggle sidebar collapsed/expanded
+    if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('b') {
+        app.sidebar_collapsed = !app.sidebar_collapsed;
+        crate::wallet::save_sidebar_collapsed(app.sidebar_collapsed);
+        return;
+    }
+
     {
         const SEQ: [u8; 10] = [38, 38, 40, 40, 37, 39, 37, 39, 98, 97];
         let code: Option<u8> = match key.code {

@@ -58,82 +58,84 @@ pub fn sparkle_text(text: &str) -> String {
     format!("{s} {text} {s}")
 }
 
-/// Draw the top tab bar showing all screens.
-pub fn draw_tabs(frame: &mut Frame, app: &mut App, area: Rect) {
-    app.tab_areas.clear();
+/// Width of the sidebar in expanded mode.
+pub const SIDEBAR_WIDTH: u16 = 18;
+/// Width of the sidebar in collapsed mode (just number + padding).
+pub const SIDEBAR_COLLAPSED_WIDTH: u16 = 4;
 
-    let tabs: Vec<Span> = Screen::ALL
-        .iter()
-        .enumerate()
-        .flat_map(|(i, screen)| {
-            let label = if *screen == app.screen {
-                sparkle_text(&format!("{} {}", i + 1, screen.title()))
-            } else {
-                format!(" {} {} ", i + 1, screen.title())
-            };
-            let style = if *screen == app.screen {
-                Style::default()
-                    .fg(Color::Black)
-                    .bg(color_at(i as u32))
-                    .bold()
-            } else {
-                Style::default().fg(dim_at(i as u32))
-            };
-            let mut spans = vec![Span::styled(label, style)];
-            if i < Screen::ALL.len() - 1 {
-                spans.push(Span::styled(
-                    " │ ",
-                    Style::default().fg(dim_at(i as u32 + 1)),
-                ));
-            }
-            spans
-        })
-        .collect();
-
-    // Calculate tab areas for mouse hit-testing
-    let mut x = area.x;
-    for (i, screen) in Screen::ALL.iter().enumerate() {
-        let label = if *screen == app.screen {
-            sparkle_text(&format!("{} {}", i + 1, screen.title()))
-        } else {
-            format!(" {} {} ", i + 1, screen.title())
-        };
-        let width = label.len() as u16;
-        app.tab_areas.push(Rect::new(x, area.y, width, 1));
-        x += width;
-        if i < Screen::ALL.len() - 1 {
-            x += 3; // " │ " separator
-        }
+/// Returns the current sidebar width based on collapsed state.
+pub fn sidebar_width(collapsed: bool) -> u16 {
+    if collapsed {
+        SIDEBAR_COLLAPSED_WIDTH
+    } else {
+        SIDEBAR_WIDTH
     }
-
-    let line = Line::from(tabs);
-    let paragraph = Paragraph::new(line);
-    frame.render_widget(paragraph, area);
 }
 
-/// Draw a horizontal separator line.
-pub fn draw_separator(frame: &mut Frame, area: Rect) {
+/// Draw the left sidebar showing all screens.
+pub fn draw_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
+    app.sidebar_areas.clear();
+
     let phase = COLOR_PHASE.load(Ordering::Relaxed);
-    let sep_text = if phase > 0 {
-        let w = area.width as usize;
-        let spans: Vec<Span> = (0..w)
-            .map(|i| {
-                Span::styled(
-                    "─",
-                    Style::default().fg(PALETTE[((phase / 3) as usize + i / 4) % PALETTE.len()]),
-                )
-            })
-            .collect();
-        Line::from(spans)
-    } else {
-        Line::from("─".repeat(area.width as usize))
-    };
-    let sep = Paragraph::new(sep_text).style(if phase > 0 {
-        Style::default()
-    } else {
-        Style::default().fg(DIM)
-    });
-    frame.render_widget(sep, area);
+
+    // Draw a vertical separator on the right edge
+    for y in area.y..area.y + area.height {
+        let sep_style = if phase > 0 {
+            Style::default().fg(PALETTE[((phase / 3) as usize + y as usize / 2) % PALETTE.len()])
+        } else {
+            Style::default().fg(DIM)
+        };
+        frame.render_widget(
+            Paragraph::new("│").style(sep_style),
+            Rect::new(area.x + area.width - 1, y, 1, 1),
+        );
+    }
+
+    let inner_width = area.width.saturating_sub(1); // exclude separator column
+
+    for (i, screen) in Screen::ALL.iter().enumerate() {
+        let y = area.y + i as u16;
+        if y >= area.y + area.height {
+            break;
+        }
+
+        let row_area = Rect::new(area.x, y, inner_width, 1);
+        app.sidebar_areas.push(row_area);
+
+        let is_active = *screen == app.screen;
+        let num = if i < 9 {
+            format!("{}", i + 1)
+        } else {
+            "0".to_string()
+        };
+
+        let label = if app.sidebar_collapsed {
+            format!(" {} ", num)
+        } else {
+            format!(
+                " {} {:<width$}",
+                num,
+                screen.title(),
+                width = (inner_width as usize).saturating_sub(4)
+            )
+        };
+
+        let style = if is_active {
+            Style::default()
+                .fg(Color::Black)
+                .bg(color_at(i as u32))
+                .bold()
+        } else {
+            Style::default().fg(dim_at(i as u32))
+        };
+
+        // Truncate label to fit
+        let display: String = label.chars().take(inner_width as usize).collect();
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(display, style))),
+            row_area,
+        );
+    }
 }
 
 /// Draw the bottom status bar: network (left), actions button + active address (right).

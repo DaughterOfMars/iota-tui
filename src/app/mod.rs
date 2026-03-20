@@ -75,8 +75,9 @@ pub struct App {
     // Which element is focused in input popups (field, submit, or cancel)
     pub popup_focus: PopupFocus,
 
-    // Layout state for mouse hit-testing
-    pub tab_areas: Vec<ratatui::layout::Rect>,
+    // Sidebar state
+    pub sidebar_collapsed: bool,
+    pub sidebar_areas: Vec<ratatui::layout::Rect>,
     // Clickable action hint areas in the status bar: (rect, action_id)
     pub hint_areas: Vec<(ratatui::layout::Rect, &'static str)>,
     // Selected row in the actions drop-down menu
@@ -165,7 +166,8 @@ impl App {
             popup_scroll: 0,
             popup_focus: PopupFocus::Fields,
 
-            tab_areas: vec![],
+            sidebar_collapsed: crate::wallet::load_sidebar_collapsed(),
+            sidebar_areas: vec![],
             hint_areas: vec![],
             action_menu_selected: 0,
 

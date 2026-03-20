@@ -127,6 +127,29 @@ pub fn load_theme() -> u32 {
         .unwrap_or(0)
 }
 
+fn sidebar_config_path() -> PathBuf {
+    dirs::data_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("iota-wallet-tui")
+        .join("sidebar.txt")
+}
+
+pub fn save_sidebar_collapsed(collapsed: bool) {
+    let path = sidebar_config_path();
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(&path, if collapsed { "1" } else { "0" });
+}
+
+pub fn load_sidebar_collapsed() -> bool {
+    let path = sidebar_config_path();
+    std::fs::read_to_string(&path)
+        .ok()
+        .map(|s| s.trim() == "1")
+        .unwrap_or(false)
+}
+
 // ── Commands and Responses ─────────────────────────────────────────
 
 /// Commands sent from the UI to the wallet backend.
