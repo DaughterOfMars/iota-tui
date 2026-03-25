@@ -659,12 +659,7 @@ pub fn handle_activity_feed_key(app: &mut App, key: KeyEvent) {
                 }
             }
             KeyCode::Enter => {
-                if let Some(&real_idx) = filtered.get(app.feed_selected)
-                    && let Some(event) = app.activity_feed.get(real_idx)
-                {
-                    let digest = event.digest.clone();
-                    app.explore_item(digest);
-                }
+                explore_feed_item(app, &filtered);
             }
             _ => {}
         }
@@ -683,14 +678,7 @@ pub fn handle_activity_feed_key(app: &mut App, key: KeyEvent) {
         return;
     }
     match key.code {
-        KeyCode::Enter => {
-            if let Some(&real_idx) = filtered.get(app.feed_selected)
-                && let Some(event) = app.activity_feed.get(real_idx)
-            {
-                let digest = event.digest.clone();
-                app.explore_item(digest);
-            }
-        }
+        KeyCode::Enter => explore_feed_item(app, &filtered),
         KeyCode::Char('/') => {
             app.feed_filter = Some(String::new());
             app.feed_selected = 0;
@@ -702,5 +690,16 @@ pub fn handle_activity_feed_key(app: &mut App, key: KeyEvent) {
             app.feed_offset = 0;
         }
         _ => {}
+    }
+}
+
+/// Explore the selected feed item by its digest (tx digest for both
+/// transactions and events).
+fn explore_feed_item(app: &mut App, filtered: &[usize]) {
+    if let Some(&real_idx) = filtered.get(app.feed_selected)
+        && let Some(item) = app.activity_feed.get(real_idx)
+        && !item.digest.is_empty()
+    {
+        app.explore_item(item.digest.clone());
     }
 }

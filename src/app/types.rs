@@ -89,6 +89,7 @@ pub struct TransactionDisplay {
     pub status: String,
     pub gas_used: String,
     pub epoch: String,
+    pub tx_kind: String,
     // Extended fields for detail pane
     pub gas_computation: String,
     pub gas_storage: String,
@@ -180,7 +181,7 @@ impl ActivityKind {
 pub struct ActivityEvent {
     pub kind: ActivityKind,
     pub summary: String,
-    /// Transaction digest (for txns) or full event type (for events).
+    /// Transaction digest (for txns) or parent tx digest (for events).
     pub digest: String,
     pub timestamp: String,
     /// Sender address, if known.
@@ -189,6 +190,8 @@ pub struct ActivityEvent {
     pub event_type: String,
     /// Gas used (transactions only).
     pub gas_used: String,
+    /// High-level transaction type (e.g. "Coin Transfer", "Stake").
+    pub tx_kind: String,
     /// Unique key for dedup across polls.
     pub dedup_key: String,
 }

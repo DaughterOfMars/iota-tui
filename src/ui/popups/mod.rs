@@ -11,7 +11,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Paragraph, Wrap},
 };
 
-use crate::app::{App, Popup, PopupFocus};
+use crate::app::{App, Popup, PopupFocus, Screen};
 
 use super::common::{
     centered_rect_min, clamp_scroll, color_at, dim_at, render_popup_scrollbar, screen_hints,
@@ -150,65 +150,63 @@ pub fn draw_popup(frame: &mut Frame, app: &mut App) {
 }
 
 fn draw_help_popup(frame: &mut Frame, app: &mut App, area: Rect) {
-    let text = vec![
+    let hints = screen_hints(app.screen);
+    let screen_title = app.screen.title();
+
+    let mut text = vec![
         Line::from(vec![Span::styled(
-            "IOTA Wallet TUI",
+            format!("{} — Help", screen_title),
             Style::default().fg(color_at(0)).bold(),
         )]),
         Line::from(""),
-        Line::from(vec![Span::styled(
-            "Navigation",
-            Style::default().bold().underlined(),
-        )]),
-        Line::from("  1-0        Switch screens"),
-        Line::from("  Tab        Toggle sidebar"),
-        Line::from("  Up/Down    Move up/down"),
-        Line::from("  Left/Right Tx Builder steps / package drill-down"),
-        Line::from("  Enter      Select / Confirm"),
-        Line::from("  Esc        Cancel / Close popup"),
-        Line::from(""),
-        Line::from(vec![Span::styled(
+    ];
+
+    // Screen-specific actions
+    if !hints.is_empty() {
+        text.push(Line::from(vec![Span::styled(
             "Actions",
             Style::default().bold().underlined(),
-        )]),
-        Line::from("  a          Add entry"),
-        Line::from("  e          Edit entry / rename key / explore pkg"),
-        Line::from("  d/Del      Delete entry"),
-        Line::from("  /          Filter list (Coins/Objects/Txns/Activity)"),
-        Line::from("  t          Type-search (Coins/Objects)"),
-        Line::from("  m          Merge coins / cycle feed mode (Activity)"),
-        Line::from("  s          Split coin / type search (Explorer)"),
-        Line::from("  x          Quick transfer (Coins) / explore (Keys)"),
-        Line::from("  u          Unstake (Staking)"),
-        Line::from("  p          Portfolio (Coins) / private key (Keys)"),
-        Line::from("  c          Copy selected / clear Tx Builder"),
-        Line::from("  C          Export CSV"),
-        Line::from("  g          Generate key"),
-        Line::from("  i          Import key"),
-        Line::from("  Space      Toggle key visibility (Keys)"),
-        Line::from("  n          Switch network"),
-        Line::from("  r          Refresh data from network"),
-        Line::from("  f          Request faucet (testnet/devnet)"),
-        Line::from("  .          Actions menu"),
-        Line::from(""),
-        Line::from(vec![Span::styled(
-            "General",
-            Style::default().bold().underlined(),
-        )]),
-        Line::from("  ?          Show this help"),
-        Line::from("  E          View error log"),
-        Line::from("  q/Ctrl-c   Quit"),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("Mouse: ", Style::default().bold()),
-            Span::raw("Click tabs, list items. Scroll to navigate."),
-        ]),
-        Line::from(""),
-        Line::from(vec![Span::styled(
-            "Press Esc to close",
-            Style::default().fg(dim_at(0)),
-        )]),
-    ];
+        )]));
+        for &(key, short_label, _) in &hints {
+            let desc = hint_description(key, short_label, app.screen);
+            text.push(Line::from(format!("  {:<12}{}", key, desc)));
+        }
+        text.push(Line::from(""));
+    }
+
+    // Navigation
+    text.push(Line::from(vec![Span::styled(
+        "Navigation",
+        Style::default().bold().underlined(),
+    )]));
+    text.push(Line::from("  Up/Down    Navigate list"));
+    match app.screen {
+        Screen::TxBuilder => {
+            text.push(Line::from("  Left/Right Move between steps"));
+        }
+        Screen::Packages => {
+            text.push(Line::from("  Left/Esc   Back to parent level"));
+        }
+        _ => {}
+    }
+    text.push(Line::from("  1-0        Switch screens"));
+    text.push(Line::from("  Tab        Toggle sidebar"));
+    text.push(Line::from(""));
+
+    // Global
+    text.push(Line::from(vec![Span::styled(
+        "Global",
+        Style::default().bold().underlined(),
+    )]));
+    text.push(Line::from("  n          Switch network"));
+    text.push(Line::from("  .          Actions menu"));
+    text.push(Line::from("  E          Error log"));
+    text.push(Line::from("  q/Ctrl-c   Quit"));
+    text.push(Line::from(""));
+    text.push(Line::from(vec![Span::styled(
+        "Press Esc to close",
+        Style::default().fg(dim_at(0)),
+    )]));
 
     let content_len = text.len();
     let inner_height = area.height.saturating_sub(2) as usize;
@@ -678,6 +676,48 @@ fn capitalize(s: &str) -> String {
     match chars.next() {
         None => String::new(),
         Some(c) => c.to_uppercase().to_string() + chars.as_str(),
+    }
+}
+
+/// Map a hint's short label to a full description, context-sensitive per screen.
+fn hint_description(key: &'static str, short: &'static str, screen: Screen) -> &'static str {
+    // Screen-specific overrides first
+    match (screen, key) {
+        (Screen::Coins, "m") => "Merge selected coins",
+        (Screen::Coins, "s") => "Split selected coin",
+        (Screen::Coins, "x") => "Quick transfer coin",
+        (Screen::Coins, "p") => "Portfolio view (multi-account)",
+        (Screen::Coins, "t") => "Search by coin type",
+        (Screen::Coins, "f") => "Request faucet tokens",
+        (Screen::Objects, "t") => "Search by object type",
+        (Screen::Staking, "u") => "Unstake selected stake",
+        (Screen::Packages, "Enter") => "Browse package modules",
+        (Screen::Packages, "e") => "Explore package in explorer",
+        (Screen::Packages, "Esc") => "Back to parent level",
+        (Screen::AddressBook, "a") => "Add address",
+        (Screen::AddressBook, "e") => "Edit selected entry",
+        (Screen::AddressBook, "d") => "Delete selected entry",
+        (Screen::AddressBook, "l") => "Lookup IOTA-Name",
+        (Screen::Keys, "a") => "Activate selected key",
+        (Screen::Keys, "Sp") => "Toggle key visibility",
+        (Screen::Keys, "g") => "Generate new key",
+        (Screen::Keys, "i") => "Import key from private key",
+        (Screen::Keys, "e") => "Rename selected key",
+        (Screen::Keys, "d") => "Delete selected key",
+        (Screen::TxBuilder, "a") => "Add command",
+        (Screen::TxBuilder, "d") => "Delete selected command",
+        (Screen::TxBuilder, "c") => "Clear / reset transaction",
+        (Screen::ActivityFeed, "m") => "Toggle mode (Txns / Events)",
+        (Screen::Explorer, "Enter") => "Search / lookup",
+        _ => match short {
+            "explore" => "Explore in explorer",
+            "filter" | "search" => "Filter list",
+            "copy" => "Copy selected to clipboard",
+            "export" => "Export list as CSV",
+            "refresh" => "Refresh data",
+            "help" => "Show this help",
+            other => other,
+        },
     }
 }
 

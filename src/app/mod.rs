@@ -537,9 +537,11 @@ impl App {
             }
             WalletEvent::PollAllTransactionsResult(txs) => {
                 if !self.poll_seeded {
-                    // First poll: populate feed with recent network history
+                    // First poll: populate feed with recent network history.
+                    // API returns oldest-first within the page; reverse so
+                    // newest transactions appear at the top of the feed.
                     self.last_known_tx_digests = txs.iter().map(|t| t.digest.clone()).collect();
-                    for tx in &txs {
+                    for tx in txs.iter().rev() {
                         self.activity_feed.push(ActivityEvent {
                             kind: ActivityKind::Transaction,
                             summary: tx.status.clone(),
@@ -549,15 +551,17 @@ impl App {
                             sender: String::new(),
                             event_type: String::new(),
                             gas_used: tx.gas_used.clone(),
+                            tx_kind: tx.tx_kind.clone(),
                         });
                     }
                     self.feed_selected = 0;
                     self.feed_offset = 0;
                     self.poll_seeded = true;
                 } else {
-                    // Detect new transactions — iterate oldest-first so
-                    // inserting at position 0 leaves newest on top.
-                    for tx in txs.iter().rev() {
+                    // New transactions: iterate forward (oldest-first from API)
+                    // and insert each at position 0, so newest ends up on top.
+                    let mut added = 0usize;
+                    for tx in &txs {
                         if !self.last_known_tx_digests.contains(&tx.digest) {
                             self.last_known_tx_digests.insert(tx.digest.clone());
                             self.activity_feed.insert(
@@ -571,12 +575,19 @@ impl App {
                                     sender: String::new(),
                                     event_type: String::new(),
                                     gas_used: tx.gas_used.clone(),
+                                    tx_kind: tx.tx_kind.clone(),
                                 },
                             );
+                            added += 1;
                             if self.screen != Screen::ActivityFeed {
                                 self.feed_unread_count += 1;
                             }
                         }
+                    }
+                    // Shift cursor so the previously selected item stays in place.
+                    if added > 0 {
+                        self.feed_selected += added;
+                        self.feed_offset += added;
                     }
                 }
                 self.cap_feed();
@@ -585,23 +596,31 @@ impl App {
                 if !self.events_seeded {
                     self.last_known_event_keys =
                         events.iter().map(|e| e.dedup_key.clone()).collect();
-                    // Insert event history at the top
-                    for (i, ev) in events.iter().enumerate() {
+                    // API returns oldest-first within the page; reverse so
+                    // newest events appear at the top of the feed.
+                    for (i, ev) in events.iter().rev().enumerate() {
                         self.activity_feed.insert(i, ev.clone());
                     }
                     self.feed_selected = 0;
                     self.feed_offset = 0;
                     self.events_seeded = true;
                 } else {
-                    // Iterate oldest-first so inserting at 0 leaves newest on top.
-                    for ev in events.iter().rev() {
+                    // New events: iterate forward (oldest-first from API)
+                    // and insert each at position 0, so newest ends up on top.
+                    let mut added = 0usize;
+                    for ev in &events {
                         if !self.last_known_event_keys.contains(&ev.dedup_key) {
                             self.last_known_event_keys.insert(ev.dedup_key.clone());
                             self.activity_feed.insert(0, ev.clone());
+                            added += 1;
                             if self.screen != Screen::ActivityFeed {
                                 self.feed_unread_count += 1;
                             }
                         }
+                    }
+                    if added > 0 {
+                        self.feed_selected += added;
+                        self.feed_offset += added;
                     }
                 }
                 self.cap_feed();
@@ -612,7 +631,14 @@ impl App {
 
     /// Send a command to the wallet backend (non-blocking).
     pub fn send_cmd(&self, cmd: WalletCmd) {
-        let _ = self.cmd_tx.try_send(cmd);
+        if let Err(tokio::sync::mpsc::error::TrySendError::Full(cmd)) = self.cmd_tx.try_send(cmd) {
+            // Channel full — log and retry once after a short yield.
+            // This can happen when polling floods the channel.
+            let tx = self.cmd_tx.clone();
+            tokio::spawn(async move {
+                let _ = tx.send(cmd).await;
+            });
+        }
     }
 
     /// Number of keys with visibility enabled.

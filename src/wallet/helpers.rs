@@ -283,6 +283,40 @@ pub(super) fn build_tx_sections_v1(
         }
     }
 
+    // Derive transaction kind from the transaction data
+    if let iota_sdk::types::Transaction::V1(tx_v1) = &signed_tx.transaction {
+        let (kind_name, detail) = match &tx_v1.kind {
+            iota_sdk::types::TransactionKind::ProgrammableTransaction(ptx) => (
+                "Programmable Transaction".to_string(),
+                Some(summarize_transaction(&ptx.commands)),
+            ),
+            iota_sdk::types::TransactionKind::Genesis(_) => ("Genesis".to_string(), None),
+            iota_sdk::types::TransactionKind::ConsensusCommitPrologueV1(_) => {
+                ("Consensus Commit Prologue".to_string(), None)
+            }
+            iota_sdk::types::TransactionKind::AuthenticatorStateUpdateV1(_) => {
+                ("Authenticator State Update".to_string(), None)
+            }
+            iota_sdk::types::TransactionKind::RandomnessStateUpdate(_) => {
+                ("Randomness State Update".to_string(), None)
+            }
+            iota_sdk::types::TransactionKind::EndOfEpoch(_) => ("End of Epoch".to_string(), None),
+            _ => ("System".to_string(), None),
+        };
+        overview.push(LookupField {
+            key: "Kind".into(),
+            value: kind_name,
+            action: None,
+        });
+        if let Some(d) = detail {
+            overview.push(LookupField {
+                key: "Summary".into(),
+                value: d,
+                action: None,
+            });
+        }
+    }
+
     let mut sections = vec![LookupSection {
         title: "Transaction".into(),
         fields: overview,
@@ -368,25 +402,10 @@ pub(super) fn build_tx_sections_v1(
                     });
                 }
 
-                // Commands
-                let cmd_fields: Vec<LookupField> = ptx
-                    .commands
-                    .iter()
-                    .enumerate()
-                    .map(|(i, cmd)| {
-                        let (desc, action) = format_command(cmd);
-                        LookupField {
-                            key: format!("Cmd {}", i),
-                            value: desc,
-                            action,
-                        }
-                    })
-                    .collect();
-                if !cmd_fields.is_empty() {
-                    sections.push(LookupSection {
-                        title: "Commands".into(),
-                        fields: cmd_fields,
-                    });
+                // Commands — each command gets its own section for clarity
+                for (i, cmd) in ptx.commands.iter().enumerate() {
+                    let cmd_section = format_command_section(i, cmd);
+                    sections.push(cmd_section);
                 }
             }
         }
@@ -546,82 +565,246 @@ fn format_arguments(args: &[iota_sdk::types::Argument]) -> String {
         .join(", ")
 }
 
-fn format_command(cmd: &iota_sdk::types::Command) -> (String, Option<crate::app::LookupAction>) {
+/// Format a PTB command as its own section with broken-out fields.
+fn format_command_section(idx: usize, cmd: &iota_sdk::types::Command) -> crate::app::LookupSection {
+    use crate::app::{LookupAction, LookupField, LookupSection};
+
     match cmd {
         iota_sdk::types::Command::MoveCall(mc) => {
             let pkg = mc.package.to_string();
-            let mut desc = format!(
-                "MoveCall {}::{}::{}",
-                &pkg[..10.min(pkg.len())],
-                mc.module,
-                mc.function
-            );
+            let mut fields = vec![
+                LookupField {
+                    key: "Package".into(),
+                    value: pkg.clone(),
+                    action: Some(LookupAction::Explore(pkg)),
+                },
+                LookupField {
+                    key: "Function".into(),
+                    value: format!("{}::{}", mc.module, mc.function),
+                    action: None,
+                },
+            ];
             if !mc.type_arguments.is_empty() {
                 let types: Vec<String> = mc.type_arguments.iter().map(prettify_type).collect();
-                write!(desc, "<{}>", types.join(", ")).ok();
+                fields.push(LookupField {
+                    key: "Type Args".into(),
+                    value: types.join(", "),
+                    action: None,
+                });
             }
             if !mc.arguments.is_empty() {
-                write!(desc, "({})", format_arguments(&mc.arguments)).ok();
+                fields.push(LookupField {
+                    key: "Arguments".into(),
+                    value: format_arguments(&mc.arguments),
+                    action: None,
+                });
             }
-            (desc, Some(crate::app::LookupAction::Explore(pkg)))
+            LookupSection {
+                title: format!("Cmd {} — MoveCall", idx),
+                fields,
+            }
         }
-        iota_sdk::types::Command::TransferObjects(t) => {
-            let desc = format!(
-                "TransferObjects [{}] -> {}",
-                format_arguments(&t.objects),
-                format_argument(&t.address)
-            );
-            (desc, None)
-        }
-        iota_sdk::types::Command::SplitCoins(s) => {
-            let desc = format!(
-                "SplitCoins {} -> [{}]",
-                format_argument(&s.coin),
-                format_arguments(&s.amounts)
-            );
-            (desc, None)
-        }
-        iota_sdk::types::Command::MergeCoins(m) => {
-            let desc = format!(
-                "MergeCoins {} <- [{}]",
-                format_argument(&m.coin),
-                format_arguments(&m.coins_to_merge)
-            );
-            (desc, None)
-        }
-        iota_sdk::types::Command::Publish(p) => {
-            let desc = format!(
-                "Publish ({} modules, {} deps)",
-                p.modules.len(),
-                p.dependencies.len()
-            );
-            (desc, None)
-        }
+        iota_sdk::types::Command::TransferObjects(t) => LookupSection {
+            title: format!("Cmd {} — TransferObjects", idx),
+            fields: vec![
+                LookupField {
+                    key: "Objects".into(),
+                    value: format_arguments(&t.objects),
+                    action: None,
+                },
+                LookupField {
+                    key: "Recipient".into(),
+                    value: format_argument(&t.address),
+                    action: None,
+                },
+            ],
+        },
+        iota_sdk::types::Command::SplitCoins(s) => LookupSection {
+            title: format!("Cmd {} — SplitCoins", idx),
+            fields: vec![
+                LookupField {
+                    key: "Coin".into(),
+                    value: format_argument(&s.coin),
+                    action: None,
+                },
+                LookupField {
+                    key: "Amounts".into(),
+                    value: format_arguments(&s.amounts),
+                    action: None,
+                },
+            ],
+        },
+        iota_sdk::types::Command::MergeCoins(m) => LookupSection {
+            title: format!("Cmd {} — MergeCoins", idx),
+            fields: vec![
+                LookupField {
+                    key: "Target".into(),
+                    value: format_argument(&m.coin),
+                    action: None,
+                },
+                LookupField {
+                    key: "Sources".into(),
+                    value: format_arguments(&m.coins_to_merge),
+                    action: None,
+                },
+            ],
+        },
+        iota_sdk::types::Command::Publish(p) => LookupSection {
+            title: format!("Cmd {} — Publish", idx),
+            fields: vec![
+                LookupField {
+                    key: "Modules".into(),
+                    value: format!("{}", p.modules.len()),
+                    action: None,
+                },
+                LookupField {
+                    key: "Dependencies".into(),
+                    value: format!("{}", p.dependencies.len()),
+                    action: None,
+                },
+            ],
+        },
         iota_sdk::types::Command::MakeMoveVector(v) => {
             let type_str = v
                 .type_
                 .as_ref()
                 .map(prettify_type)
                 .unwrap_or_else(|| "?".into());
-            let desc = format!(
-                "MakeMoveVector<{}> [{}]",
-                type_str,
-                format_arguments(&v.elements)
-            );
-            (desc, None)
+            LookupSection {
+                title: format!("Cmd {} — MakeMoveVector", idx),
+                fields: vec![
+                    LookupField {
+                        key: "Type".into(),
+                        value: type_str,
+                        action: None,
+                    },
+                    LookupField {
+                        key: "Elements".into(),
+                        value: format_arguments(&v.elements),
+                        action: None,
+                    },
+                ],
+            }
         }
         iota_sdk::types::Command::Upgrade(u) => {
             let pkg = u.package.to_string();
-            let desc = format!(
-                "Upgrade {} ({} modules, {} deps)",
-                &pkg[..10.min(pkg.len())],
-                u.modules.len(),
-                u.dependencies.len()
-            );
-            (desc, Some(crate::app::LookupAction::Explore(pkg)))
+            LookupSection {
+                title: format!("Cmd {} — Upgrade", idx),
+                fields: vec![
+                    LookupField {
+                        key: "Package".into(),
+                        value: pkg.clone(),
+                        action: Some(LookupAction::Explore(pkg)),
+                    },
+                    LookupField {
+                        key: "Modules".into(),
+                        value: format!("{}", u.modules.len()),
+                        action: None,
+                    },
+                    LookupField {
+                        key: "Dependencies".into(),
+                        value: format!("{}", u.dependencies.len()),
+                        action: None,
+                    },
+                ],
+            }
         }
-        _ => ("Unsupported command type".to_string(), None),
+        _ => LookupSection {
+            title: format!("Cmd {}", idx),
+            fields: vec![LookupField {
+                key: "Type".into(),
+                value: "Unsupported command type".into(),
+                action: None,
+            }],
+        },
     }
+}
+
+/// Derive a human-readable transaction type from the list of PTB commands.
+/// Derive a human-readable label for a transaction kind.
+pub(super) fn summarize_tx_kind(tx: &iota_sdk::types::SignedTransaction) -> String {
+    match &tx.transaction {
+        iota_sdk::types::Transaction::V1(tx_v1) => match &tx_v1.kind {
+            iota_sdk::types::TransactionKind::ProgrammableTransaction(ptx) => {
+                summarize_transaction(&ptx.commands)
+            }
+            iota_sdk::types::TransactionKind::Genesis(_) => "Genesis".to_string(),
+            iota_sdk::types::TransactionKind::ConsensusCommitPrologueV1(_) => {
+                "Consensus Commit".to_string()
+            }
+            iota_sdk::types::TransactionKind::AuthenticatorStateUpdateV1(_) => {
+                "Auth State Update".to_string()
+            }
+            iota_sdk::types::TransactionKind::RandomnessStateUpdate(_) => {
+                "Randomness Update".to_string()
+            }
+            iota_sdk::types::TransactionKind::EndOfEpoch(_) => "End of Epoch".to_string(),
+            _ => "System".to_string(),
+        },
+        _ => "Unknown".to_string(),
+    }
+}
+
+/// Derive a human-readable transaction type from the list of PTB commands.
+pub(super) fn summarize_transaction(commands: &[iota_sdk::types::Command]) -> String {
+    // Collect the "verb" of each command
+    let mut has_transfer = false;
+    let mut has_merge = false;
+    let mut has_publish = false;
+    let mut has_upgrade = false;
+    let mut move_calls: Vec<String> = Vec::new();
+
+    for cmd in commands {
+        match cmd {
+            iota_sdk::types::Command::TransferObjects(_) => has_transfer = true,
+            iota_sdk::types::Command::SplitCoins(_) => {}
+            iota_sdk::types::Command::MergeCoins(_) => has_merge = true,
+            iota_sdk::types::Command::Publish(_) => has_publish = true,
+            iota_sdk::types::Command::Upgrade(_) => has_upgrade = true,
+            iota_sdk::types::Command::MoveCall(mc) => {
+                let label = format!("{}::{}", mc.module, mc.function);
+                if !move_calls.contains(&label) {
+                    move_calls.push(label);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Publish / Upgrade are distinctive enough to lead
+    if has_publish {
+        return "Package Publish".to_string();
+    }
+    if has_upgrade {
+        return "Package Upgrade".to_string();
+    }
+
+    // Check for well-known Move calls
+    for mc in &move_calls {
+        if mc.contains("request_add_stake") || mc.contains("request_add_delegation") {
+            return "Stake".to_string();
+        }
+        if mc.contains("request_withdraw_stake") {
+            return "Unstake".to_string();
+        }
+    }
+
+    // Simple transfer pattern: SplitCoins + TransferObjects with no other Move calls
+    if has_transfer && move_calls.is_empty() {
+        return "Transfer".to_string();
+    }
+
+    // Merge only
+    if has_merge && move_calls.is_empty() && !has_transfer {
+        return "Merge".to_string();
+    }
+
+    // Move call(s) — just say "Move Call" for brevity
+    if !move_calls.is_empty() {
+        return "Move Call".to_string();
+    }
+
+    "PTB".to_string()
 }
 
 pub(super) fn log_error(msg: &str) {

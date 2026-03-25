@@ -7,7 +7,7 @@ use iota_sdk::types::{Address, ObjectType};
 
 use super::helpers::{
     decode_private_key, extract_symbol, format_gas, format_timestamp_ms, generate_keypair,
-    keypair_address, parse_iota_amount, prettify_struct, prettify_type,
+    keypair_address, parse_iota_amount, prettify_struct, prettify_type, summarize_tx_kind,
 };
 use super::{
     BalanceInfo, CoinInfo, Network, ObjectInfo, StoredKey, WalletBackend, WalletEvent, save_network,
@@ -167,6 +167,7 @@ impl WalletBackend {
                         status,
                         gas_used: format_gas(total_gas),
                         epoch: format!("{}", v1.epoch),
+                        tx_kind: String::new(),
                         gas_computation: format_gas(gas.computation_cost),
                         gas_storage: format_gas(gas.storage_cost),
                         gas_rebate: format_gas(gas.storage_rebate),
@@ -178,6 +179,7 @@ impl WalletBackend {
                     status: "Unsupported effects version".into(),
                     gas_used: "?".into(),
                     epoch: "?".into(),
+                    tx_kind: String::new(),
                     gas_computation: "?".into(),
                     gas_storage: "?".into(),
                     gas_rebate: "?".into(),
@@ -886,7 +888,7 @@ impl WalletBackend {
         let client = self.client.as_ref().ok_or("Not connected")?;
 
         let page = client
-            .transactions_effects(
+            .transactions_data_effects(
                 None,
                 PaginationFilter {
                     direction: Direction::Backward,
@@ -898,39 +900,44 @@ impl WalletBackend {
         let txs: Vec<crate::app::TransactionDisplay> = page
             .data()
             .iter()
-            .map(|effects| match effects {
-                iota_sdk::types::TransactionEffects::V1(v1) => {
-                    let status = match &v1.status {
-                        iota_sdk::types::ExecutionStatus::Success => "Success".to_string(),
-                        iota_sdk::types::ExecutionStatus::Failure { error, .. } => {
-                            format!("Failed: {:?}", error)
+            .map(|td| {
+                let tx_kind = summarize_tx_kind(&td.tx);
+                match &td.effects {
+                    iota_sdk::types::TransactionEffects::V1(v1) => {
+                        let status = match &v1.status {
+                            iota_sdk::types::ExecutionStatus::Success => "Success".to_string(),
+                            iota_sdk::types::ExecutionStatus::Failure { error, .. } => {
+                                format!("Failed: {:?}", error)
+                            }
+                            _ => "Unknown".to_string(),
+                        };
+                        let gas = &v1.gas_used;
+                        let total_gas = gas.computation_cost + gas.storage_cost
+                            - gas.storage_rebate.min(gas.storage_cost);
+                        crate::app::TransactionDisplay {
+                            digest: v1.transaction_digest.to_string(),
+                            status,
+                            gas_used: format_gas(total_gas),
+                            epoch: format!("{}", v1.epoch),
+                            tx_kind,
+                            gas_computation: format_gas(gas.computation_cost),
+                            gas_storage: format_gas(gas.storage_cost),
+                            gas_rebate: format_gas(gas.storage_rebate),
+                            changed_objects: v1.changed_objects.len(),
                         }
-                        _ => "Unknown".to_string(),
-                    };
-                    let gas = &v1.gas_used;
-                    let total_gas = gas.computation_cost + gas.storage_cost
-                        - gas.storage_rebate.min(gas.storage_cost);
-                    crate::app::TransactionDisplay {
-                        digest: v1.transaction_digest.to_string(),
-                        status,
-                        gas_used: format_gas(total_gas),
-                        epoch: format!("{}", v1.epoch),
-                        gas_computation: format_gas(gas.computation_cost),
-                        gas_storage: format_gas(gas.storage_cost),
-                        gas_rebate: format_gas(gas.storage_rebate),
-                        changed_objects: v1.changed_objects.len(),
                     }
+                    _ => crate::app::TransactionDisplay {
+                        digest: "?".into(),
+                        status: "Unknown".into(),
+                        gas_used: "?".into(),
+                        epoch: "?".into(),
+                        tx_kind,
+                        gas_computation: "?".into(),
+                        gas_storage: "?".into(),
+                        gas_rebate: "?".into(),
+                        changed_objects: 0,
+                    },
                 }
-                _ => crate::app::TransactionDisplay {
-                    digest: "?".into(),
-                    status: "Unknown".into(),
-                    gas_used: "?".into(),
-                    epoch: "?".into(),
-                    gas_computation: "?".into(),
-                    gas_storage: "?".into(),
-                    gas_rebate: "?".into(),
-                    changed_objects: 0,
-                },
             })
             .collect();
 
@@ -990,7 +997,6 @@ impl WalletBackend {
                 } else {
                     ts.clone()
                 };
-                // Use timestamp + type + BCS bytes as a unique dedup key
                 let bcs_hex = &ev.bcs.0;
                 let dedup_key = format!("{ts}:{event_type}:{bcs_hex}");
                 let summary = if module_name.is_empty() {
@@ -1001,11 +1007,12 @@ impl WalletBackend {
                 crate::app::ActivityEvent {
                     kind: crate::app::ActivityKind::Event,
                     summary,
-                    digest: short_type.to_string(),
+                    digest: String::new(),
                     timestamp: short_ts,
                     sender,
                     event_type: event_type.to_string(),
                     gas_used: String::new(),
+                    tx_kind: String::new(),
                     dedup_key,
                 }
             })

@@ -84,6 +84,7 @@ fn draw_table(
     } else {
         Row::new(vec![
             Cell::from("Time").style(header_style()),
+            Cell::from("Kind").style(header_style()),
             Cell::from("Digest").style(header_style()),
             Cell::from("Status").style(header_style()),
         ])
@@ -127,11 +128,13 @@ fn draw_table(
                     Cell::from(sender_display),
                 ]
             } else {
-                // Digest gets whatever space remains after time + status
+                // Digest gets whatever space remains after time + kind + status
+                let kind_w = event.tx_kind.len().max(4);
                 let digest_budget = inner_w
                     .saturating_sub(time_w)
+                    .saturating_sub(kind_w)
                     .saturating_sub(event.summary.len())
-                    .saturating_sub(6);
+                    .saturating_sub(9); // column gaps
                 let digest_display = if event.digest.len() <= digest_budget {
                     event.digest.clone()
                 } else {
@@ -139,6 +142,7 @@ fn draw_table(
                 };
                 vec![
                     Cell::from(event.timestamp.clone()),
+                    Cell::from(event.tx_kind.clone()),
                     Cell::from(digest_display),
                     Cell::from(event.summary.clone()),
                 ]
@@ -147,33 +151,34 @@ fn draw_table(
         })
         .collect();
 
-    // Compute max width of the middle column from visible data
-    let mid_max: u16 = filtered
-        .iter()
-        .skip(app.feed_offset)
-        .take(visible_rows)
-        .map(|&i| {
-            let e = &app.activity_feed[i];
-            if is_events {
-                e.summary.len()
-            } else {
-                e.digest.len()
-            }
-        })
-        .max()
-        .unwrap_or(10) as u16;
-
-    let widths = if is_events {
-        [
+    let widths: Vec<Constraint> = if is_events {
+        // Compute max event name width from visible data
+        let mid_max: u16 = filtered
+            .iter()
+            .skip(app.feed_offset)
+            .take(visible_rows)
+            .map(|&i| app.activity_feed[i].summary.len())
+            .max()
+            .unwrap_or(10) as u16;
+        vec![
             Constraint::Length(time_w as u16),
             Constraint::Length(mid_max.max(6)),
             Constraint::Min(12),
         ]
     } else {
-        [
+        // Compute max kind width from visible data
+        let kind_max: u16 = filtered
+            .iter()
+            .skip(app.feed_offset)
+            .take(visible_rows)
+            .map(|&i| app.activity_feed[i].tx_kind.len())
+            .max()
+            .unwrap_or(6) as u16;
+        vec![
             Constraint::Length(time_w as u16),
-            Constraint::Min(mid_max.max(12)),
-            Constraint::Min(10),
+            Constraint::Length(kind_max.max(4)),
+            Constraint::Min(12), // digest
+            Constraint::Min(8),  // status
         ]
     };
 
@@ -218,19 +223,20 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect, filtered: &[usize]) {
     let real_idx = filtered.get(app.feed_selected).copied();
     let content = if let Some(event) = real_idx.and_then(|i| app.activity_feed.get(i)) {
         let id_width = area.width.saturating_sub(16) as usize;
-        let mut lines = vec![
-            detail_line("Time", &event.timestamp, Style::default()),
-            detail_line(
-                if event.kind == ActivityKind::Event {
-                    "Type"
-                } else {
-                    "Digest"
-                },
-                &truncate_address(&event.digest, id_width),
-                accent_style(),
-            ),
-            detail_line("Summary", &event.summary, Style::default()),
-        ];
+        let mut lines = vec![detail_line("Time", &event.timestamp, Style::default())];
+        if !event.tx_kind.is_empty() {
+            lines.push(detail_line("Kind", &event.tx_kind, Style::default()));
+        }
+        lines.push(detail_line(
+            if event.kind == ActivityKind::Event {
+                "Event Type"
+            } else {
+                "Digest"
+            },
+            &truncate_address(&event.digest, id_width),
+            accent_style(),
+        ));
+        lines.push(detail_line("Summary", &event.summary, Style::default()));
         if !event.gas_used.is_empty() {
             lines.push(detail_line("Gas", &event.gas_used, dim_style()));
         }

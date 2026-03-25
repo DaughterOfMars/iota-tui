@@ -1,6 +1,9 @@
 //! Lookup and address-page handler methods for `WalletBackend`.
 
-use iota_sdk::graphql_client::{Client, Direction, PaginationFilter, query_types::ObjectFilter};
+use iota_sdk::graphql_client::{
+    Client, Direction, PaginationFilter,
+    query_types::{EventFilter, ObjectFilter},
+};
 use iota_sdk::types::ObjectType;
 
 use super::WalletBackend;
@@ -144,7 +147,7 @@ impl WalletBackend {
             .or_else(|_| query.parse::<iota_sdk::types::Digest>())
             && let Ok(Some(td)) = client.transaction_data_effects(digest).await
         {
-            let sections = match &td.effects {
+            let mut sections = match &td.effects {
                 iota_sdk::types::TransactionEffects::V1(v1) => build_tx_sections_v1(v1, &td.tx),
                 _ => vec![LookupSection {
                     title: "Transaction".into(),
@@ -155,6 +158,50 @@ impl WalletBackend {
                     }],
                 }],
             };
+
+            // Fetch emitted events for this transaction
+            if let Ok(ev_page) = client
+                .events(
+                    EventFilter {
+                        transaction_digest: Some(digest.to_string()),
+                        ..Default::default()
+                    },
+                    PaginationFilter::default(),
+                )
+                .await
+            {
+                let ev_data = ev_page.data();
+                if !ev_data.is_empty() {
+                    let ev_fields: Vec<LookupField> = ev_data
+                        .iter()
+                        .enumerate()
+                        .map(|(i, ev)| {
+                            let event_type = &ev.type_.repr;
+                            let short_type = event_type.rsplit("::").next().unwrap_or(event_type);
+                            let module = ev
+                                .sending_module
+                                .as_ref()
+                                .map(|m| m.name.to_string())
+                                .unwrap_or_default();
+                            let label = if module.is_empty() {
+                                short_type.to_string()
+                            } else {
+                                format!("{module}::{short_type}")
+                            };
+                            let data_str = format_json_value(&ev.json);
+                            LookupField {
+                                key: format!("Event {}", i),
+                                value: format!("{label}: {data_str}"),
+                                action: None,
+                            }
+                        })
+                        .collect();
+                    sections.push(LookupSection {
+                        title: format!("Events ({})", ev_fields.len()),
+                        fields: ev_fields,
+                    });
+                }
+            }
 
             self.event_tx
                 .send(WalletEvent::ExplorerLookupResult(

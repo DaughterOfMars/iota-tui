@@ -43,8 +43,8 @@ async fn main() -> color_eyre::Result<()> {
 
 async fn run(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> color_eyre::Result<()> {
     // Create channels
-    let (cmd_tx, cmd_rx) = mpsc::channel::<WalletCmd>(32);
-    let (event_tx, mut event_rx) = mpsc::channel::<wallet::WalletEvent>(32);
+    let (cmd_tx, cmd_rx) = mpsc::channel::<WalletCmd>(128);
+    let (event_tx, mut event_rx) = mpsc::channel::<wallet::WalletEvent>(128);
 
     // Spawn wallet backend
     let backend = WalletBackend::new(cmd_rx, event_tx);
