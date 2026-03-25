@@ -880,22 +880,14 @@ impl WalletBackend {
         Ok(())
     }
 
-    pub(super) async fn handle_poll_transactions(
+    pub(super) async fn handle_poll_all_transactions(
         &self,
-        addr: Address,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        use iota_sdk::graphql_client::query_types::TransactionsFilter;
-
         let client = self.client.as_ref().ok_or("Not connected")?;
-
-        let filter = TransactionsFilter {
-            sign_address: Some(addr),
-            ..Default::default()
-        };
 
         let page = client
             .transactions_effects(
-                filter,
+                None,
                 PaginationFilter {
                     direction: Direction::Backward,
                     ..PaginationFilter::default()
@@ -943,7 +935,84 @@ impl WalletBackend {
             .collect();
 
         self.event_tx
-            .send(WalletEvent::PollTransactionsResult(txs))
+            .send(WalletEvent::PollAllTransactionsResult(txs))
+            .await?;
+        Ok(())
+    }
+
+    pub(super) async fn handle_poll_events(
+        &self,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        use iota_sdk::graphql_client::query_types::EventFilter;
+
+        let client = self.client.as_ref().ok_or("Not connected")?;
+
+        let page = client
+            .events(
+                None::<EventFilter>,
+                PaginationFilter {
+                    direction: Direction::Backward,
+                    ..PaginationFilter::default()
+                },
+            )
+            .await?;
+
+        let events: Vec<crate::app::ActivityEvent> = page
+            .data()
+            .iter()
+            .map(|ev| {
+                let module_name = ev
+                    .sending_module
+                    .as_ref()
+                    .map(|m| m.name.to_string())
+                    .unwrap_or_default();
+                let event_type = ev.type_.repr.as_str();
+                let short_type = event_type.rsplit("::").next().unwrap_or(event_type);
+                let sender = ev
+                    .sender
+                    .as_ref()
+                    .map(|s| s.address.to_string())
+                    .unwrap_or_default();
+                let ts = ev
+                    .timestamp
+                    .as_ref()
+                    .map(|t| t.0.clone())
+                    .unwrap_or_default();
+                let short_ts = if ts.contains('T') {
+                    ts.split('T')
+                        .nth(1)
+                        .unwrap_or(&ts)
+                        .trim_end_matches('Z')
+                        .split('.')
+                        .next()
+                        .unwrap_or(&ts)
+                        .to_string()
+                } else {
+                    ts.clone()
+                };
+                // Use timestamp + type + BCS bytes as a unique dedup key
+                let bcs_hex = &ev.bcs.0;
+                let dedup_key = format!("{ts}:{event_type}:{bcs_hex}");
+                let summary = if module_name.is_empty() {
+                    short_type.to_string()
+                } else {
+                    format!("{module_name}::{short_type}")
+                };
+                crate::app::ActivityEvent {
+                    kind: crate::app::ActivityKind::Event,
+                    summary,
+                    digest: short_type.to_string(),
+                    timestamp: short_ts,
+                    sender,
+                    event_type: event_type.to_string(),
+                    gas_used: String::new(),
+                    dedup_key,
+                }
+            })
+            .collect();
+
+        self.event_tx
+            .send(WalletEvent::PollEventsResult(events))
             .await?;
         Ok(())
     }

@@ -296,8 +296,11 @@ pub fn screen_hints(screen: Screen) -> Vec<(&'static str, &'static str, &'static
         ],
         Screen::ActivityFeed => vec![
             ("Enter", "explore", "explore"),
+            ("/", "filter", "filter"),
+            ("m", "mode", "feed_mode"),
             ("c", "copy", "copy"),
             ("C", "export", "export"),
+            ("r", "refresh", "refresh"),
             ("?", "help", "help"),
         ],
     }

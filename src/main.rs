@@ -100,16 +100,13 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> colo
                         app.sidebar_width = app.sidebar_width.saturating_sub(3).max(target);
                     }
                 }
-                // Poll for new transactions every 30 seconds (300 ticks)
-                if app.connected {
+                // Poll for new transactions and events every 60s, only while on the Activity Feed
+                if app.connected && app.screen == crate::app::Screen::ActivityFeed {
                     app.poll_tick_counter += 1;
-                    if app.poll_tick_counter >= 900 {
+                    if app.poll_tick_counter >= 1818 {
                         app.poll_tick_counter = 0;
-                        if let Some(key) = app.active_key()
-                            && let Ok(addr) = iota_sdk::types::Address::from_hex(&key.address)
-                        {
-                            let _ = cmd_tx.send(WalletCmd::PollTransactions(addr)).await;
-                        }
+                        let _ = cmd_tx.send(WalletCmd::PollAllTransactions).await;
+                        let _ = cmd_tx.send(WalletCmd::PollEvents).await;
                     }
                 }
             }

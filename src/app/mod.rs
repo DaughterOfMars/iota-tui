@@ -127,9 +127,13 @@ pub struct App {
     pub feed_selected: usize,
     pub feed_offset: usize,
     pub feed_unread_count: usize,
+    pub feed_filter: Option<String>,
+    pub feed_mode: FeedMode,
     pub last_known_tx_digests: std::collections::HashSet<String>,
+    pub last_known_event_keys: std::collections::HashSet<String>,
     pub poll_tick_counter: u32,
     pub poll_seeded: bool,
+    pub events_seeded: bool,
 
     // Portfolio summary mode (aggregated view)
     pub coins_summary_mode: bool,
@@ -251,9 +255,13 @@ impl App {
             feed_selected: 0,
             feed_offset: 0,
             feed_unread_count: 0,
+            feed_filter: None,
+            feed_mode: FeedMode::Transactions,
             last_known_tx_digests: std::collections::HashSet::new(),
+            last_known_event_keys: std::collections::HashSet::new(),
             poll_tick_counter: 0,
             poll_seeded: false,
+            events_seeded: false,
 
             coins_summary_mode: false,
             portfolio_summary: vec![],
@@ -293,13 +301,11 @@ impl App {
                         });
                     }
                 }
-                // Seed the activity feed with current transactions
+                // Seed the activity feed with current transactions and events
                 self.poll_seeded = false;
-                if let Some(key) = self.active_key()
-                    && let Ok(addr) = iota_sdk::types::Address::from_hex(&key.address)
-                {
-                    self.send_cmd(WalletCmd::PollTransactions(addr));
-                }
+                self.events_seeded = false;
+                self.send_cmd(WalletCmd::PollAllTransactions);
+                self.send_cmd(WalletCmd::PollEvents);
             }
             WalletEvent::Balances(balances) => {
                 for b in &balances {
@@ -529,33 +535,42 @@ impl App {
                 self.pkg_functions_offset = 0;
                 self.pkg_view = PackageBrowserView::Functions;
             }
-            WalletEvent::PollTransactionsResult(txs) => {
+            WalletEvent::PollAllTransactionsResult(txs) => {
                 if !self.poll_seeded {
-                    // First poll: seed known digests, no notifications
+                    // First poll: populate feed with recent network history
                     self.last_known_tx_digests = txs.iter().map(|t| t.digest.clone()).collect();
+                    for tx in &txs {
+                        self.activity_feed.push(ActivityEvent {
+                            kind: ActivityKind::Transaction,
+                            summary: tx.status.clone(),
+                            dedup_key: tx.digest.clone(),
+                            digest: tx.digest.clone(),
+                            timestamp: format!("Epoch {}", tx.epoch),
+                            sender: String::new(),
+                            event_type: String::new(),
+                            gas_used: tx.gas_used.clone(),
+                        });
+                    }
+                    self.feed_selected = 0;
+                    self.feed_offset = 0;
                     self.poll_seeded = true;
                 } else {
-                    // Detect new transactions
-                    let secs = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_secs();
-                    let now = format!(
-                        "{:02}:{:02}:{:02}",
-                        (secs / 3600) % 24,
-                        (secs / 60) % 60,
-                        secs % 60
-                    );
-                    for tx in &txs {
+                    // Detect new transactions — iterate oldest-first so
+                    // inserting at position 0 leaves newest on top.
+                    for tx in txs.iter().rev() {
                         if !self.last_known_tx_digests.contains(&tx.digest) {
                             self.last_known_tx_digests.insert(tx.digest.clone());
                             self.activity_feed.insert(
                                 0,
                                 ActivityEvent {
-                                    kind: ActivityKind::OutgoingTx,
-                                    summary: format!("{} ({})", tx.status, tx.gas_used),
+                                    kind: ActivityKind::Transaction,
+                                    summary: tx.status.clone(),
+                                    dedup_key: tx.digest.clone(),
                                     digest: tx.digest.clone(),
-                                    timestamp: now.clone(),
+                                    timestamp: format!("Epoch {}", tx.epoch),
+                                    sender: String::new(),
+                                    event_type: String::new(),
+                                    gas_used: tx.gas_used.clone(),
                                 },
                             );
                             if self.screen != Screen::ActivityFeed {
@@ -563,11 +578,33 @@ impl App {
                             }
                         }
                     }
-                    // Cap feed at 50 entries
-                    if self.activity_feed.len() > 50 {
-                        self.activity_feed.truncate(50);
+                }
+                self.cap_feed();
+            }
+            WalletEvent::PollEventsResult(events) => {
+                if !self.events_seeded {
+                    self.last_known_event_keys =
+                        events.iter().map(|e| e.dedup_key.clone()).collect();
+                    // Insert event history at the top
+                    for (i, ev) in events.iter().enumerate() {
+                        self.activity_feed.insert(i, ev.clone());
+                    }
+                    self.feed_selected = 0;
+                    self.feed_offset = 0;
+                    self.events_seeded = true;
+                } else {
+                    // Iterate oldest-first so inserting at 0 leaves newest on top.
+                    for ev in events.iter().rev() {
+                        if !self.last_known_event_keys.contains(&ev.dedup_key) {
+                            self.last_known_event_keys.insert(ev.dedup_key.clone());
+                            self.activity_feed.insert(0, ev.clone());
+                            if self.screen != Screen::ActivityFeed {
+                                self.feed_unread_count += 1;
+                            }
+                        }
                     }
                 }
+                self.cap_feed();
             }
             WalletEvent::Error(_e) => {}
         }
@@ -667,6 +704,14 @@ impl App {
         }
         if screen == Screen::ActivityFeed {
             self.feed_unread_count = 0;
+            self.feed_filter = None;
+            // Reset poll counter so the next tick cycle starts fresh
+            self.poll_tick_counter = 0;
+            // Trigger an immediate poll if we haven't loaded data yet
+            if self.connected && !self.poll_seeded {
+                self.send_cmd(WalletCmd::PollAllTransactions);
+                self.send_cmd(WalletCmd::PollEvents);
+            }
         }
     }
 
@@ -950,6 +995,12 @@ impl App {
         self.keys.iter().find(|k| k.is_active)
     }
 
+    fn cap_feed(&mut self) {
+        if self.activity_feed.len() > 100 {
+            self.activity_feed.truncate(100);
+        }
+    }
+
     /// Number of key-derived entries shown at the top of the address book.
     /// Returns indices into `self.objects` for objects that look like packages.
     pub fn package_indices(&self) -> Vec<usize> {
@@ -1021,6 +1072,26 @@ impl App {
                 t.digest.to_lowercase().contains(&q)
                     || t.status.to_lowercase().contains(&q)
                     || t.epoch.contains(&q)
+            })
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Returns indices into `self.activity_feed` matching the current feed mode and filter.
+    pub fn filtered_feed(&self) -> Vec<usize> {
+        let q = self.feed_filter.as_deref().unwrap_or("").to_lowercase();
+        self.activity_feed
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| match self.feed_mode {
+                FeedMode::Transactions => e.kind == ActivityKind::Transaction,
+                FeedMode::Events => e.kind == ActivityKind::Event,
+            })
+            .filter(|(_, e)| {
+                q.is_empty()
+                    || e.summary.to_lowercase().contains(&q)
+                    || e.digest.to_lowercase().contains(&q)
+                    || e.timestamp.to_lowercase().contains(&q)
             })
             .map(|(i, _)| i)
             .collect()
@@ -1378,15 +1449,22 @@ impl App {
             },
             Screen::ActivityFeed => {
                 if let Some(e) = self.activity_feed.get(self.feed_selected) {
-                    (
-                        "Activity Details",
-                        vec![
-                            ("Timestamp", e.timestamp.clone()),
-                            ("Kind", e.kind.icon().to_string()),
-                            ("Summary", e.summary.clone()),
-                            ("Digest", e.digest.clone()),
-                        ],
-                    )
+                    let mut fields = vec![
+                        ("Timestamp", e.timestamp.clone()),
+                        ("Kind", e.kind.label().to_string()),
+                        ("Summary", e.summary.clone()),
+                        ("Digest", e.digest.clone()),
+                    ];
+                    if !e.gas_used.is_empty() {
+                        fields.push(("Gas", e.gas_used.clone()));
+                    }
+                    if !e.sender.is_empty() {
+                        fields.push(("Sender", e.sender.clone()));
+                    }
+                    if !e.event_type.is_empty() {
+                        fields.push(("Event Type", e.event_type.clone()));
+                    }
+                    ("Activity Details", fields)
                 } else {
                     ("Activity Details", vec![])
                 }
@@ -1539,14 +1617,13 @@ impl App {
                 csv
             }
             Screen::ActivityFeed => {
-                let mut csv = "Timestamp,Kind,Summary,Digest\n".to_string();
-                for e in &self.activity_feed {
+                let filtered = self.filtered_feed();
+                let mut csv = "Timestamp,Summary,Digest,Gas\n".to_string();
+                for &i in &filtered {
+                    let e = &self.activity_feed[i];
                     csv.push_str(&format!(
                         "{},{},{},{}\n",
-                        e.timestamp,
-                        e.kind.icon(),
-                        e.summary,
-                        e.digest
+                        e.timestamp, e.summary, e.digest, e.gas_used
                     ));
                 }
                 csv

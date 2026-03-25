@@ -110,12 +110,8 @@ fn days_to_ymd(days_since_epoch: u64) -> (u64, u64, u64) {
 pub(super) fn format_gas(nanos: u64) -> String {
     if nanos >= 1_000_000_000 {
         format!("{:.4} IOTA", nanos as f64 / 1_000_000_000.0)
-    } else if nanos >= 1_000_000 {
-        format!("{:.2}M", nanos as f64 / 1_000_000.0)
-    } else if nanos >= 1_000 {
-        format!("{:.1}K", nanos as f64 / 1_000.0)
     } else {
-        format!("{}", nanos)
+        format!("{} NANOS", nanos)
     }
 }
 

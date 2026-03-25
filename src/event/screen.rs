@@ -622,19 +622,85 @@ pub fn handle_tx_key(app: &mut App, key: KeyEvent) {
 }
 
 pub fn handle_activity_feed_key(app: &mut App, key: KeyEvent) {
+    // Filter mode
+    if app.feed_filter.is_some() {
+        let filtered = app.filtered_feed();
+        match key.code {
+            KeyCode::Esc => {
+                app.feed_filter = None;
+                app.feed_selected = 0;
+                app.feed_offset = 0;
+            }
+            KeyCode::Backspace => {
+                if let Some(ref mut q) = app.feed_filter {
+                    q.pop();
+                    if q.is_empty() {
+                        app.feed_filter = None;
+                    }
+                }
+                app.feed_selected = 0;
+                app.feed_offset = 0;
+            }
+            KeyCode::Char(c) => {
+                if let Some(ref mut q) = app.feed_filter {
+                    q.push(c);
+                }
+                app.feed_selected = 0;
+                app.feed_offset = 0;
+            }
+            KeyCode::Up => {
+                if app.feed_selected > 0 {
+                    app.feed_selected -= 1;
+                }
+            }
+            KeyCode::Down => {
+                if app.feed_selected + 1 < filtered.len() {
+                    app.feed_selected += 1;
+                }
+            }
+            KeyCode::Enter => {
+                if let Some(&real_idx) = filtered.get(app.feed_selected)
+                    && let Some(event) = app.activity_feed.get(real_idx)
+                {
+                    let digest = event.digest.clone();
+                    app.explore_item(digest);
+                }
+            }
+            _ => {}
+        }
+        return;
+    }
+
+    // Normal mode
+    let filtered = app.filtered_feed();
     let mut nav = ListNav {
         selected: &mut app.feed_selected,
         offset: &mut app.feed_offset,
-        len: app.activity_feed.len(),
+        len: filtered.len(),
         visible_rows: app.content_visible_rows,
     };
     if nav.handle_key(key.code) {
         return;
     }
-    if key.code == KeyCode::Enter
-        && let Some(event) = app.activity_feed.get(app.feed_selected)
-    {
-        let digest = event.digest.clone();
-        app.explore_item(digest);
+    match key.code {
+        KeyCode::Enter => {
+            if let Some(&real_idx) = filtered.get(app.feed_selected)
+                && let Some(event) = app.activity_feed.get(real_idx)
+            {
+                let digest = event.digest.clone();
+                app.explore_item(digest);
+            }
+        }
+        KeyCode::Char('/') => {
+            app.feed_filter = Some(String::new());
+            app.feed_selected = 0;
+            app.feed_offset = 0;
+        }
+        KeyCode::Char('m') => {
+            app.feed_mode = app.feed_mode.cycle();
+            app.feed_selected = 0;
+            app.feed_offset = 0;
+        }
+        _ => {}
     }
 }

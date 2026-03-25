@@ -74,6 +74,23 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         }
     }
 
+    // When a filter is active, route all keys to the screen handler
+    // so typed characters don't trigger global shortcuts (e.g. 'n' for network).
+    let filter_active = app.coins_filter.is_some()
+        || app.objects_filter.is_some()
+        || app.transactions_filter.is_some()
+        || app.feed_filter.is_some();
+    if filter_active {
+        match app.screen {
+            Screen::Coins => screen::handle_coins_key(app, key),
+            Screen::Objects => screen::handle_objects_key(app, key),
+            Screen::Transactions => screen::handle_transactions_key(app, key),
+            Screen::ActivityFeed => screen::handle_activity_feed_key(app, key),
+            _ => {}
+        }
+        return;
+    }
+
     match key.code {
         KeyCode::Char('q') => {
             app.open_popup(Popup::ConfirmQuit);
@@ -181,11 +198,8 @@ fn handle_key(app: &mut App, key: KeyEvent) {
     }
 
     // Global copy/export: 'c' copies selected, 'C' exports CSV
-    // Skip if a filter is active (chars feed the filter) or on TxBuilder (c = clear)
-    let filter_active = app.coins_filter.is_some()
-        || app.objects_filter.is_some()
-        || app.transactions_filter.is_some();
-    if !filter_active && app.screen != Screen::TxBuilder {
+    // Skip on TxBuilder where 'c' means clear.
+    if app.screen != Screen::TxBuilder {
         match key.code {
             KeyCode::Char('c') => {
                 app.copy_selected();

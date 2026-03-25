@@ -134,16 +134,43 @@ pub struct ModuleFunctionDisplay {
     pub return_types: Vec<String>,
 }
 
+/// Feed display mode — transactions or events.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FeedMode {
+    Transactions,
+    Events,
+}
+
+impl FeedMode {
+    pub fn label(self) -> &'static str {
+        match self {
+            FeedMode::Transactions => "Txns",
+            FeedMode::Events => "Events",
+        }
+    }
+
+    pub fn cycle(self) -> Self {
+        match self {
+            FeedMode::Transactions => FeedMode::Events,
+            FeedMode::Events => FeedMode::Transactions,
+        }
+    }
+}
+
 /// Kind of activity event in the feed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActivityKind {
-    OutgoingTx,
+    /// A transaction (historical or newly detected).
+    Transaction,
+    /// An on-chain event.
+    Event,
 }
 
 impl ActivityKind {
-    pub fn icon(self) -> &'static str {
+    pub fn label(self) -> &'static str {
         match self {
-            ActivityKind::OutgoingTx => ">>",
+            ActivityKind::Transaction => "Transaction",
+            ActivityKind::Event => "Event",
         }
     }
 }
@@ -153,8 +180,17 @@ impl ActivityKind {
 pub struct ActivityEvent {
     pub kind: ActivityKind,
     pub summary: String,
+    /// Transaction digest (for txns) or full event type (for events).
     pub digest: String,
     pub timestamp: String,
+    /// Sender address, if known.
+    pub sender: String,
+    /// Full event type string (events only).
+    pub event_type: String,
+    /// Gas used (transactions only).
+    pub gas_used: String,
+    /// Unique key for dedup across polls.
+    pub dedup_key: String,
 }
 
 /// Result of a dry-run simulation for the transaction builder.
