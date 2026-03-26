@@ -49,8 +49,6 @@ pub struct ExplorerState {
     pub lookup_tx_has_next: bool,
     pub lookup_tx_page: usize,
     pub visible_rows: usize,
-    /// Y position of the pagination row (set during rendering, used for mouse hit-testing).
-    pub pagination_row_y: u16,
 }
 
 impl Default for ExplorerState {
@@ -95,7 +93,6 @@ impl Default for ExplorerState {
             lookup_tx_has_next: false,
             lookup_tx_page: 0,
             visible_rows: 15,
-            pagination_row_y: 0,
         }
     }
 }

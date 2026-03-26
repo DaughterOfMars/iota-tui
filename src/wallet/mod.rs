@@ -197,8 +197,6 @@ pub enum WalletCmd {
         package_addr: String,
         module_name: String,
     },
-    PollAllTransactions,
-    PollEvents,
 }
 
 /// Events sent from the wallet backend back to the UI.
@@ -272,8 +270,6 @@ pub enum WalletEvent {
         module_name: String,
         functions: Vec<crate::app::ModuleFunctionDisplay>,
     },
-    PollAllTransactionsResult(Vec<crate::app::TransactionDisplay>),
-    PollEventsResult(Vec<crate::app::ActivityEvent>),
     Error(String),
 }
 
@@ -364,8 +360,6 @@ impl WalletBackend {
                         .await
                 }
                 WalletCmd::RefreshStakes(addr) => self.handle_stakes(addr).await,
-                WalletCmd::PollAllTransactions => self.handle_poll_all_transactions().await,
-                WalletCmd::PollEvents => self.handle_poll_events().await,
                 WalletCmd::FetchPackageModules { package_addr } => {
                     self.handle_fetch_package_modules(&package_addr).await
                 }

@@ -796,6 +796,52 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                 }
             }
         }
+        Some(Popup::Settings) => {
+            use crate::app::SettingsTab;
+            match key.code {
+                KeyCode::Esc => {
+                    app.popup = None;
+                }
+                KeyCode::Tab => {
+                    app.settings_tab = app.settings_tab.next();
+                }
+                KeyCode::BackTab => {
+                    app.settings_tab = app.settings_tab.prev();
+                }
+                KeyCode::Char('n') => {
+                    app.popup = None;
+                    app.open_popup(Popup::SwitchNetwork);
+                }
+                _ => {
+                    // Route to existing screen handler for the active tab
+                    match app.settings_tab {
+                        SettingsTab::Keys => {
+                            app.screen = crate::app::Screen::Keys;
+                            super::screen::handle_keys_key(app, key);
+                        }
+                        SettingsTab::AddressBook => {
+                            app.screen = crate::app::Screen::AddressBook;
+                            super::screen::handle_address_key(app, key);
+                        }
+                        SettingsTab::Network => {}
+                    }
+                }
+            }
+        }
+        Some(Popup::Welcome) => match key.code {
+            KeyCode::Esc => {
+                app.popup = None;
+            }
+            KeyCode::Char('g') | KeyCode::Char('G') => {
+                app.popup = None;
+                app.open_popup(Popup::GenerateKey);
+            }
+            KeyCode::Char('i') | KeyCode::Char('I') => {
+                app.popup = None;
+                app.open_popup(Popup::ImportKey);
+            }
+            _ => {}
+        },
         None => {}
     }
 }

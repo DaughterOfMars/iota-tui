@@ -2,15 +2,15 @@
 
 use ratatui::{
     Frame,
-    layout::{Alignment, Constraint, Layout, Rect},
+    layout::Rect,
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
+    widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState},
 };
 
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use crate::app::{App, Screen};
+use crate::app::Screen;
 
 pub const ACCENT: Color = Color::Cyan;
 pub const DIM: Color = Color::DarkGray;
@@ -56,158 +56,6 @@ pub fn sparkle_text(text: &str) -> String {
     let idx = (phase / 5) as usize;
     let s = SPARKLES[idx % SPARKLES.len()];
     format!("{s} {text} {s}")
-}
-
-/// Width of the sidebar in expanded mode.
-pub const SIDEBAR_WIDTH: u16 = 18;
-/// Width of the sidebar in collapsed mode (just number + padding).
-pub const SIDEBAR_COLLAPSED_WIDTH: u16 = 4;
-
-/// Draw the left sidebar showing all screens.
-pub fn draw_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
-    app.sidebar_areas.clear();
-
-    let phase = COLOR_PHASE.load(Ordering::Relaxed);
-
-    // Draw a vertical separator on the right edge
-    for y in area.y..area.y + area.height {
-        let sep_style = if phase > 0 {
-            Style::default().fg(PALETTE[((phase / 3) as usize + y as usize / 2) % PALETTE.len()])
-        } else {
-            Style::default().fg(DIM)
-        };
-        frame.render_widget(
-            Paragraph::new("│").style(sep_style),
-            Rect::new(area.x + area.width - 1, y, 1, 1),
-        );
-    }
-
-    let inner_width = area.width.saturating_sub(1); // exclude separator column
-
-    for (i, screen) in Screen::ALL.iter().enumerate() {
-        let y = area.y + i as u16;
-        if y >= area.y + area.height {
-            break;
-        }
-
-        let row_area = Rect::new(area.x, y, inner_width, 1);
-        app.sidebar_areas.push(row_area);
-
-        let is_active = *screen == app.screen;
-        let is_focused = app.sidebar_focus && i == app.sidebar_selected;
-        let num = if i < 9 {
-            format!("{}", i + 1)
-        } else {
-            "0".to_string()
-        };
-
-        let unread = if *screen == Screen::ActivityFeed && app.feed_unread_count > 0 {
-            format!(" ({})", app.feed_unread_count)
-        } else {
-            String::new()
-        };
-
-        let label = if inner_width <= SIDEBAR_COLLAPSED_WIDTH {
-            if *screen == Screen::ActivityFeed && app.feed_unread_count > 0 {
-                format!(" {}*", num)
-            } else {
-                format!(" {} ", num)
-            }
-        } else {
-            format!(
-                " {} {}{:<width$}",
-                num,
-                screen.title(),
-                unread,
-                width =
-                    (inner_width as usize).saturating_sub(4 + screen.title().len() + unread.len())
-            )
-        };
-
-        let style = if is_focused {
-            Style::default().fg(Color::Black).bg(Color::White).bold()
-        } else if is_active {
-            Style::default()
-                .fg(Color::Black)
-                .bg(color_at(i as u32))
-                .bold()
-        } else {
-            Style::default().fg(dim_at(i as u32))
-        };
-
-        // Truncate label to fit
-        let display: String = label.chars().take(inner_width as usize).collect();
-        frame.render_widget(
-            Paragraph::new(Line::from(Span::styled(display, style))),
-            row_area,
-        );
-    }
-}
-
-/// Draw the bottom status bar: network (left), actions button + active address (right).
-pub fn draw_status_bar(frame: &mut Frame, app: &mut App, area: Rect) {
-    app.hint_areas.clear();
-
-    let active_addr = app
-        .active_key()
-        .map(|k| format!("{}..{}", &k.address[..8], &k.address[k.address.len() - 6..]))
-        .unwrap_or_else(|| "No active key".into());
-
-    let net_indicator = if app.loading {
-        Span::styled(
-            format!(" {} ... ", app.network_name),
-            Style::default().fg(Color::Black).bg(Color::Yellow).bold(),
-        )
-    } else if app.connected {
-        Span::styled(
-            format!(" {} ", app.network_name),
-            Style::default().fg(Color::Black).bg(Color::Green).bold(),
-        )
-    } else {
-        Span::styled(
-            " offline ",
-            Style::default().fg(Color::Black).bg(Color::Red).bold(),
-        )
-    };
-
-    let button_text = " [. Actions] ";
-    let addr_tag = " addr ";
-    let addr_text = format!(" {} ", active_addr);
-    let right_width = button_text.len() as u16 + addr_tag.len() as u16 + addr_text.len() as u16 + 1;
-
-    let cols = Layout::horizontal([
-        Constraint::Length(net_indicator.width() as u16),
-        Constraint::Min(0),
-        Constraint::Length(right_width),
-    ])
-    .split(area);
-
-    // Network indicator (left) — clickable to switch network
-    app.hint_areas.push((cols[0], "network"));
-    frame.render_widget(Paragraph::new(Line::from(vec![net_indicator])), cols[0]);
-
-    // Actions button + active address (right)
-    let right_area = cols[2];
-    let button_x = right_area.x;
-    let button_width = button_text.len() as u16;
-    app.hint_areas.push((
-        Rect::new(button_x, right_area.y, button_width, 1),
-        "open_menu",
-    ));
-
-    let right_line = Line::from(vec![
-        Span::styled(button_text, Style::default().fg(color_at(0)).bold()),
-        Span::raw(" "),
-        Span::styled(
-            " addr ",
-            Style::default().fg(Color::Black).bg(color_at(1)).bold(),
-        ),
-        Span::styled(addr_text, Style::default().fg(color_at(2))),
-    ]);
-    frame.render_widget(
-        Paragraph::new(right_line).alignment(Alignment::Right),
-        right_area,
-    );
 }
 
 /// Return structured hints for each screen.
@@ -292,15 +140,6 @@ pub fn screen_hints(screen: Screen) -> Vec<(&'static str, &'static str, &'static
         ],
         Screen::Explorer => vec![
             ("Enter", "search", "explore"),
-            ("r", "refresh", "refresh"),
-            ("?", "help", "help"),
-        ],
-        Screen::ActivityFeed => vec![
-            ("Enter", "explore", "explore"),
-            ("/", "filter", "filter"),
-            ("m", "mode", "feed_mode"),
-            ("c", "copy", "copy"),
-            ("C", "export", "export"),
             ("r", "refresh", "refresh"),
             ("?", "help", "help"),
         ],

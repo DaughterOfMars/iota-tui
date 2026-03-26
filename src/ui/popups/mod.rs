@@ -96,9 +96,9 @@ pub fn draw_popup(frame: &mut Frame, app: &mut App) {
             draw_rename_key_popup(frame, app, popup_area);
         }
         Some(Popup::SwitchNetwork) => {
-            let popup_area = centered_rect_min(50, 40, 36, 12, area);
+            let popup_area = centered_rect_min(50, 50, 44, 16, area);
             frame.render_widget(Clear, popup_area);
-            draw_switch_network_popup(frame, popup_area);
+            draw_switch_network_popup(frame, app, popup_area);
         }
         Some(Popup::ConfirmDeleteAddress) => {
             let popup_area = centered_rect_min(55, 40, 44, 10, area);
@@ -149,6 +149,16 @@ pub fn draw_popup(frame: &mut Frame, app: &mut App) {
             let popup_area = actions_menu_area(app, area);
             frame.render_widget(Clear, popup_area);
             draw_actions_menu(frame, app, popup_area);
+        }
+        Some(Popup::Settings) => {
+            let popup_area = centered_rect_min(75, 75, 60, 20, area);
+            frame.render_widget(Clear, popup_area);
+            draw_settings_popup(frame, app, popup_area);
+        }
+        Some(Popup::Welcome) => {
+            let popup_area = centered_rect_min(50, 30, 42, 9, area);
+            frame.render_widget(Clear, popup_area);
+            draw_welcome_popup(frame, popup_area);
         }
         None => {}
     }
@@ -414,35 +424,65 @@ fn draw_rename_key_popup(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(Paragraph::new(text).block(block), area);
 }
 
-fn draw_switch_network_popup(frame: &mut Frame, area: Rect) {
-    let text = vec![
-        Line::from(""),
-        Line::from(vec![Span::styled(
-            "Select network:",
-            Style::default().bold(),
-        )]),
+fn draw_switch_network_popup(frame: &mut Frame, app: &App, area: Rect) {
+    let mut text = vec![
         Line::from(""),
         Line::from(vec![
-            Span::styled("  [1/m] ", Style::default().fg(color_at(0)).bold()),
-            Span::raw("Mainnet"),
+            Span::styled("  Connected: ", Style::default().fg(dim_at(0))),
+            Span::styled(&app.network_name, Style::default().fg(Color::White).bold()),
         ]),
-        Line::from(vec![
-            Span::styled("  [2/t] ", Style::default().fg(color_at(0)).bold()),
-            Span::raw("Testnet"),
-        ]),
-        Line::from(vec![
-            Span::styled("  [3/d] ", Style::default().fg(color_at(0)).bold()),
-            Span::raw("Devnet"),
-        ]),
-        Line::from(""),
-        Line::from(vec![Span::styled(
-            "  Esc to cancel",
-            Style::default().fg(dim_at(0)),
-        )]),
     ];
 
+    // Show network overview stats if available
+    if let Some(ref ov) = app.explorer.overview {
+        text.push(Line::from(""));
+        text.push(Line::from(vec![
+            Span::styled("  Chain ID    ", Style::default().fg(dim_at(0))),
+            Span::styled(&ov.chain_id, Style::default().fg(Color::White)),
+        ]));
+        text.push(Line::from(vec![
+            Span::styled("  Epoch       ", Style::default().fg(dim_at(0))),
+            Span::styled(&ov.epoch, Style::default().fg(Color::White)),
+        ]));
+        text.push(Line::from(vec![
+            Span::styled("  Gas Price   ", Style::default().fg(dim_at(0))),
+            Span::styled(&ov.gas_price, Style::default().fg(Color::White)),
+        ]));
+        text.push(Line::from(vec![
+            Span::styled("  Checkpoint  ", Style::default().fg(dim_at(0))),
+            Span::styled(&ov.latest_checkpoint, Style::default().fg(Color::White)),
+        ]));
+        text.push(Line::from(vec![
+            Span::styled("  Total Txs   ", Style::default().fg(dim_at(0))),
+            Span::styled(&ov.total_txs, Style::default().fg(Color::White)),
+        ]));
+    }
+
+    text.push(Line::from(""));
+    text.push(Line::from(vec![Span::styled(
+        "  Switch to:",
+        Style::default().bold(),
+    )]));
+    text.push(Line::from(vec![
+        Span::styled("  [1/m] ", Style::default().fg(color_at(0)).bold()),
+        Span::raw("Mainnet"),
+    ]));
+    text.push(Line::from(vec![
+        Span::styled("  [2/t] ", Style::default().fg(color_at(0)).bold()),
+        Span::raw("Testnet"),
+    ]));
+    text.push(Line::from(vec![
+        Span::styled("  [3/d] ", Style::default().fg(color_at(0)).bold()),
+        Span::raw("Devnet"),
+    ]));
+    text.push(Line::from(""));
+    text.push(Line::from(vec![Span::styled(
+        "  Esc to close",
+        Style::default().fg(dim_at(0)),
+    )]));
+
     let block = Block::default()
-        .title(sparkle_text(" Switch Network "))
+        .title(sparkle_text(" Network "))
         .title_style(Style::default().fg(color_at(1)).bold())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -712,7 +752,6 @@ fn hint_description(key: &'static str, short: &'static str, screen: Screen) -> &
         (Screen::TxBuilder, "a") => "Add command",
         (Screen::TxBuilder, "d") => "Delete selected command",
         (Screen::TxBuilder, "c") => "Clear / reset transaction",
-        (Screen::ActivityFeed, "m") => "Toggle mode (Txns / Events)",
         (Screen::Explorer, "Enter") => "Search / lookup",
         _ => match short {
             "explore" => "Explore in explorer",
@@ -905,6 +944,126 @@ fn draw_confirm_quit(frame: &mut Frame, area: Rect) {
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(Color::Yellow));
+
+    frame.render_widget(Paragraph::new(text).block(block), area);
+}
+
+fn draw_settings_popup(frame: &mut Frame, app: &mut App, area: Rect) {
+    use crate::app::SettingsTab;
+    use ratatui::layout::{Constraint, Layout};
+
+    let block = Block::default()
+        .title(sparkle_text(" Settings "))
+        .title_style(Style::default().fg(color_at(0)).bold())
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(color_at(0)));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    if inner.height < 4 || inner.width < 20 {
+        return;
+    }
+
+    let tab_layout = Layout::vertical([Constraint::Length(1), Constraint::Min(4)]).split(inner);
+
+    let mut tab_spans: Vec<Span> = vec![Span::raw("  ")];
+    for tab in SettingsTab::ALL {
+        let is_active = tab == app.settings_tab;
+        let style = if is_active {
+            Style::default().fg(Color::Black).bg(color_at(0)).bold()
+        } else {
+            Style::default().fg(dim_at(0))
+        };
+        tab_spans.push(Span::styled(format!(" {} ", tab.title()), style));
+        tab_spans.push(Span::raw("  "));
+    }
+    frame.render_widget(Paragraph::new(Line::from(tab_spans)), tab_layout[0]);
+
+    let content_area = tab_layout[1];
+
+    match app.settings_tab {
+        SettingsTab::Keys => {
+            app.screen = crate::app::Screen::Keys;
+            super::keys::draw(frame, app, content_area);
+        }
+        SettingsTab::AddressBook => {
+            app.screen = crate::app::Screen::AddressBook;
+            super::address_book::draw(frame, app, content_area);
+        }
+        SettingsTab::Network => {
+            draw_network_settings(frame, app, content_area);
+        }
+    }
+}
+
+fn draw_network_settings(frame: &mut Frame, app: &App, area: Rect) {
+    let net_status = if app.connected {
+        format!("Connected to {}", app.network_name)
+    } else if app.loading {
+        format!("Connecting to {} ...", app.network_name)
+    } else {
+        "Disconnected".to_string()
+    };
+
+    let status_color = if app.connected {
+        Color::Green
+    } else if app.loading {
+        Color::Yellow
+    } else {
+        Color::Red
+    };
+
+    let text = vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Network: ", Style::default().fg(Color::White).bold()),
+            Span::styled(&net_status, Style::default().fg(status_color)),
+        ]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Press [n] to switch network",
+            Style::default().fg(Color::DarkGray),
+        )]),
+    ];
+
+    frame.render_widget(Paragraph::new(text), area);
+}
+
+fn draw_welcome_popup(frame: &mut Frame, area: Rect) {
+    let text = vec![
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  To get started, set up a keypair:",
+            Style::default().fg(Color::White),
+        )]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("    [", Style::default().fg(Color::DarkGray)),
+            Span::styled("G", Style::default().fg(color_at(0)).bold()),
+            Span::styled(
+                "]  Generate a new keypair",
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("    [", Style::default().fg(Color::DarkGray)),
+            Span::styled("I", Style::default().fg(color_at(0)).bold()),
+            Span::styled(
+                "]  Import an existing private key",
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]),
+        Line::from(""),
+    ];
+
+    let block = Block::default()
+        .title(sparkle_text(" Welcome to iota-tui! "))
+        .title_style(Style::default().fg(color_at(0)).bold())
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(color_at(0)));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
 }

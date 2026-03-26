@@ -21,6 +21,32 @@ pub struct App {
     pub input_cursor: usize,
     pub popup: Option<Popup>,
 
+    // ── Grid view state ──────────────────────────────────────────
+    /// Which box is focused in the grid view.
+    pub focused_section: Section,
+    /// Which section is open as a full overlay (None = grid view).
+    pub section_open: Option<Section>,
+    /// Active context menu, if any.
+    pub context_menu: Option<ContextMenu>,
+    /// Whether the search bar has input focus.
+    pub search_focused: bool,
+    /// Search bar text buffer.
+    pub search_buffer: String,
+    /// Viewing an external entity's data (None = own address).
+    pub exploring: Option<String>,
+    /// Settings popup tab (when settings popup is open).
+    pub settings_tab: SettingsTab,
+    /// Whether the tx builder overlay is open.
+    pub tx_builder_open: bool,
+    /// Grid box areas for mouse hit-testing (updated each frame).
+    pub grid_box_areas: Vec<(Section, ratatui::layout::Rect)>,
+    /// Search bar area for mouse hit-testing.
+    pub search_bar_area: ratatui::layout::Rect,
+    /// Network tag area for mouse hit-testing.
+    pub net_tag_area: ratatui::layout::Rect,
+    /// Last click position and time for double-click detection.
+    pub last_click: Option<(u16, u16, std::time::Instant)>,
+
     // Network state
     pub connected: bool,
     pub network_name: String,
@@ -91,13 +117,6 @@ pub struct App {
     // Which element is focused in input popups (field, submit, or cancel)
     pub popup_focus: PopupFocus,
 
-    // Sidebar state — collapsed by default, temporarily expanded on hover/keyboard
-    pub sidebar_open: bool,
-    pub sidebar_focus: bool, // keyboard focus: Up/Down navigate, Enter selects
-    pub sidebar_selected: usize, // highlighted screen index while focused
-    pub sidebar_width: u16,  // current animated width
-    pub sidebar_rect: ratatui::layout::Rect, // full sidebar area for hover detection
-    pub sidebar_areas: Vec<ratatui::layout::Rect>,
     // Clickable action hint areas in the status bar: (rect, action_id)
     pub hint_areas: Vec<(ratatui::layout::Rect, &'static str)>,
     // Selected row in the actions drop-down menu
@@ -121,19 +140,6 @@ pub struct App {
     // Coin management popup state
     pub quick_transfer_field: usize, // 0 = recipient, 1 = amount
     pub quick_transfer_buffers: [String; 2],
-
-    // Activity feed
-    pub activity_feed: Vec<ActivityEvent>,
-    pub feed_selected: usize,
-    pub feed_offset: usize,
-    pub feed_unread_count: usize,
-    pub feed_filter: Option<String>,
-    pub feed_mode: FeedMode,
-    pub last_known_tx_digests: std::collections::HashSet<String>,
-    pub last_known_event_keys: std::collections::HashSet<String>,
-    pub poll_tick_counter: u32,
-    pub poll_seeded: bool,
-    pub events_seeded: bool,
 
     // Portfolio summary mode (aggregated view)
     pub coins_summary_mode: bool,
@@ -166,6 +172,20 @@ impl App {
             input_buffer: String::new(),
             input_cursor: 0,
             popup: None,
+
+            // Grid view state
+            focused_section: Section::Coins,
+            section_open: None,
+            context_menu: None,
+            search_focused: false,
+            search_buffer: String::new(),
+            exploring: None,
+            settings_tab: SettingsTab::Keys,
+            tx_builder_open: false,
+            grid_box_areas: vec![],
+            search_bar_area: ratatui::layout::Rect::default(),
+            net_tag_area: ratatui::layout::Rect::default(),
+            last_click: None,
 
             connected: false,
             network_name: "disconnected".into(),
@@ -229,12 +249,6 @@ impl App {
             popup_scroll: 0,
             popup_focus: PopupFocus::Fields,
 
-            sidebar_open: false,
-            sidebar_focus: false,
-            sidebar_selected: 0,
-            sidebar_width: crate::ui::common::SIDEBAR_COLLAPSED_WIDTH,
-            sidebar_rect: ratatui::layout::Rect::default(),
-            sidebar_areas: vec![],
             hint_areas: vec![],
             action_menu_selected: 0,
 
@@ -250,18 +264,6 @@ impl App {
 
             quick_transfer_field: 0,
             quick_transfer_buffers: [String::new(), String::new()],
-
-            activity_feed: vec![],
-            feed_selected: 0,
-            feed_offset: 0,
-            feed_unread_count: 0,
-            feed_filter: None,
-            feed_mode: FeedMode::Transactions,
-            last_known_tx_digests: std::collections::HashSet::new(),
-            last_known_event_keys: std::collections::HashSet::new(),
-            poll_tick_counter: 0,
-            poll_seeded: false,
-            events_seeded: false,
 
             coins_summary_mode: false,
             portfolio_summary: vec![],
@@ -301,11 +303,6 @@ impl App {
                         });
                     }
                 }
-                // Seed the activity feed with current transactions and events
-                self.poll_seeded = false;
-                self.events_seeded = false;
-                self.send_cmd(WalletCmd::PollAllTransactions);
-                self.send_cmd(WalletCmd::PollEvents);
             }
             WalletEvent::Balances(balances) => {
                 for b in &balances {
@@ -397,6 +394,10 @@ impl App {
                     private_key_hex,
                 });
                 if is_first {
+                    // Close welcome popup if it's open
+                    if self.popup == Some(Popup::Welcome) {
+                        self.popup = None;
+                    }
                     self.request_refresh();
                 }
             }
@@ -411,7 +412,8 @@ impl App {
             }
             WalletEvent::TxSubmitted => {
                 self.tx.reset();
-                self.navigate(Screen::Transactions);
+                self.tx_builder_open = false;
+                self.section_open = Some(Section::Transactions);
                 self.request_refresh();
             }
             WalletEvent::IotaNameResolved {
@@ -549,96 +551,6 @@ impl App {
                 self.pkg_functions_offset = 0;
                 self.pkg_view = PackageBrowserView::Functions;
             }
-            WalletEvent::PollAllTransactionsResult(txs) => {
-                if !self.poll_seeded {
-                    // First poll: populate feed with recent network history.
-                    // API returns oldest-first within the page; reverse so
-                    // newest transactions appear at the top of the feed.
-                    self.last_known_tx_digests = txs.iter().map(|t| t.digest.clone()).collect();
-                    for tx in txs.iter().rev() {
-                        self.activity_feed.push(ActivityEvent {
-                            kind: ActivityKind::Transaction,
-                            summary: tx.status.clone(),
-                            dedup_key: tx.digest.clone(),
-                            digest: tx.digest.clone(),
-                            timestamp: format!("Epoch {}", tx.epoch),
-                            sender: String::new(),
-                            event_type: String::new(),
-                            gas_used: tx.gas_used.clone(),
-                            tx_kind: tx.tx_kind.clone(),
-                        });
-                    }
-                    self.feed_selected = 0;
-                    self.feed_offset = 0;
-                    self.poll_seeded = true;
-                } else {
-                    // New transactions: iterate forward (oldest-first from API)
-                    // and insert each at position 0, so newest ends up on top.
-                    let mut added = 0usize;
-                    for tx in &txs {
-                        if !self.last_known_tx_digests.contains(&tx.digest) {
-                            self.last_known_tx_digests.insert(tx.digest.clone());
-                            self.activity_feed.insert(
-                                0,
-                                ActivityEvent {
-                                    kind: ActivityKind::Transaction,
-                                    summary: tx.status.clone(),
-                                    dedup_key: tx.digest.clone(),
-                                    digest: tx.digest.clone(),
-                                    timestamp: format!("Epoch {}", tx.epoch),
-                                    sender: String::new(),
-                                    event_type: String::new(),
-                                    gas_used: tx.gas_used.clone(),
-                                    tx_kind: tx.tx_kind.clone(),
-                                },
-                            );
-                            added += 1;
-                            if self.screen != Screen::ActivityFeed {
-                                self.feed_unread_count += 1;
-                            }
-                        }
-                    }
-                    // Shift cursor so the previously selected item stays in place.
-                    if added > 0 {
-                        self.feed_selected += added;
-                        self.feed_offset += added;
-                    }
-                }
-                self.cap_feed();
-            }
-            WalletEvent::PollEventsResult(events) => {
-                if !self.events_seeded {
-                    self.last_known_event_keys =
-                        events.iter().map(|e| e.dedup_key.clone()).collect();
-                    // API returns oldest-first within the page; reverse so
-                    // newest events appear at the top of the feed.
-                    for (i, ev) in events.iter().rev().enumerate() {
-                        self.activity_feed.insert(i, ev.clone());
-                    }
-                    self.feed_selected = 0;
-                    self.feed_offset = 0;
-                    self.events_seeded = true;
-                } else {
-                    // New events: iterate forward (oldest-first from API)
-                    // and insert each at position 0, so newest ends up on top.
-                    let mut added = 0usize;
-                    for ev in &events {
-                        if !self.last_known_event_keys.contains(&ev.dedup_key) {
-                            self.last_known_event_keys.insert(ev.dedup_key.clone());
-                            self.activity_feed.insert(0, ev.clone());
-                            added += 1;
-                            if self.screen != Screen::ActivityFeed {
-                                self.feed_unread_count += 1;
-                            }
-                        }
-                    }
-                    if added > 0 {
-                        self.feed_selected += added;
-                        self.feed_offset += added;
-                    }
-                }
-                self.cap_feed();
-            }
             WalletEvent::Error(_e) => {}
         }
     }
@@ -716,15 +628,8 @@ impl App {
         self.explorer.refresh_explorer(&self.cmd_tx);
     }
 
-    /// Whether the sidebar is currently shown in collapsed (narrow) mode.
-    pub fn sidebar_collapsed(&self) -> bool {
-        !self.sidebar_open
-    }
-
     pub fn navigate(&mut self, screen: Screen) {
         self.screen = screen;
-        self.sidebar_open = false;
-        self.sidebar_focus = false;
         self.input_mode = InputMode::Normal;
         self.popup = None;
         self.popup_scroll = 0;
@@ -740,17 +645,6 @@ impl App {
             }
             if self.explorer.validators.is_empty() {
                 self.send_cmd(WalletCmd::RefreshValidators);
-            }
-        }
-        if screen == Screen::ActivityFeed {
-            self.feed_unread_count = 0;
-            self.feed_filter = None;
-            // Reset poll counter so the next tick cycle starts fresh
-            self.poll_tick_counter = 0;
-            // Trigger an immediate poll if we haven't loaded data yet
-            if self.connected && !self.poll_seeded {
-                self.send_cmd(WalletCmd::PollAllTransactions);
-                self.send_cmd(WalletCmd::PollEvents);
             }
         }
     }
@@ -1068,12 +962,6 @@ impl App {
         self.keys.iter().find(|k| k.is_active)
     }
 
-    fn cap_feed(&mut self) {
-        if self.activity_feed.len() > 100 {
-            self.activity_feed.truncate(100);
-        }
-    }
-
     /// Number of key-derived entries shown at the top of the address book.
     /// Returns indices into `self.objects` for objects that look like packages.
     pub fn package_indices(&self) -> Vec<usize> {
@@ -1145,26 +1033,6 @@ impl App {
                 t.digest.to_lowercase().contains(&q)
                     || t.status.to_lowercase().contains(&q)
                     || t.epoch.contains(&q)
-            })
-            .map(|(i, _)| i)
-            .collect()
-    }
-
-    /// Returns indices into `self.activity_feed` matching the current feed mode and filter.
-    pub fn filtered_feed(&self) -> Vec<usize> {
-        let q = self.feed_filter.as_deref().unwrap_or("").to_lowercase();
-        self.activity_feed
-            .iter()
-            .enumerate()
-            .filter(|(_, e)| match self.feed_mode {
-                FeedMode::Transactions => e.kind == ActivityKind::Transaction,
-                FeedMode::Events => e.kind == ActivityKind::Event,
-            })
-            .filter(|(_, e)| {
-                q.is_empty()
-                    || e.summary.to_lowercase().contains(&q)
-                    || e.digest.to_lowercase().contains(&q)
-                    || e.timestamp.to_lowercase().contains(&q)
             })
             .map(|(i, _)| i)
             .collect()
@@ -1520,28 +1388,6 @@ impl App {
                 }
                 _ => ("Details", vec![]),
             },
-            Screen::ActivityFeed => {
-                if let Some(e) = self.activity_feed.get(self.feed_selected) {
-                    let mut fields = vec![
-                        ("Timestamp", e.timestamp.clone()),
-                        ("Kind", e.kind.label().to_string()),
-                        ("Summary", e.summary.clone()),
-                        ("Digest", e.digest.clone()),
-                    ];
-                    if !e.gas_used.is_empty() {
-                        fields.push(("Gas", e.gas_used.clone()));
-                    }
-                    if !e.sender.is_empty() {
-                        fields.push(("Sender", e.sender.clone()));
-                    }
-                    if !e.event_type.is_empty() {
-                        fields.push(("Event Type", e.event_type.clone()));
-                    }
-                    ("Activity Details", fields)
-                } else {
-                    ("Activity Details", vec![])
-                }
-            }
             _ => ("Details", vec![]),
         }
     }
@@ -1598,10 +1444,6 @@ impl App {
                     None
                 }
             }
-            Screen::ActivityFeed => self
-                .activity_feed
-                .get(self.feed_selected)
-                .map(|e| e.digest.clone()),
             Screen::TxBuilder => None,
         };
 
@@ -1695,18 +1537,6 @@ impl App {
                 let mut csv = "Label,Address,Notes\n".to_string();
                 for e in &self.address_book {
                     csv.push_str(&format!("{},{},{}\n", e.label, e.address, e.notes));
-                }
-                csv
-            }
-            Screen::ActivityFeed => {
-                let filtered = self.filtered_feed();
-                let mut csv = "Timestamp,Summary,Digest,Gas\n".to_string();
-                for &i in &filtered {
-                    let e = &self.activity_feed[i];
-                    csv.push_str(&format!(
-                        "{},{},{},{}\n",
-                        e.timestamp, e.summary, e.digest, e.gas_used
-                    ));
                 }
                 csv
             }

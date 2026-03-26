@@ -53,6 +53,11 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> colo
 
     let mut app = app::App::new(cmd_tx.clone(), initial_keys);
 
+    // Show welcome popup if no keys exist
+    if app.keys.is_empty() {
+        app.popup = Some(app::Popup::Welcome);
+    }
+
     // Connect to last used network (defaults to testnet)
     let saved_network = wallet::load_network();
     let _ = cmd_tx.send(WalletCmd::Connect(saved_network)).await;
@@ -86,28 +91,6 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> colo
                     && instant.elapsed() >= std::time::Duration::from_secs(2)
                 {
                     app.clipboard_toast = None;
-                }
-                // Animate sidebar width toward target
-                {
-                    let target = if app.sidebar_collapsed() {
-                        ui::common::SIDEBAR_COLLAPSED_WIDTH
-                    } else {
-                        ui::common::SIDEBAR_WIDTH
-                    };
-                    if app.sidebar_width < target {
-                        app.sidebar_width = (app.sidebar_width + 3).min(target);
-                    } else if app.sidebar_width > target {
-                        app.sidebar_width = app.sidebar_width.saturating_sub(3).max(target);
-                    }
-                }
-                // Poll for new transactions and events every 60s, only while on the Activity Feed
-                if app.connected && app.screen == crate::app::Screen::ActivityFeed {
-                    app.poll_tick_counter += 1;
-                    if app.poll_tick_counter >= 1818 {
-                        app.poll_tick_counter = 0;
-                        let _ = cmd_tx.send(WalletCmd::PollAllTransactions).await;
-                        let _ = cmd_tx.send(WalletCmd::PollEvents).await;
-                    }
                 }
             }
         }

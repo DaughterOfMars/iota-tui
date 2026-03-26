@@ -1,10 +1,10 @@
 //! UI rendering — draws all screens, popups, and shared components.
 
-mod activity_feed;
 mod address_book;
 mod coins;
 pub(crate) mod common;
-mod explorer;
+mod context_menu;
+pub(crate) mod grid;
 mod keys;
 mod objects;
 mod packages;
@@ -13,7 +13,7 @@ mod staking;
 mod transactions;
 mod tx_builder;
 
-use crate::app::{App, Screen};
+use crate::app::{App, Section};
 use ratatui::Frame;
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
@@ -21,48 +21,26 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
     app.frame_area = area;
 
-    let sw = app.sidebar_width;
+    // Update layout info for scroll calculations
+    app.content_visible_rows = area.height.saturating_sub(4) as usize;
+    app.content_area_y = area.y;
+    app.content_area = area;
 
-    // Horizontal split: sidebar | main content
-    let h_layout = ratatui::layout::Layout::horizontal([
-        ratatui::layout::Constraint::Length(sw),
-        ratatui::layout::Constraint::Min(10),
-    ])
-    .split(area);
-
-    let sidebar_area = h_layout[0];
-    let main_area = h_layout[1];
-
-    // Vertical split of main area: content + status bar
-    let v_layout = ratatui::layout::Layout::vertical([
-        ratatui::layout::Constraint::Min(10),   // content
-        ratatui::layout::Constraint::Length(1), // status bar
-    ])
-    .split(main_area);
-
-    app.sidebar_rect = sidebar_area;
-    common::draw_sidebar(frame, app, sidebar_area);
-
-    // Update layout info for scroll calculations and mouse hit-testing
-    app.content_visible_rows = v_layout[0].height.saturating_sub(4) as usize;
-    app.content_area_y = v_layout[0].y;
-    app.content_area = v_layout[0];
-    let layout = [v_layout[0], v_layout[1]]; // content, status
-
-    match app.screen {
-        Screen::Coins => coins::draw(frame, app, layout[0]),
-        Screen::Objects => objects::draw(frame, app, layout[0]),
-        Screen::Transactions => transactions::draw(frame, app, layout[0]),
-        Screen::Staking => staking::draw(frame, app, layout[0]),
-        Screen::Packages => packages::draw(frame, app, layout[0]),
-        Screen::AddressBook => address_book::draw(frame, app, layout[0]),
-        Screen::Keys => keys::draw(frame, app, layout[0]),
-        Screen::TxBuilder => tx_builder::draw(frame, app, layout[0]),
-        Screen::Explorer => explorer::draw(frame, app, layout[0]),
-        Screen::ActivityFeed => activity_feed::draw(frame, app, layout[0]),
+    // Main view: grid or section overlay
+    if let Some(section) = app.section_open {
+        draw_section_overlay(frame, app, area, section);
+    } else if app.tx_builder_open {
+        // Tx Builder as full-screen overlay
+        tx_builder::draw(frame, app, area);
+    } else {
+        // Grid view (the main view)
+        grid::draw(frame, app, area);
     }
 
-    common::draw_status_bar(frame, app, layout[1]);
+    // Draw context menu on top if active
+    if app.context_menu.is_some() {
+        context_menu::draw(frame, app);
+    }
 
     // Draw popup overlay last
     if app.popup.is_some() {
@@ -90,5 +68,66 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         ]));
         frame.render_widget(ratatui::widgets::Clear, toast_area);
         frame.render_widget(toast, toast_area);
+    }
+}
+
+/// Draw a section as a near-full-screen overlay.
+fn draw_section_overlay(
+    frame: &mut Frame,
+    app: &mut App,
+    area: ratatui::layout::Rect,
+    section: Section,
+) {
+    use ratatui::{
+        style::Style,
+        text::{Line, Span},
+        widgets::{Block, BorderType, Borders, Clear},
+    };
+
+    // Compute overlay area (95% of terminal, centered)
+    let margin_x = (area.width as f32 * 0.025).max(1.0) as u16;
+    let margin_y = (area.height as f32 * 0.025).max(1.0) as u16;
+    let overlay = ratatui::layout::Rect::new(
+        area.x + margin_x,
+        area.y + margin_y,
+        area.width.saturating_sub(margin_x * 2),
+        area.height.saturating_sub(margin_y * 2),
+    );
+
+    // Clear background
+    frame.render_widget(Clear, overlay);
+
+    // Title with close hint
+    let title = format!(" {} ", section.title());
+    let close_hint = " Esc to close ";
+
+    let block = Block::default()
+        .title(common::sparkle_text(&title))
+        .title_style(common::header_style())
+        .title_bottom(
+            Line::from(Span::styled(close_hint, common::dim_style()))
+                .alignment(ratatui::layout::Alignment::Right),
+        )
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(common::color_at(0)));
+
+    let inner = block.inner(overlay);
+    frame.render_widget(block, overlay);
+
+    // Update content area for the overlay
+    app.content_visible_rows = inner.height.saturating_sub(4) as usize;
+    app.content_area = inner;
+
+    // Set the legacy screen so existing draw functions work
+    app.screen = section.to_screen();
+
+    // Render the existing screen content inside the overlay
+    match section {
+        Section::Coins => coins::draw(frame, app, inner),
+        Section::Objects => objects::draw(frame, app, inner),
+        Section::Staking => staking::draw(frame, app, inner),
+        Section::Transactions => transactions::draw(frame, app, inner),
+        Section::Packages => packages::draw(frame, app, inner),
     }
 }

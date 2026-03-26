@@ -1,6 +1,187 @@
 //! Display types, enums, and data structures used across the TUI.
 
-/// Which screen/tab is currently active.
+// ── Grid sections (the box grid on the main view) ─────────────────
+
+/// A section in the main box grid view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Section {
+    Coins,
+    Objects,
+    Staking,
+    Transactions,
+    Packages,
+}
+
+impl Section {
+    pub fn title(self) -> &'static str {
+        match self {
+            Section::Coins => "Coins",
+            Section::Objects => "Objects",
+            Section::Staking => "Staking",
+            Section::Transactions => "Transactions",
+            Section::Packages => "Packages",
+        }
+    }
+
+    /// Map a section to the legacy Screen variant used for full overlay rendering.
+    pub fn to_screen(self) -> Screen {
+        match self {
+            Section::Coins => Screen::Coins,
+            Section::Objects => Screen::Objects,
+            Section::Staking => Screen::Staking,
+            Section::Transactions => Screen::Transactions,
+            Section::Packages => Screen::Packages,
+        }
+    }
+}
+
+// ── Context menu ──────────────────────────────────────────────────
+
+/// An action available in the context menu.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContextAction {
+    Send,
+    Merge,
+    Split,
+    Transfer,
+    Unstake,
+    CopyId,
+    Explore,
+    ExplorePackage,
+    ViewDetails,
+    CopyDigest,
+}
+
+impl ContextAction {
+    pub fn label(self) -> &'static str {
+        match self {
+            ContextAction::Send => "Send",
+            ContextAction::Merge => "Merge",
+            ContextAction::Split => "Split",
+            ContextAction::Transfer => "Transfer",
+            ContextAction::Unstake => "Unstake",
+            ContextAction::CopyId => "Copy ID",
+            ContextAction::Explore => "Explore",
+            ContextAction::ExplorePackage => "Explore Package",
+            ContextAction::ViewDetails => "View Details",
+            ContextAction::CopyDigest => "Copy Digest",
+        }
+    }
+
+    /// Shortcut character for quick selection in the menu.
+    pub fn shortcut(self) -> char {
+        match self {
+            ContextAction::Send => 's',
+            ContextAction::Merge => 'm',
+            ContextAction::Split => 'p',
+            ContextAction::Transfer => 't',
+            ContextAction::Unstake => 'u',
+            ContextAction::CopyId => 'c',
+            ContextAction::Explore => 'e',
+            ContextAction::ExplorePackage => 'e',
+            ContextAction::ViewDetails => 'v',
+            ContextAction::CopyDigest => 'c',
+        }
+    }
+}
+
+/// Returns the context menu actions available for a given section.
+pub fn actions_for(section: Section, is_own: bool) -> Vec<ContextAction> {
+    match section {
+        Section::Coins => {
+            let mut actions = vec![];
+            if is_own {
+                actions.extend_from_slice(&[
+                    ContextAction::Send,
+                    ContextAction::Merge,
+                    ContextAction::Split,
+                ]);
+            }
+            actions.push(ContextAction::CopyId);
+            actions.push(ContextAction::Explore);
+            actions
+        }
+        Section::Objects => {
+            let mut actions = vec![];
+            if is_own {
+                actions.push(ContextAction::Transfer);
+            }
+            actions.push(ContextAction::CopyId);
+            actions.push(ContextAction::Explore);
+            actions
+        }
+        Section::Staking => {
+            let mut actions = vec![];
+            if is_own {
+                actions.push(ContextAction::Unstake);
+            }
+            actions.push(ContextAction::CopyId);
+            actions
+        }
+        Section::Transactions => {
+            vec![ContextAction::ViewDetails, ContextAction::CopyDigest]
+        }
+        Section::Packages => {
+            vec![ContextAction::ExplorePackage, ContextAction::CopyId]
+        }
+    }
+}
+
+/// State of an active context menu.
+#[derive(Debug, Clone)]
+pub struct ContextMenu {
+    pub section: Section,
+    pub actions: Vec<ContextAction>,
+    pub selected: usize,
+    pub anchor_row: u16,
+    pub anchor_col: u16,
+}
+
+// ── Settings popup tabs ───────────────────────────────────────────
+
+/// Which sub-tab is active in the Settings popup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SettingsTab {
+    Keys,
+    AddressBook,
+    Network,
+}
+
+impl SettingsTab {
+    pub const ALL: [SettingsTab; 3] = [
+        SettingsTab::Keys,
+        SettingsTab::AddressBook,
+        SettingsTab::Network,
+    ];
+
+    pub fn title(self) -> &'static str {
+        match self {
+            SettingsTab::Keys => "Keys",
+            SettingsTab::AddressBook => "Address Book",
+            SettingsTab::Network => "Network",
+        }
+    }
+
+    pub fn next(self) -> Self {
+        match self {
+            SettingsTab::Keys => SettingsTab::AddressBook,
+            SettingsTab::AddressBook => SettingsTab::Network,
+            SettingsTab::Network => SettingsTab::Keys,
+        }
+    }
+
+    pub fn prev(self) -> Self {
+        match self {
+            SettingsTab::Keys => SettingsTab::Network,
+            SettingsTab::AddressBook => SettingsTab::Keys,
+            SettingsTab::Network => SettingsTab::AddressBook,
+        }
+    }
+}
+
+// ── Legacy Screen enum (used for overlay rendering) ───────────────
+
+/// Which screen/tab is currently active (legacy — used inside section overlays).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
     Coins,
@@ -12,23 +193,9 @@ pub enum Screen {
     Keys,
     TxBuilder,
     Explorer,
-    ActivityFeed,
 }
 
 impl Screen {
-    pub const ALL: [Screen; 10] = [
-        Screen::Coins,
-        Screen::Objects,
-        Screen::Transactions,
-        Screen::Staking,
-        Screen::Packages,
-        Screen::AddressBook,
-        Screen::Keys,
-        Screen::TxBuilder,
-        Screen::Explorer,
-        Screen::ActivityFeed,
-    ];
-
     pub fn title(self) -> &'static str {
         match self {
             Screen::Coins => "Coins",
@@ -40,12 +207,7 @@ impl Screen {
             Screen::Keys => "Keys",
             Screen::TxBuilder => "Tx Builder",
             Screen::Explorer => "Explorer",
-            Screen::ActivityFeed => "Activity",
         }
-    }
-
-    pub fn index(self) -> usize {
-        Screen::ALL.iter().position(|&s| s == self).unwrap_or(0)
     }
 }
 
@@ -133,67 +295,6 @@ pub struct ModuleFunctionDisplay {
     pub type_param_count: usize,
     pub param_types: Vec<String>,
     pub return_types: Vec<String>,
-}
-
-/// Feed display mode — transactions or events.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FeedMode {
-    Transactions,
-    Events,
-}
-
-impl FeedMode {
-    pub fn label(self) -> &'static str {
-        match self {
-            FeedMode::Transactions => "Txns",
-            FeedMode::Events => "Events",
-        }
-    }
-
-    pub fn cycle(self) -> Self {
-        match self {
-            FeedMode::Transactions => FeedMode::Events,
-            FeedMode::Events => FeedMode::Transactions,
-        }
-    }
-}
-
-/// Kind of activity event in the feed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ActivityKind {
-    /// A transaction (historical or newly detected).
-    Transaction,
-    /// An on-chain event.
-    Event,
-}
-
-impl ActivityKind {
-    pub fn label(self) -> &'static str {
-        match self {
-            ActivityKind::Transaction => "Transaction",
-            ActivityKind::Event => "Event",
-        }
-    }
-}
-
-/// An event in the activity feed.
-#[derive(Debug, Clone)]
-pub struct ActivityEvent {
-    pub kind: ActivityKind,
-    pub summary: String,
-    /// Transaction digest (for txns) or parent tx digest (for events).
-    pub digest: String,
-    pub timestamp: String,
-    /// Sender address, if known.
-    pub sender: String,
-    /// Full event type string (events only).
-    pub event_type: String,
-    /// Gas used (transactions only).
-    pub gas_used: String,
-    /// High-level transaction type (e.g. "Coin Transfer", "Stake").
-    pub tx_kind: String,
-    /// Unique key for dedup across polls.
-    pub dedup_key: String,
 }
 
 /// Result of a dry-run simulation for the transaction builder.
@@ -411,6 +512,8 @@ pub enum Popup {
     SplitCoin,
     QuickTransfer,
     ObjectTransfer,
+    Settings,
+    Welcome,
 }
 
 // ── Explorer types ─────────────────────────────────────────────────
@@ -431,15 +534,6 @@ impl ExplorerView {
         ExplorerView::Validators,
         ExplorerView::Lookup,
     ];
-
-    pub fn title(self) -> &'static str {
-        match self {
-            ExplorerView::Overview => "Overview",
-            ExplorerView::Checkpoints => "Checkpoints",
-            ExplorerView::Validators => "Validators",
-            ExplorerView::Lookup => "Lookup",
-        }
-    }
 
     pub fn index(self) -> usize {
         Self::ALL.iter().position(|&v| v == self).unwrap_or(0)
@@ -483,6 +577,7 @@ pub enum LookupAction {
 }
 
 /// A single key-value field in a lookup result, optionally navigable.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct LookupField {
     pub key: String,
@@ -499,6 +594,7 @@ pub struct LookupSection {
 }
 
 /// Result of a lookup query in the Explorer Lookup sub-view.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum LookupResult {
     Object { sections: Vec<LookupSection> },
@@ -560,6 +656,7 @@ impl LookupResult {
 
     /// Convert a visible line index to a tree cursor (section, depth, field_idx).
     /// Returns None if the line is out of range.
+    #[allow(dead_code)]
     pub fn line_to_cursor(&self, line: usize) -> Option<(usize, usize, usize)> {
         let mut current_line = 0;
         for (si, section) in self.sections().iter().enumerate() {
