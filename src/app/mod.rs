@@ -477,17 +477,21 @@ impl App {
                         self.explorer.validators.len().saturating_sub(1);
                 }
             }
-            WalletEvent::ExplorerLookupResult(result) => {
+            WalletEvent::ExplorerLookupResult(mut result) => {
                 self.explorer.lookup_selected = 0;
                 self.explorer.lookup_offset = 0;
                 self.explorer.lookup_section = 0;
                 self.explorer.lookup_depth = 0;
                 self.explorer.lookup_field_idx = 0;
                 self.explorer.lookup_address = None;
+                // Expand the first section by default
+                if let Some(s) = result.sections_mut().first_mut() {
+                    s.collapsed = false;
+                }
                 self.explorer.lookup_result = Some(result);
             }
             WalletEvent::AddressLookupPage {
-                result,
+                mut result,
                 obj_cursor,
                 obj_has_next,
                 tx_cursor,
@@ -498,6 +502,10 @@ impl App {
                 self.explorer.lookup_section = 0;
                 self.explorer.lookup_depth = 0;
                 self.explorer.lookup_field_idx = 0;
+                // Expand the first section by default
+                if let Some(s) = result.sections_mut().first_mut() {
+                    s.collapsed = false;
+                }
                 self.explorer.lookup_obj_cursor = obj_cursor;
                 self.explorer.lookup_obj_has_next = obj_has_next;
                 self.explorer.lookup_tx_cursor = tx_cursor;

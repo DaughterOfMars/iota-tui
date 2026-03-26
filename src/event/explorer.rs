@@ -57,25 +57,29 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
         return;
     }
 
-    // Sub-view navigation with Left/Right
-    match key.code {
-        KeyCode::Left => {
-            let idx = app.explorer.view.index();
-            if idx > 0 {
-                app.explorer.view = ExplorerView::ALL[idx - 1];
-                app.refresh_explorer();
+    // Sub-view navigation with Left/Right (but not when browsing lookup sections)
+    let in_lookup =
+        app.explorer.view == ExplorerView::Lookup && app.explorer.lookup_result.is_some();
+    if !in_lookup {
+        match key.code {
+            KeyCode::Left => {
+                let idx = app.explorer.view.index();
+                if idx > 0 {
+                    app.explorer.view = ExplorerView::ALL[idx - 1];
+                    app.refresh_explorer();
+                }
+                return;
             }
-            return;
-        }
-        KeyCode::Right => {
-            let idx = app.explorer.view.index();
-            if idx + 1 < ExplorerView::ALL.len() {
-                app.explorer.view = ExplorerView::ALL[idx + 1];
-                app.refresh_explorer();
+            KeyCode::Right => {
+                let idx = app.explorer.view.index();
+                if idx + 1 < ExplorerView::ALL.len() {
+                    app.explorer.view = ExplorerView::ALL[idx + 1];
+                    app.refresh_explorer();
+                }
+                return;
             }
-            return;
+            _ => {}
         }
-        _ => {}
     }
 
     match app.explorer.view {
