@@ -518,29 +518,7 @@ pub enum Popup {
 
 // ── Explorer types ─────────────────────────────────────────────────
 
-/// Which sub-view of the Explorer screen is active.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ExplorerView {
-    Overview,
-    Checkpoints,
-    Validators,
-    Lookup,
-}
-
-impl ExplorerView {
-    pub const ALL: [ExplorerView; 4] = [
-        ExplorerView::Overview,
-        ExplorerView::Checkpoints,
-        ExplorerView::Validators,
-        ExplorerView::Lookup,
-    ];
-
-    pub fn index(self) -> usize {
-        Self::ALL.iter().position(|&v| v == self).unwrap_or(0)
-    }
-}
-
-/// Network overview stats displayed in the Explorer Overview sub-view.
+/// Network overview stats displayed in the network popup.
 #[derive(Debug, Clone, Default)]
 pub struct NetworkOverview {
     pub chain_id: String,
@@ -548,23 +526,6 @@ pub struct NetworkOverview {
     pub gas_price: String,
     pub latest_checkpoint: String,
     pub total_txs: String,
-}
-
-/// A checkpoint row in the Explorer Checkpoints sub-view.
-#[derive(Debug, Clone)]
-pub struct CheckpointDisplay {
-    pub sequence: u64,
-    pub digest: String,
-    pub timestamp: String,
-    pub tx_count: u64,
-}
-
-/// A validator row in the Explorer Validators sub-view.
-#[derive(Debug, Clone)]
-pub struct ValidatorDisplay {
-    pub name: String,
-    pub address: String,
-    pub stake: String,
 }
 
 /// What happens when a user presses Enter on a lookup field.

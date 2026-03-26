@@ -12,7 +12,7 @@ use super::common;
 use crate::app::App;
 
 /// Draw the context menu if active.
-pub fn draw(frame: &mut Frame, app: &App) {
+pub fn draw(frame: &mut Frame, app: &mut App) {
     let Some(ref menu) = app.context_menu else {
         return;
     };
@@ -49,6 +49,8 @@ pub fn draw(frame: &mut Frame, app: &App) {
         menu_width.min(frame_area.width),
         menu_height.min(frame_area.height),
     );
+
+    app.context_menu_area = area;
 
     frame.render_widget(Clear, area);
 

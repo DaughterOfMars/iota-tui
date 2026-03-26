@@ -29,7 +29,7 @@ pub fn handle_context_menu_key(app: &mut App, key: KeyEvent) {
             let action = menu.actions[menu.selected];
             let section = menu.section;
             app.context_menu = None;
-            execute_action(app, section, action);
+            execute_context_action(app, section, action);
         }
         KeyCode::Char(c) => {
             // Jump to action by shortcut character
@@ -37,7 +37,7 @@ pub fn handle_context_menu_key(app: &mut App, key: KeyEvent) {
                 let action = menu.actions[idx];
                 let section = menu.section;
                 app.context_menu = None;
-                execute_action(app, section, action);
+                execute_context_action(app, section, action);
             }
         }
         _ => {}
@@ -45,7 +45,7 @@ pub fn handle_context_menu_key(app: &mut App, key: KeyEvent) {
 }
 
 /// Execute a context menu action.
-fn execute_action(app: &mut App, section: Section, action: ContextAction) {
+pub fn execute_context_action(app: &mut App, section: Section, action: ContextAction) {
     // Set the legacy screen so existing handlers work
     app.screen = section.to_screen();
 

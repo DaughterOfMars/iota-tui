@@ -73,6 +73,12 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
 
+    // Layer 3.5: Explorer overlay (when exploring an external entity)
+    if app.exploring.is_some() {
+        handle_explorer_overlay_key(app, key);
+        return;
+    }
+
     // Layer 4: Tx Builder overlay
     if app.tx_builder_open {
         handle_tx_builder_overlay_key(app, key);
@@ -120,6 +126,30 @@ fn handle_section_overlay_key(app: &mut App, key: KeyEvent, section: Section) {
     {
         app.section_open = None;
         return;
+    }
+
+    // Global shortcuts available inside overlays
+    if app.input_mode != InputMode::Editing {
+        match key.code {
+            KeyCode::Char('q') => {
+                app.open_popup(Popup::ConfirmQuit);
+                return;
+            }
+            KeyCode::Char('?') => {
+                app.open_popup(Popup::Help);
+                return;
+            }
+            KeyCode::Char('n') => {
+                app.open_popup(Popup::SwitchNetwork);
+                return;
+            }
+            KeyCode::Char('E') => {
+                app.load_error_log();
+                app.open_popup(Popup::ErrorLog);
+                return;
+            }
+            _ => {}
+        }
     }
 
     // Context menu trigger
@@ -199,6 +229,44 @@ fn handle_tx_builder_overlay_key(app: &mut App, key: KeyEvent) {
     }
 
     screen::handle_tx_key(app, key);
+}
+
+/// Handle keys when the explorer overlay is showing (exploring an external entity).
+fn handle_explorer_overlay_key(app: &mut App, key: KeyEvent) {
+    // Global shortcuts available inside the explorer
+    if app.input_mode != InputMode::Editing {
+        match key.code {
+            KeyCode::Char('q') => {
+                app.open_popup(Popup::ConfirmQuit);
+                return;
+            }
+            KeyCode::Char('?') => {
+                app.open_popup(Popup::Help);
+                return;
+            }
+            KeyCode::Char('n') => {
+                app.open_popup(Popup::SwitchNetwork);
+                return;
+            }
+            KeyCode::Char('E') => {
+                app.load_error_log();
+                app.open_popup(Popup::ErrorLog);
+                return;
+            }
+            KeyCode::Esc => {
+                // Close explorer and return to grid
+                app.exploring = None;
+                app.search_buffer.clear();
+                app.request_refresh();
+                return;
+            }
+            _ => {}
+        }
+    }
+
+    // Route to the existing explorer key handler
+    app.screen = Screen::Explorer;
+    explorer::handle_explorer_key(app, key);
 }
 
 fn has_active_filter(app: &App, section: Section) -> bool {

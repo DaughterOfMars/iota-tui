@@ -6,8 +6,8 @@ use iota_sdk::transaction_builder::TransactionBuilder;
 use iota_sdk::types::{Address, ObjectType};
 
 use super::helpers::{
-    decode_private_key, extract_symbol, format_gas, format_timestamp_ms, generate_keypair,
-    keypair_address, parse_iota_amount, prettify_struct, prettify_type,
+    decode_private_key, extract_symbol, format_gas, generate_keypair, keypair_address,
+    parse_iota_amount, prettify_struct, prettify_type,
 };
 use super::{
     BalanceInfo, CoinInfo, Network, ObjectInfo, StoredKey, WalletBackend, WalletEvent, save_network,
@@ -566,80 +566,6 @@ impl WalletBackend {
                 latest_checkpoint: latest_cp,
                 total_transactions: total_txs,
             })
-            .await?;
-        Ok(())
-    }
-
-    pub(super) async fn handle_checkpoints(
-        &self,
-        cursor: Option<String>,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let client = self.client.as_ref().ok_or("Not connected")?;
-
-        let page = client
-            .checkpoints(PaginationFilter {
-                direction: Direction::Backward,
-                cursor,
-                limit: None,
-            })
-            .await?;
-
-        let next_cursor = page.page_info().start_cursor.clone();
-        let has_next = page.page_info().has_previous_page;
-
-        let checkpoints: Vec<crate::app::CheckpointDisplay> = page
-            .data()
-            .iter()
-            .map(|cp| {
-                let ts = format_timestamp_ms(cp.timestamp_ms);
-                crate::app::CheckpointDisplay {
-                    sequence: cp.sequence_number,
-                    digest: cp.content_digest.to_string(),
-                    timestamp: ts,
-                    tx_count: cp.network_total_transactions,
-                }
-            })
-            .collect();
-
-        self.event_tx
-            .send(WalletEvent::Checkpoints {
-                checkpoints,
-                cursor: next_cursor,
-                has_next,
-            })
-            .await?;
-        Ok(())
-    }
-
-    pub(super) async fn handle_validators(
-        &self,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let client = self.client.as_ref().ok_or("Not connected")?;
-
-        let page = client
-            .active_validators(None, PaginationFilter::default())
-            .await?;
-
-        let validators: Vec<crate::app::ValidatorDisplay> = page
-            .data()
-            .iter()
-            .map(|v| {
-                let name = v.name.clone().unwrap_or_else(|| "Unknown".into());
-                let address = v.address.address.to_string();
-                let stake = v
-                    .voting_power
-                    .map(|p| format!("{}%", p as f64 / 100.0))
-                    .unwrap_or_else(|| "?".into());
-                crate::app::ValidatorDisplay {
-                    name,
-                    address,
-                    stake,
-                }
-            })
-            .collect();
-
-        self.event_tx
-            .send(WalletEvent::Validators(validators))
             .await?;
         Ok(())
     }

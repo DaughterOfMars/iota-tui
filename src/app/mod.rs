@@ -44,6 +44,8 @@ pub struct App {
     pub search_bar_area: ratatui::layout::Rect,
     /// Network tag area for mouse hit-testing.
     pub net_tag_area: ratatui::layout::Rect,
+    /// Context menu rendered area for mouse hit-testing (updated each frame).
+    pub context_menu_area: ratatui::layout::Rect,
     /// Last click position and time for double-click detection.
     pub last_click: Option<(u16, u16, std::time::Instant)>,
 
@@ -185,6 +187,7 @@ impl App {
             grid_box_areas: vec![],
             search_bar_area: ratatui::layout::Rect::default(),
             net_tag_area: ratatui::layout::Rect::default(),
+            context_menu_area: ratatui::layout::Rect::default(),
             last_click: None,
 
             connected: false,
@@ -281,13 +284,9 @@ impl App {
                 self.connected = true;
                 self.network_name = network;
                 self.request_refresh();
-                // Refresh explorer data for the new network
+                // Refresh network overview for the new network
                 self.explorer.overview = None;
-                self.explorer.checkpoints.clear();
-                self.explorer.validators.clear();
                 self.send_cmd(WalletCmd::RefreshNetworkOverview);
-                self.send_cmd(WalletCmd::RefreshCheckpoints { cursor: None });
-                self.send_cmd(WalletCmd::RefreshValidators);
                 // Re-run explorer lookup/search if one was active
                 if let Some(query) = self.explorer.lookup_query.clone() {
                     self.send_cmd(WalletCmd::LookupAddress(query));
@@ -459,26 +458,6 @@ impl App {
                     total_txs: total_transactions,
                 });
             }
-            WalletEvent::Checkpoints {
-                checkpoints,
-                cursor,
-                has_next,
-            } => {
-                self.explorer.checkpoints = checkpoints;
-                self.explorer.checkpoints_cursor = cursor;
-                self.explorer.checkpoints_has_next = has_next;
-                if self.explorer.checkpoints_selected >= self.explorer.checkpoints.len() {
-                    self.explorer.checkpoints_selected =
-                        self.explorer.checkpoints.len().saturating_sub(1);
-                }
-            }
-            WalletEvent::Validators(validators) => {
-                self.explorer.validators = validators;
-                if self.explorer.validators_selected >= self.explorer.validators.len() {
-                    self.explorer.validators_selected =
-                        self.explorer.validators.len().saturating_sub(1);
-                }
-            }
             WalletEvent::ExplorerLookupResult(mut result) => {
                 self.explorer.lookup_selected = 0;
                 self.explorer.lookup_offset = 0;
@@ -623,11 +602,6 @@ impl App {
         }
     }
 
-    /// Refresh explorer data for the current sub-view.
-    pub fn refresh_explorer(&mut self) {
-        self.explorer.refresh_explorer(&self.cmd_tx);
-    }
-
     pub fn navigate(&mut self, screen: Screen) {
         self.screen = screen;
         self.input_mode = InputMode::Normal;
@@ -638,24 +612,21 @@ impl App {
         self.objects_filter = None;
         self.transactions_filter = None;
         if screen == Screen::Explorer {
-            // Load all explorer data upfront so sub-views aren't empty
             self.send_cmd(WalletCmd::RefreshNetworkOverview);
-            if self.explorer.checkpoints.is_empty() {
-                self.send_cmd(WalletCmd::RefreshCheckpoints { cursor: None });
-            }
-            if self.explorer.validators.is_empty() {
-                self.send_cmd(WalletCmd::RefreshValidators);
-            }
         }
     }
 
     /// Navigate to Explorer > Lookup and immediately submit a lookup query.
     pub fn explore_item(&mut self, query: String) {
-        self.screen = Screen::Explorer;
-        self.explorer.view = ExplorerView::Lookup;
-        self.input_mode = InputMode::Normal;
+        // Close any open overlay/popup and switch to grid explore mode
+        self.section_open = None;
         self.popup = None;
         self.popup_scroll = 0;
+        self.input_mode = InputMode::Normal;
+        self.context_menu = None;
+
+        // Set up explorer lookup state
+        self.screen = Screen::Explorer;
         self.explorer.search_mode = false;
         self.explorer.lookup_result = None;
         self.explorer.lookup_selected = 0;
@@ -677,13 +648,16 @@ impl App {
         self.explorer.search_has_next = false;
         self.explorer.search_cursor = None;
         self.explorer.search_cursors.clear();
+
+        // Update search bar to show what we're exploring
+        self.search_buffer = query.clone();
+        self.exploring = Some(query.clone());
         self.send_cmd(WalletCmd::LookupAddress(query));
     }
 
     /// Navigate to Explorer > Lookup and immediately submit a type search.
     pub fn explore_type(&mut self, type_filter: String) {
         self.screen = Screen::Explorer;
-        self.explorer.view = ExplorerView::Lookup;
         self.input_mode = InputMode::Normal;
         self.popup = None;
         self.popup_scroll = 0;
@@ -1349,45 +1323,7 @@ impl App {
                     ("Address Details", vec![])
                 }
             }
-            Screen::Explorer => match self.explorer.view {
-                ExplorerView::Checkpoints => {
-                    let filtered = self.explorer.filtered_checkpoints();
-                    if let Some(&ci) = filtered.get(self.explorer.checkpoints_selected)
-                        && let Some(cp) = self.explorer.checkpoints.get(ci)
-                    {
-                        (
-                            "Checkpoint Details",
-                            vec![
-                                ("Sequence", cp.sequence.to_string()),
-                                ("Digest", cp.digest.clone()),
-                                ("Timestamp", cp.timestamp.clone()),
-                                ("Total Transactions", cp.tx_count.to_string()),
-                            ],
-                        )
-                    } else {
-                        ("Checkpoint Details", vec![])
-                    }
-                }
-                ExplorerView::Validators => {
-                    if let Some(v) = self
-                        .explorer
-                        .validators
-                        .get(self.explorer.validators_selected)
-                    {
-                        (
-                            "Validator Details",
-                            vec![
-                                ("Name", v.name.clone()),
-                                ("Address", v.address.clone()),
-                                ("Voting Power", v.stake.clone()),
-                            ],
-                        )
-                    } else {
-                        ("Validator Details", vec![])
-                    }
-                }
-                _ => ("Details", vec![]),
-            },
+            Screen::Explorer => ("Details", vec![]),
             _ => ("Details", vec![]),
         }
     }

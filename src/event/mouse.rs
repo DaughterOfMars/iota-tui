@@ -29,8 +29,25 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                 return;
             }
 
-            // Handle context menu: click outside dismisses
+            // Handle context menu: click inside selects/executes, click outside dismisses
             if app.context_menu.is_some() {
+                let cm = app.context_menu_area;
+                if row >= cm.y && row < cm.y + cm.height && col >= cm.x && col < cm.x + cm.width {
+                    // Click inside the menu — determine which item (1px border on each side)
+                    let inner_y = cm.y + 1; // skip top border
+                    if row >= inner_y {
+                        let item_idx = (row - inner_y) as usize;
+                        if let Some(ref menu) = app.context_menu
+                            && item_idx < menu.actions.len()
+                        {
+                            let action = menu.actions[item_idx];
+                            let section = menu.section;
+                            app.context_menu = None;
+                            super::context_menu::execute_context_action(app, section, action);
+                            return;
+                        }
+                    }
+                }
                 app.context_menu = None;
                 return;
             }
@@ -59,8 +76,23 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
             }
 
             // Section overlay: route to old screen-based handlers
-            if app.section_open.is_some() {
-                handle_overlay_click(app, col, row);
+            if let Some(section) = app.section_open {
+                if is_double_click {
+                    // Double-click in overlay opens context menu
+                    let is_own = app.exploring.is_none();
+                    let actions = crate::app::actions_for(section, is_own);
+                    if !actions.is_empty() {
+                        app.context_menu = Some(crate::app::ContextMenu {
+                            section,
+                            actions,
+                            selected: 0,
+                            anchor_row: row,
+                            anchor_col: col,
+                        });
+                    }
+                } else {
+                    handle_overlay_click(app, col, row);
+                }
                 return;
             }
 
@@ -362,52 +394,22 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
             );
         }
         Screen::Explorer => {
-            // Explorer sub-view scroll: checkpoints, validators, search results
-            use crate::app::ExplorerView;
-            match app.explorer.view {
-                ExplorerView::Checkpoints => {
-                    app.explorer.checkpoints_selected = apply_delta(
-                        app.explorer.checkpoints_selected,
-                        delta,
-                        app.explorer.checkpoints.len(),
-                    );
-                    App::scroll_into_view(
-                        app.explorer.checkpoints_selected,
-                        &mut app.explorer.checkpoints_offset,
-                        app.explorer.visible_rows,
-                    );
-                }
-                ExplorerView::Validators => {
-                    app.explorer.validators_selected = apply_delta(
-                        app.explorer.validators_selected,
-                        delta,
-                        app.explorer.validators.len(),
-                    );
-                    App::scroll_into_view(
-                        app.explorer.validators_selected,
-                        &mut app.explorer.validators_offset,
-                        app.explorer.visible_rows,
-                    );
-                }
-                ExplorerView::Lookup if !app.explorer.search_results.is_empty() => {
-                    app.explorer.search_selected = apply_delta(
-                        app.explorer.search_selected,
-                        delta,
-                        app.explorer.search_results.len(),
-                    );
-                    App::scroll_into_view(
-                        app.explorer.search_selected,
-                        &mut app.explorer.search_offset,
-                        app.explorer.visible_rows,
-                    );
-                }
-                ExplorerView::Lookup if app.explorer.lookup_result.is_some() => {
-                    let result = app.explorer.lookup_result.as_ref().unwrap();
-                    let total_lines = result.total_visible_lines();
-                    let new_offset = apply_delta(app.explorer.lookup_offset, delta, total_lines);
-                    app.explorer.lookup_offset = new_offset;
-                }
-                _ => {}
+            if !app.explorer.search_results.is_empty() {
+                app.explorer.search_selected = apply_delta(
+                    app.explorer.search_selected,
+                    delta,
+                    app.explorer.search_results.len(),
+                );
+                App::scroll_into_view(
+                    app.explorer.search_selected,
+                    &mut app.explorer.search_offset,
+                    app.explorer.visible_rows,
+                );
+            } else if app.explorer.lookup_result.is_some() {
+                let result = app.explorer.lookup_result.as_ref().unwrap();
+                let total_lines = result.total_visible_lines();
+                let new_offset = apply_delta(app.explorer.lookup_offset, delta, total_lines);
+                app.explorer.lookup_offset = new_offset;
             }
         }
     }

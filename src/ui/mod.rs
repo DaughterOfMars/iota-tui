@@ -4,6 +4,7 @@ mod address_book;
 mod coins;
 pub(crate) mod common;
 mod context_menu;
+mod explorer;
 pub(crate) mod grid;
 mod keys;
 mod objects;
@@ -26,9 +27,11 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     app.content_area_y = area.y;
     app.content_area = area;
 
-    // Main view: grid or section overlay
+    // Main view: grid or section overlay or explorer
     if let Some(section) = app.section_open {
         draw_section_overlay(frame, app, area, section);
+    } else if app.exploring.is_some() {
+        draw_explorer_overlay(frame, app, area);
     } else if app.tx_builder_open {
         // Tx Builder as full-screen overlay
         tx_builder::draw(frame, app, area);
@@ -130,4 +133,58 @@ fn draw_section_overlay(
         Section::Transactions => transactions::draw(frame, app, inner),
         Section::Packages => packages::draw(frame, app, inner),
     }
+}
+
+/// Draw the explorer as a near-full-screen overlay when exploring an external entity.
+fn draw_explorer_overlay(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
+    use ratatui::{
+        style::Style,
+        text::{Line, Span},
+        widgets::{Block, BorderType, Borders, Clear},
+    };
+
+    let margin_x = (area.width as f32 * 0.025).max(1.0) as u16;
+    let margin_y = (area.height as f32 * 0.025).max(1.0) as u16;
+    let overlay = ratatui::layout::Rect::new(
+        area.x + margin_x,
+        area.y + margin_y,
+        area.width.saturating_sub(margin_x * 2),
+        area.height.saturating_sub(margin_y * 2),
+    );
+
+    frame.render_widget(Clear, overlay);
+
+    let query_label = app
+        .exploring
+        .as_deref()
+        .map(|q| {
+            if q.len() > 30 {
+                format!(" Exploring: {}…{} ", &q[..14], &q[q.len() - 10..])
+            } else {
+                format!(" Exploring: {} ", q)
+            }
+        })
+        .unwrap_or_else(|| " Explorer ".to_string());
+
+    let close_hint = " Esc to close ";
+
+    let block = Block::default()
+        .title(common::sparkle_text(&query_label))
+        .title_style(common::header_style())
+        .title_bottom(
+            Line::from(Span::styled(close_hint, common::dim_style()))
+                .alignment(ratatui::layout::Alignment::Right),
+        )
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(common::color_at(0)));
+
+    let inner = block.inner(overlay);
+    frame.render_widget(block, overlay);
+
+    app.content_visible_rows = inner.height.saturating_sub(4) as usize;
+    app.content_area = inner;
+    app.screen = crate::app::Screen::Explorer;
+
+    explorer::draw(frame, app, inner);
 }

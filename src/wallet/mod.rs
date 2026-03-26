@@ -175,10 +175,6 @@ pub enum WalletCmd {
     },
     // Explorer commands
     RefreshNetworkOverview,
-    RefreshCheckpoints {
-        cursor: Option<String>,
-    },
-    RefreshValidators,
     LookupAddress(String),
     SearchObjectsByType {
         type_filter: String,
@@ -242,12 +238,6 @@ pub enum WalletEvent {
         latest_checkpoint: String,
         total_transactions: String,
     },
-    Checkpoints {
-        checkpoints: Vec<crate::app::CheckpointDisplay>,
-        cursor: Option<String>,
-        has_next: bool,
-    },
-    Validators(Vec<crate::app::ValidatorDisplay>),
     ExplorerLookupResult(crate::app::LookupResult),
     AddressLookupPage {
         result: crate::app::LookupResult,
@@ -341,8 +331,6 @@ impl WalletBackend {
                     self.handle_iota_name_lookup(&name, &label, &notes).await
                 }
                 WalletCmd::RefreshNetworkOverview => self.handle_network_overview().await,
-                WalletCmd::RefreshCheckpoints { cursor } => self.handle_checkpoints(cursor).await,
-                WalletCmd::RefreshValidators => self.handle_validators().await,
                 WalletCmd::LookupAddress(query) => self.handle_lookup(&query).await,
                 WalletCmd::LookupAddressPage {
                     address,
