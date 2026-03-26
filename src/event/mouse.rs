@@ -289,20 +289,30 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                                             }
                                         }
                                     }
-                                } else if let Some(ref result) = app.explorer.lookup_result {
+                                } else if let Some(ref mut result) = app.explorer.lookup_result {
                                     // Lookup result: border(1) then content lines
                                     let data_start = result_start + 1;
                                     if row >= data_start {
-                                        // explorer_lookup_offset is a line index
                                         let abs_line = app.explorer.lookup_offset
                                             + (row - data_start) as usize;
-                                        // Convert line index to field index (skip headers)
-                                        if let Some(field_idx) = result.line_to_field(abs_line)
-                                            && field_idx < result.total_fields()
+                                        if let Some((si, depth, fi)) =
+                                            result.line_to_cursor(abs_line)
                                         {
-                                            app.explorer.lookup_selected = field_idx;
-                                            // Activate on click if field has an action
-                                            if let Some(field) = result.field_at(field_idx) {
+                                            app.explorer.lookup_section = si;
+                                            app.explorer.lookup_depth = depth;
+                                            app.explorer.lookup_field_idx = fi;
+
+                                            if depth == 0 {
+                                                // Click on heading: toggle collapse
+                                                if let Some(s) = result.sections_mut().get_mut(si) {
+                                                    s.collapsed = !s.collapsed;
+                                                }
+                                            } else if let Some(field) = result
+                                                .sections()
+                                                .get(si)
+                                                .and_then(|s| s.fields.get(fi))
+                                            {
+                                                // Click on field: activate action
                                                 match &field.action {
                                                     Some(LookupAction::Explore(val)) => {
                                                         let val = val.clone();
@@ -480,19 +490,9 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
                 }
                 ExplorerView::Lookup if app.explorer.lookup_result.is_some() => {
                     let result = app.explorer.lookup_result.as_ref().unwrap();
-                    let total = result.total_fields();
-                    app.explorer.lookup_selected =
-                        apply_delta(app.explorer.lookup_selected, delta, total);
-                    let visible = app.explorer.visible_rows;
-                    app.explorer
-                        .lookup_result
-                        .as_ref()
-                        .unwrap()
-                        .scroll_into_view(
-                            app.explorer.lookup_selected,
-                            &mut app.explorer.lookup_offset,
-                            visible,
-                        );
+                    let total_lines = result.total_visible_lines();
+                    let new_offset = apply_delta(app.explorer.lookup_offset, delta, total_lines);
+                    app.explorer.lookup_offset = new_offset;
                 }
                 _ => {}
             }
@@ -747,6 +747,7 @@ fn handle_popup_click(app: &mut App, col: u16, row: u16) {
         Some(Popup::ConfirmQuit) => centered_rect_min(50, 30, 40, 7, area),
         Some(Popup::SplitCoin) => centered_rect_min(50, 30, 40, 9, area),
         Some(Popup::QuickTransfer) => centered_rect_min(60, 50, 48, 13, area),
+        Some(Popup::ObjectTransfer) => centered_rect_min(60, 40, 48, 10, area),
         Some(Popup::ActionsMenu) => actions_menu_area(app, area),
         None => return,
     };
@@ -902,7 +903,8 @@ fn handle_popup_click(app: &mut App, col: u16, row: u16) {
             | Popup::LookupIotaName
             | Popup::AddCommandForm
             | Popup::SplitCoin
-            | Popup::QuickTransfer,
+            | Popup::QuickTransfer
+            | Popup::ObjectTransfer,
         ) => {
             let button_row = (popup_area.height.saturating_sub(2)) as usize;
             if inner_row == button_row {
@@ -919,6 +921,7 @@ fn handle_popup_click(app: &mut App, col: u16, row: u16) {
                     Some(Popup::AddCommandForm) => (2, 9),
                     Some(Popup::SplitCoin) => (2, 11),
                     Some(Popup::QuickTransfer) => (13, 21),
+                    Some(Popup::ObjectTransfer) => (13, 21),
                     _ => (2, 14),
                 };
                 let cancel_start = submit_end + 2;
@@ -1018,6 +1021,12 @@ fn click_popup_field(app: &mut App, inner_row: usize) {
                 app.quick_transfer_field = f;
                 let val = app.quick_transfer_buffers[f].clone();
                 app.start_input(&val);
+            }
+        }
+        Some(Popup::ObjectTransfer) => {
+            // Single field: Recipient at rows 3-4
+            if inner_row <= 5 {
+                app.popup_focus = PopupFocus::Fields;
             }
         }
         _ => {}
@@ -1159,6 +1168,11 @@ fn submit_input_popup(app: &mut App) {
             app.stop_input();
             app.popup = None;
             app.finalize_quick_transfer();
+        }
+        Some(Popup::ObjectTransfer) => {
+            app.stop_input();
+            app.popup = None;
+            app.finalize_object_transfer();
         }
         _ => {}
     }

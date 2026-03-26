@@ -62,17 +62,13 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
     let show_all = app.show_multiple_owners();
 
     let header_cols: Vec<&str> = if show_all {
-        vec!["Object ID", "Type", "Version", "Digest", "Owner", ""]
+        vec!["Object ID", "Type", "Digest", "Owner", ""]
     } else {
-        vec!["Object ID", "Type", "Version", "Digest", ""]
+        vec!["Object ID", "Type", "Digest", ""]
     };
     let header = Row::new(header_cols)
         .style(common::header_style())
         .bottom_margin(1);
-
-    let max_type_width = table_area
-        .width
-        .saturating_sub(if show_all { 74 } else { 60 }) as usize;
 
     let rows: Vec<Row> = filtered
         .iter()
@@ -89,8 +85,7 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
 
             let mut cells: Vec<Cell> = vec![
                 Cell::from(common::truncate_address(&obj.object_id, 20)),
-                Cell::from(common::truncate_type(&obj.type_name, max_type_width)),
-                Cell::from(obj.version.clone()),
+                Cell::from(common::short_type_name(&obj.type_name)),
                 Cell::from(common::truncate_address(&obj.digest, 16)),
             ];
             if show_all {
@@ -106,7 +101,6 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
         vec![
             Constraint::Length(22),
             Constraint::Min(20),
-            Constraint::Length(8),
             Constraint::Length(18),
             Constraint::Length(14),
             Constraint::Length(2),
@@ -115,7 +109,6 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
         vec![
             Constraint::Length(22),
             Constraint::Min(20),
-            Constraint::Length(8),
             Constraint::Length(18),
             Constraint::Length(2),
         ]

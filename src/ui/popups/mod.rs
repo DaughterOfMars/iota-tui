@@ -140,6 +140,11 @@ pub fn draw_popup(frame: &mut Frame, app: &mut App) {
             frame.render_widget(Clear, popup_area);
             draw_quick_transfer_popup(frame, app, popup_area);
         }
+        Some(Popup::ObjectTransfer) => {
+            let popup_area = centered_rect_min(60, 40, 48, 10, area);
+            frame.render_widget(Clear, popup_area);
+            draw_object_transfer_popup(frame, app, popup_area);
+        }
         Some(Popup::ActionsMenu) => {
             let popup_area = actions_menu_area(app, area);
             frame.render_widget(Clear, popup_area);
@@ -808,6 +813,68 @@ fn draw_quick_transfer_popup(frame: &mut Frame, app: &App, area: Rect) {
 
     let block = Block::default()
         .title(sparkle_text(" Quick Transfer "))
+        .title_style(Style::default().fg(color_at(1)).bold())
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(color_at(2)));
+
+    frame.render_widget(Paragraph::new(lines).block(block), area);
+}
+
+fn draw_object_transfer_popup(frame: &mut Frame, app: &App, area: Rect) {
+    let obj_label = app
+        .filtered_objects()
+        .get(app.objects_selected)
+        .and_then(|&i| app.objects.get(i))
+        .map(|o| {
+            format!(
+                "Object: {}",
+                super::common::truncate_address(&o.object_id, 24)
+            )
+        })
+        .unwrap_or_default();
+
+    let is_active = app.popup_focus == PopupFocus::Fields;
+    let value = &app.input_buffer;
+    let label_style = if is_active {
+        Style::default().fg(color_at(0)).bold()
+    } else {
+        Style::default().fg(Color::White)
+    };
+    let input_style = if is_active {
+        Style::default()
+            .fg(Color::White)
+            .add_modifier(Modifier::UNDERLINED)
+    } else {
+        Style::default().fg(dim_at(0))
+    };
+
+    let display = if value.is_empty() && !is_active {
+        "(empty)".to_string()
+    } else if is_active {
+        format!("{}|", value)
+    } else {
+        value.clone()
+    };
+
+    let lines = vec![
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            format!("  {}", obj_label),
+            Style::default().fg(Color::Gray),
+        )]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Recipient (address or alias): ",
+            label_style,
+        )]),
+        Line::from(vec![Span::styled(format!("  {}", display), input_style)]),
+        Line::from(""),
+        button_line("Send", app.popup_focus, "  Tab: next  "),
+    ];
+
+    let block = Block::default()
+        .title(sparkle_text(" Transfer Object "))
         .title_style(Style::default().fg(color_at(1)).bold())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)

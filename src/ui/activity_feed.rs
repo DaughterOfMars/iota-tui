@@ -26,6 +26,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             Span::styled(" Filter: ", Style::default().fg(Color::Yellow).bold()),
             Span::styled(query, accent_style()),
             Span::styled("_", dim_style()),
+            Span::styled("  (searches summary, digest, time)", dim_style()),
         ]);
         frame.render_widget(Paragraph::new(bar), split[0]);
         split[1]

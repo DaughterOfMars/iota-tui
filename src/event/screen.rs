@@ -233,6 +233,12 @@ pub fn handle_objects_key(app: &mut App, key: KeyEvent) {
                 app.explore_type(tn);
             }
         }
+        KeyCode::Char('x') => {
+            if !app.objects.is_empty() {
+                app.open_popup(Popup::ObjectTransfer);
+                app.start_input("");
+            }
+        }
         KeyCode::Char('/') => {
             app.objects_filter = Some(String::new());
             app.objects_selected = 0;

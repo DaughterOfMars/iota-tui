@@ -480,6 +480,9 @@ impl App {
             WalletEvent::ExplorerLookupResult(result) => {
                 self.explorer.lookup_selected = 0;
                 self.explorer.lookup_offset = 0;
+                self.explorer.lookup_section = 0;
+                self.explorer.lookup_depth = 0;
+                self.explorer.lookup_field_idx = 0;
                 self.explorer.lookup_address = None;
                 self.explorer.lookup_result = Some(result);
             }
@@ -492,6 +495,9 @@ impl App {
             } => {
                 self.explorer.lookup_selected = 0;
                 self.explorer.lookup_offset = 0;
+                self.explorer.lookup_section = 0;
+                self.explorer.lookup_depth = 0;
+                self.explorer.lookup_field_idx = 0;
                 self.explorer.lookup_obj_cursor = obj_cursor;
                 self.explorer.lookup_obj_has_next = obj_has_next;
                 self.explorer.lookup_tx_cursor = tx_cursor;
@@ -752,6 +758,9 @@ impl App {
         self.explorer.lookup_result = None;
         self.explorer.lookup_selected = 0;
         self.explorer.lookup_offset = 0;
+        self.explorer.lookup_section = 0;
+        self.explorer.lookup_depth = 0;
+        self.explorer.lookup_field_idx = 0;
         self.explorer.lookup_query = Some(query.clone());
         self.explorer.lookup_address = Some(query.clone());
         self.explorer.lookup_obj_cursor = None;
@@ -778,6 +787,9 @@ impl App {
         self.popup_scroll = 0;
         self.explorer.search_mode = true;
         self.explorer.lookup_result = None;
+        self.explorer.lookup_section = 0;
+        self.explorer.lookup_depth = 0;
+        self.explorer.lookup_field_idx = 0;
         self.explorer.search_results.clear();
         self.explorer.search_selected = 0;
         self.explorer.search_offset = 0;
@@ -970,6 +982,33 @@ impl App {
         self.tx.commands.push(PtbCommand::TransferIota {
             recipient: resolved,
             amount: amount.clone(),
+        });
+        self.tx.step = TxBuilderStep::Review;
+        self.navigate(Screen::TxBuilder);
+        self.send_cmd(WalletCmd::DryRun {
+            sender_idx: self.tx.sender,
+            commands: self.tx.commands.clone(),
+        });
+        self.tx.dry_running = true;
+        self.tx.dry_run_dirty = false;
+    }
+
+    pub fn finalize_object_transfer(&mut self) {
+        let recipient = self.input_buffer.clone();
+        if recipient.is_empty() {
+            return;
+        }
+        let filtered = self.filtered_objects();
+        let Some(&real_idx) = filtered.get(self.objects_selected) else {
+            return;
+        };
+        let obj = &self.objects[real_idx];
+        let object_id = obj.object_id.clone();
+        let resolved = self.resolve_address(&recipient);
+        self.tx.reset();
+        self.tx.commands.push(PtbCommand::TransferObjects {
+            recipient: resolved,
+            object_ids: vec![object_id],
         });
         self.tx.step = TxBuilderStep::Review;
         self.navigate(Screen::TxBuilder);
@@ -1535,9 +1574,18 @@ impl App {
             Screen::Keys => self.keys.get(self.keys_selected).map(|k| k.address.clone()),
             Screen::Explorer => {
                 if let Some(ref result) = self.explorer.lookup_result {
-                    result
-                        .field_at(self.explorer.lookup_selected)
-                        .map(|f| f.value.clone())
+                    if self.explorer.lookup_depth == 1 {
+                        result
+                            .sections()
+                            .get(self.explorer.lookup_section)
+                            .and_then(|s| s.fields.get(self.explorer.lookup_field_idx))
+                            .map(|f| f.value.clone())
+                    } else {
+                        result
+                            .sections()
+                            .get(self.explorer.lookup_section)
+                            .map(|s| s.title.clone())
+                    }
                 } else {
                     None
                 }

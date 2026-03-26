@@ -501,8 +501,10 @@ fn draw_lookup(frame: &mut Frame, app: &mut App, area: Rect) {
         // Re-run scroll with the actual visible rows from this frame to fix
         // any stale-value drift from the event handler.
         if let Some(ref result) = app.explorer.lookup_result {
-            result.scroll_into_view(
-                app.explorer.lookup_selected,
+            result.scroll_cursor_into_view(
+                app.explorer.lookup_section,
+                app.explorer.lookup_depth,
+                app.explorer.lookup_field_idx,
                 &mut app.explorer.lookup_offset,
                 visible,
             );
@@ -542,53 +544,70 @@ fn draw_lookup_sections(
     frame.render_widget(block, area);
 
     let visible_rows = inner.height as usize;
-    let mut flat_idx: usize = 0;
     let mut lines: Vec<Line> = Vec::new();
 
-    for section in sections {
-        // Section header
+    let cur_sec = app.explorer.lookup_section;
+    let cur_depth = app.explorer.lookup_depth;
+    let cur_field = app.explorer.lookup_field_idx;
+
+    for (si, section) in sections.iter().enumerate() {
+        let heading_selected = si == cur_sec && cur_depth == 0;
+        let collapse_indicator = if section.collapsed { "▸" } else { "▾" };
+
+        let heading_style = if heading_selected {
+            common::selected_style()
+        } else {
+            Style::default().fg(Color::Cyan).bold()
+        };
         lines.push(Line::from(Span::styled(
-            format!("── {} ──", section.title),
-            Style::default().fg(Color::Cyan).bold(),
+            format!(
+                "{} {} ({})",
+                collapse_indicator,
+                section.title,
+                section.fields.len()
+            ),
+            heading_style,
         )));
 
-        for field in &section.fields {
-            let is_selected = flat_idx == app.explorer.lookup_selected;
-            let has_action = field.action.is_some();
+        if !section.collapsed {
+            for (fi, field) in section.fields.iter().enumerate() {
+                let is_selected = si == cur_sec && cur_depth == 1 && fi == cur_field;
+                let has_action = field.action.is_some();
 
-            let key_style = if is_selected {
-                common::selected_style()
-            } else {
-                Style::default().fg(Color::White).bold()
-            };
-            let val_style = if is_selected {
-                common::selected_style()
-            } else if has_action {
-                common::accent_style()
-            } else {
-                Style::default().fg(Color::Gray)
-            };
+                let key_style = if is_selected {
+                    common::selected_style()
+                } else {
+                    Style::default().fg(Color::White).bold()
+                };
+                let val_style = if is_selected {
+                    common::selected_style()
+                } else if has_action {
+                    common::accent_style()
+                } else {
+                    Style::default().fg(Color::Gray)
+                };
 
-            let nav_hint = if is_selected && has_action {
-                " ⏎"
-            } else {
-                ""
-            };
+                let nav_hint = if is_selected && has_action {
+                    " ⏎"
+                } else {
+                    ""
+                };
 
-            lines.push(Line::from(vec![
-                Span::styled(format!("  {:<20}", field.key), key_style),
-                Span::styled(
-                    common::truncate_address(&field.value, inner.width.saturating_sub(24) as usize),
-                    val_style,
-                ),
-                Span::styled(nav_hint.to_string(), Style::default().fg(Color::Green)),
-            ]));
-
-            flat_idx += 1;
+                lines.push(Line::from(vec![
+                    Span::styled(format!("  {:<20}", field.key), key_style),
+                    Span::styled(
+                        common::truncate_address(
+                            &field.value,
+                            inner.width.saturating_sub(24) as usize,
+                        ),
+                        val_style,
+                    ),
+                    Span::styled(nav_hint.to_string(), Style::default().fg(Color::Green)),
+                ]));
+            }
         }
     }
 
-    // explorer_lookup_offset is already a line index
     let line_offset = app.explorer.lookup_offset;
 
     let display_lines: Vec<Line> = lines

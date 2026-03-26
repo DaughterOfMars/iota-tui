@@ -32,6 +32,12 @@ pub struct ExplorerState {
     pub search_cursors: Vec<Option<String>>,
     pub lookup_selected: usize,
     pub lookup_offset: usize,
+    /// Which section the cursor is on (index into sections vec).
+    pub lookup_section: usize,
+    /// 0 = cursor is on section heading, 1 = cursor is on a field within the section.
+    pub lookup_depth: usize,
+    /// Which field within the current section (only meaningful when lookup_depth == 1).
+    pub lookup_field_idx: usize,
     pub lookup_query: Option<String>,
     pub lookup_address: Option<String>,
     pub lookup_obj_cursor: Option<String>,
@@ -75,6 +81,9 @@ impl Default for ExplorerState {
             search_cursors: vec![],
             lookup_selected: 0,
             lookup_offset: 0,
+            lookup_section: 0,
+            lookup_depth: 0,
+            lookup_field_idx: 0,
             lookup_query: None,
             lookup_address: None,
             lookup_obj_cursor: None,

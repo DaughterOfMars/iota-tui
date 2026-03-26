@@ -283,43 +283,10 @@ pub(super) fn build_tx_sections_v1(
         }
     }
 
-    // Derive transaction kind from the transaction data
-    if let iota_sdk::types::Transaction::V1(tx_v1) = &signed_tx.transaction {
-        let (kind_name, detail) = match &tx_v1.kind {
-            iota_sdk::types::TransactionKind::ProgrammableTransaction(ptx) => (
-                "Programmable Transaction".to_string(),
-                Some(summarize_transaction(&ptx.commands)),
-            ),
-            iota_sdk::types::TransactionKind::Genesis(_) => ("Genesis".to_string(), None),
-            iota_sdk::types::TransactionKind::ConsensusCommitPrologueV1(_) => {
-                ("Consensus Commit Prologue".to_string(), None)
-            }
-            iota_sdk::types::TransactionKind::AuthenticatorStateUpdateV1(_) => {
-                ("Authenticator State Update".to_string(), None)
-            }
-            iota_sdk::types::TransactionKind::RandomnessStateUpdate(_) => {
-                ("Randomness State Update".to_string(), None)
-            }
-            iota_sdk::types::TransactionKind::EndOfEpoch(_) => ("End of Epoch".to_string(), None),
-            _ => ("System".to_string(), None),
-        };
-        overview.push(LookupField {
-            key: "Kind".into(),
-            value: kind_name,
-            action: None,
-        });
-        if let Some(d) = detail {
-            overview.push(LookupField {
-                key: "Summary".into(),
-                value: d,
-                action: None,
-            });
-        }
-    }
-
     let mut sections = vec![LookupSection {
         title: "Transaction".into(),
         fields: overview,
+        collapsed: true,
     }];
 
     // Gas section (display in NANOS)
@@ -349,6 +316,7 @@ pub(super) fn build_tx_sections_v1(
                 action: None,
             },
         ],
+        collapsed: true,
     });
 
     // Signatures section
@@ -374,6 +342,7 @@ pub(super) fn build_tx_sections_v1(
         sections.push(LookupSection {
             title: "Signatures".into(),
             fields: sig_fields,
+            collapsed: true,
         });
     }
 
@@ -399,6 +368,7 @@ pub(super) fn build_tx_sections_v1(
                     sections.push(LookupSection {
                         title: "Inputs".into(),
                         fields: input_fields,
+                        collapsed: true,
                     });
                 }
 
@@ -417,6 +387,7 @@ pub(super) fn build_tx_sections_v1(
                     value: "Unsupported transaction version — cannot display details".into(),
                     action: None,
                 }],
+                collapsed: true,
             });
         }
     }
@@ -439,6 +410,7 @@ pub(super) fn build_tx_sections_v1(
         sections.push(LookupSection {
             title: format!("Changed Objects ({})", changed_fields.len()),
             fields: changed_fields,
+            collapsed: true,
         });
     }
 
@@ -602,6 +574,7 @@ fn format_command_section(idx: usize, cmd: &iota_sdk::types::Command) -> crate::
             LookupSection {
                 title: format!("Cmd {} — MoveCall", idx),
                 fields,
+                collapsed: true,
             }
         }
         iota_sdk::types::Command::TransferObjects(t) => LookupSection {
@@ -618,6 +591,7 @@ fn format_command_section(idx: usize, cmd: &iota_sdk::types::Command) -> crate::
                     action: None,
                 },
             ],
+            collapsed: true,
         },
         iota_sdk::types::Command::SplitCoins(s) => LookupSection {
             title: format!("Cmd {} — SplitCoins", idx),
@@ -633,6 +607,7 @@ fn format_command_section(idx: usize, cmd: &iota_sdk::types::Command) -> crate::
                     action: None,
                 },
             ],
+            collapsed: true,
         },
         iota_sdk::types::Command::MergeCoins(m) => LookupSection {
             title: format!("Cmd {} — MergeCoins", idx),
@@ -648,6 +623,7 @@ fn format_command_section(idx: usize, cmd: &iota_sdk::types::Command) -> crate::
                     action: None,
                 },
             ],
+            collapsed: true,
         },
         iota_sdk::types::Command::Publish(p) => LookupSection {
             title: format!("Cmd {} — Publish", idx),
@@ -663,6 +639,7 @@ fn format_command_section(idx: usize, cmd: &iota_sdk::types::Command) -> crate::
                     action: None,
                 },
             ],
+            collapsed: true,
         },
         iota_sdk::types::Command::MakeMoveVector(v) => {
             let type_str = v
@@ -684,6 +661,7 @@ fn format_command_section(idx: usize, cmd: &iota_sdk::types::Command) -> crate::
                         action: None,
                     },
                 ],
+                collapsed: true,
             }
         }
         iota_sdk::types::Command::Upgrade(u) => {
@@ -707,6 +685,7 @@ fn format_command_section(idx: usize, cmd: &iota_sdk::types::Command) -> crate::
                         action: None,
                     },
                 ],
+                collapsed: true,
             }
         }
         _ => LookupSection {
@@ -716,6 +695,7 @@ fn format_command_section(idx: usize, cmd: &iota_sdk::types::Command) -> crate::
                 value: "Unsupported command type".into(),
                 action: None,
             }],
+            collapsed: true,
         },
     }
 }

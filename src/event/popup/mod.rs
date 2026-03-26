@@ -742,6 +742,60 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                 }
             }
         }
+        Some(Popup::ObjectTransfer) => {
+            if handle_button_focus_key(app, key) {
+                return;
+            }
+            match key.code {
+                KeyCode::Esc => {
+                    if app.popup_focus != PopupFocus::Fields {
+                        app.popup_focus = PopupFocus::Fields;
+                    } else {
+                        app.popup = None;
+                        app.input_mode = InputMode::Normal;
+                        app.input_clear();
+                    }
+                }
+                KeyCode::Tab => match app.popup_focus {
+                    PopupFocus::Fields => {
+                        app.popup_focus = PopupFocus::Submit;
+                    }
+                    PopupFocus::Submit => app.popup_focus = PopupFocus::Cancel,
+                    PopupFocus::Cancel => {
+                        app.popup_focus = PopupFocus::Fields;
+                    }
+                },
+                KeyCode::BackTab => match app.popup_focus {
+                    PopupFocus::Fields => {
+                        app.popup_focus = PopupFocus::Cancel;
+                    }
+                    PopupFocus::Submit => {
+                        app.popup_focus = PopupFocus::Fields;
+                    }
+                    PopupFocus::Cancel => app.popup_focus = PopupFocus::Submit,
+                },
+                KeyCode::Enter => match app.popup_focus {
+                    PopupFocus::Fields => {
+                        app.popup_focus = PopupFocus::Submit;
+                    }
+                    PopupFocus::Submit => {
+                        app.stop_input();
+                        app.popup = None;
+                        app.finalize_object_transfer();
+                    }
+                    PopupFocus::Cancel => {
+                        app.popup = None;
+                        app.input_mode = InputMode::Normal;
+                        app.input_clear();
+                    }
+                },
+                _ => {
+                    if app.popup_focus == PopupFocus::Fields {
+                        handle_input_key(app, key);
+                    }
+                }
+            }
+        }
         None => {}
     }
 }

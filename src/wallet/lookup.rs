@@ -72,6 +72,7 @@ impl WalletBackend {
                 let mut sections = vec![LookupSection {
                     title: "Object".into(),
                     fields: info_fields,
+                    collapsed: true,
                 }];
 
                 // Fetch move object content (JSON fields) into a separate section
@@ -94,6 +95,7 @@ impl WalletBackend {
                         sections.push(LookupSection {
                             title: format!("Fields ({})", field_entries.len()),
                             fields: field_entries,
+                            collapsed: true,
                         });
                     }
                 }
@@ -128,6 +130,7 @@ impl WalletBackend {
                         sections.push(LookupSection {
                             title: format!("Dynamic Fields ({})", df_fields.len()),
                             fields: df_fields,
+                            collapsed: true,
                         });
                     }
                 }
@@ -156,6 +159,7 @@ impl WalletBackend {
                         value: "Unsupported transaction effects version".into(),
                         action: None,
                     }],
+                    collapsed: true,
                 }],
             };
 
@@ -199,6 +203,7 @@ impl WalletBackend {
                     sections.push(LookupSection {
                         title: format!("Events ({})", ev_fields.len()),
                         fields: ev_fields,
+                        collapsed: true,
                     });
                 }
             }
@@ -290,6 +295,7 @@ impl WalletBackend {
         let mut sections = vec![LookupSection {
             title: "Address".into(),
             fields: overview,
+            collapsed: true,
         }];
 
         // Objects section
@@ -312,6 +318,7 @@ impl WalletBackend {
             sections.push(LookupSection {
                 title: format!("Objects ({})", obj_fields.len()),
                 fields: obj_fields,
+                collapsed: true,
             });
         }
 
@@ -364,6 +371,7 @@ impl WalletBackend {
                     sections.push(LookupSection {
                         title: format!("Transactions ({})", tx_fields.len()),
                         fields: tx_fields,
+                        collapsed: true,
                     });
                 }
             }

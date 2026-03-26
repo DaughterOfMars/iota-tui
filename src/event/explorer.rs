@@ -210,24 +210,32 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                         app.explore_item(id);
                         return;
                     }
-                    // If lookup result is showing, follow the selected field's action
-                    if let Some(ref result) = app.explorer.lookup_result {
-                        if let Some(field) = result.field_at(app.explorer.lookup_selected) {
-                            match &field.action {
-                                Some(LookupAction::Explore(val)) => {
-                                    let val = val.clone();
-                                    app.explore_item(val);
-                                    return;
+                    // If lookup result is showing, handle tree navigation
+                    if let Some(ref mut result) = app.explorer.lookup_result {
+                        let sections = result.sections_mut();
+                        if app.explorer.lookup_depth == 0 {
+                            // On a heading: toggle collapsed
+                            if let Some(s) = sections.get_mut(app.explorer.lookup_section) {
+                                s.collapsed = !s.collapsed;
+                            }
+                        } else if let Some(section) = sections.get(app.explorer.lookup_section) {
+                            // On a field: follow action
+                            if let Some(field) = section.fields.get(app.explorer.lookup_field_idx) {
+                                match &field.action {
+                                    Some(LookupAction::Explore(val)) => {
+                                        let val = val.clone();
+                                        app.explore_item(val);
+                                        return;
+                                    }
+                                    Some(LookupAction::TypeSearch(val)) => {
+                                        let val = val.clone();
+                                        app.explore_type(val);
+                                        return;
+                                    }
+                                    None => {}
                                 }
-                                Some(LookupAction::TypeSearch(val)) => {
-                                    let val = val.clone();
-                                    app.explore_type(val);
-                                    return;
-                                }
-                                None => {}
                             }
                         }
-                        // No action on this field — do nothing (don't open input)
                         return;
                     }
                     // No results at all — open lookup input
@@ -239,6 +247,9 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                     app.explorer.search_selected = 0;
                     app.explorer.lookup_selected = 0;
                     app.explorer.lookup_offset = 0;
+                    app.explorer.lookup_section = 0;
+                    app.explorer.lookup_depth = 0;
+                    app.explorer.lookup_field_idx = 0;
                     app.explorer.search_has_next = false;
                     app.explorer.search_cursor = None;
                     app.explorer.search_cursors.clear();
@@ -248,10 +259,8 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                         if app.explorer.search_selected > 0 {
                             app.explorer.search_selected -= 1;
                         }
-                    } else if app.explorer.lookup_result.is_some()
-                        && app.explorer.lookup_selected > 0
-                    {
-                        app.explorer.lookup_selected -= 1;
+                    } else if app.explorer.lookup_result.is_some() {
+                        lookup_cursor_up(app);
                     }
                 }
                 KeyCode::Down => {
@@ -259,23 +268,37 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                         if app.explorer.search_selected + 1 < app.explorer.search_results.len() {
                             app.explorer.search_selected += 1;
                         }
-                    } else if let Some(ref result) = app.explorer.lookup_result {
-                        let total = result.total_fields();
-                        if app.explorer.lookup_selected + 1 < total {
-                            app.explorer.lookup_selected += 1;
-                        }
+                    } else if app.explorer.lookup_result.is_some() {
+                        lookup_cursor_down(app);
+                    }
+                }
+                KeyCode::Left => {
+                    if app.explorer.lookup_result.is_some() {
+                        lookup_cursor_left(app);
+                    }
+                }
+                KeyCode::Right => {
+                    if app.explorer.lookup_result.is_some() {
+                        lookup_cursor_right(app);
                     }
                 }
                 KeyCode::Home => {
                     app.explorer.search_selected = 0;
-                    app.explorer.lookup_selected = 0;
+                    app.explorer.lookup_section = 0;
+                    app.explorer.lookup_depth = 0;
+                    app.explorer.lookup_field_idx = 0;
                 }
                 KeyCode::End => {
                     if !app.explorer.search_results.is_empty() {
                         app.explorer.search_selected =
                             app.explorer.search_results.len().saturating_sub(1);
                     } else if let Some(ref result) = app.explorer.lookup_result {
-                        app.explorer.lookup_selected = result.total_fields().saturating_sub(1);
+                        let n = result.sections().len();
+                        if n > 0 {
+                            app.explorer.lookup_section = n - 1;
+                            app.explorer.lookup_depth = 0;
+                            app.explorer.lookup_field_idx = 0;
+                        }
                     }
                 }
                 KeyCode::Char(']')
@@ -363,11 +386,119 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
                     app.explorer.visible_rows,
                 );
             } else if let Some(ref result) = app.explorer.lookup_result {
-                result.scroll_into_view(
-                    app.explorer.lookup_selected,
+                result.scroll_cursor_into_view(
+                    app.explorer.lookup_section,
+                    app.explorer.lookup_depth,
+                    app.explorer.lookup_field_idx,
                     &mut app.explorer.lookup_offset,
                     app.explorer.visible_rows,
                 );
+            }
+        }
+    }
+}
+
+/// Move cursor up in the lookup tree.
+fn lookup_cursor_up(app: &mut App) {
+    let result = match app.explorer.lookup_result {
+        Some(ref r) => r,
+        None => return,
+    };
+    let sections = result.sections();
+    if sections.is_empty() {
+        return;
+    }
+
+    if app.explorer.lookup_depth == 1 {
+        // Inside a section's fields
+        if app.explorer.lookup_field_idx > 0 {
+            app.explorer.lookup_field_idx -= 1;
+        } else {
+            // At first field — go back to heading
+            app.explorer.lookup_depth = 0;
+        }
+    } else {
+        // On a heading — move to previous section
+        if app.explorer.lookup_section > 0 {
+            app.explorer.lookup_section -= 1;
+            // If previous section is expanded and has fields, land on its last field
+            let prev = &sections[app.explorer.lookup_section];
+            if !prev.collapsed && !prev.fields.is_empty() {
+                app.explorer.lookup_depth = 1;
+                app.explorer.lookup_field_idx = prev.fields.len() - 1;
+            }
+        }
+    }
+}
+
+/// Move cursor down in the lookup tree.
+fn lookup_cursor_down(app: &mut App) {
+    let result = match app.explorer.lookup_result {
+        Some(ref r) => r,
+        None => return,
+    };
+    let sections = result.sections();
+    if sections.is_empty() {
+        return;
+    }
+
+    if app.explorer.lookup_depth == 1 {
+        // Inside a section's fields
+        let section = &sections[app.explorer.lookup_section];
+        if app.explorer.lookup_field_idx + 1 < section.fields.len() {
+            app.explorer.lookup_field_idx += 1;
+        } else {
+            // Past last field — move to next section heading
+            if app.explorer.lookup_section + 1 < sections.len() {
+                app.explorer.lookup_section += 1;
+                app.explorer.lookup_depth = 0;
+                app.explorer.lookup_field_idx = 0;
+            }
+        }
+    } else {
+        // On a heading
+        let section = &sections[app.explorer.lookup_section];
+        if !section.collapsed && !section.fields.is_empty() {
+            // Expanded with fields — step into first field
+            app.explorer.lookup_depth = 1;
+            app.explorer.lookup_field_idx = 0;
+        } else {
+            // Collapsed or empty — move to next section heading
+            if app.explorer.lookup_section + 1 < sections.len() {
+                app.explorer.lookup_section += 1;
+            }
+        }
+    }
+}
+
+/// Left: collapse section or jump to heading.
+fn lookup_cursor_left(app: &mut App) {
+    if app.explorer.lookup_depth == 1 {
+        // On a field — jump back to section heading
+        app.explorer.lookup_depth = 0;
+        app.explorer.lookup_field_idx = 0;
+    } else if let Some(ref mut result) = app.explorer.lookup_result {
+        // On a heading — collapse it
+        if let Some(s) = result.sections_mut().get_mut(app.explorer.lookup_section) {
+            s.collapsed = true;
+        }
+    }
+}
+
+/// Right: expand section or step into fields.
+fn lookup_cursor_right(app: &mut App) {
+    if let Some(ref mut result) = app.explorer.lookup_result {
+        let sections = result.sections_mut();
+        if let Some(s) = sections.get_mut(app.explorer.lookup_section)
+            && app.explorer.lookup_depth == 0
+        {
+            if s.collapsed {
+                // Expand the section
+                s.collapsed = false;
+            } else if !s.fields.is_empty() {
+                // Already expanded — step into first field
+                app.explorer.lookup_depth = 1;
+                app.explorer.lookup_field_idx = 0;
             }
         }
     }

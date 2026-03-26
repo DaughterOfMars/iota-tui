@@ -232,6 +232,7 @@ pub fn screen_hints(screen: Screen) -> Vec<(&'static str, &'static str, &'static
         Screen::Objects => vec![
             ("Enter", "explore", "explore"),
             ("t", "type-search", "type_search"),
+            ("x", "transfer", "transfer"),
             ("/", "search", "filter"),
             ("c", "copy", "copy"),
             ("C", "export", "export"),
@@ -321,6 +322,49 @@ pub fn centered_rect_min(
     let x = area.x + (area.width.saturating_sub(w)) / 2;
     let y = area.y + (area.height.saturating_sub(h)) / 2;
     Rect::new(x, y, w, h)
+}
+
+/// Extract the short type name from a fully-qualified Move type string.
+/// e.g. `0x2::iota::IOTA` → `IOTA`, `0xabc::module::MyStruct<0x2::coin::Coin>` → `MyStruct<Coin>`.
+pub fn short_type_name(full_type: &str) -> String {
+    // Handle generics: extract the outer name and recursively shorten type params
+    if let Some(open) = full_type.find('<') {
+        let outer = short_segment(&full_type[..open]);
+        let inner = &full_type[open + 1..full_type.len().saturating_sub(1)];
+        // Split inner type params by comma, shorten each
+        let params: Vec<String> = split_type_params(inner)
+            .iter()
+            .map(|p| short_type_name(p.trim()))
+            .collect();
+        format!("{}<{}>", outer, params.join(", "))
+    } else {
+        short_segment(full_type)
+    }
+}
+
+/// Extract the last `::` segment from a type path (e.g. `0x2::iota::IOTA` → `IOTA`).
+fn short_segment(path: &str) -> String {
+    path.rsplit("::").next().unwrap_or(path).to_string()
+}
+
+/// Split generic type parameters by top-level commas (respecting nested `<>`).
+fn split_type_params(s: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut depth = 0usize;
+    let mut start = 0;
+    for (i, c) in s.char_indices() {
+        match c {
+            '<' => depth += 1,
+            '>' => depth = depth.saturating_sub(1),
+            ',' if depth == 0 => {
+                parts.push(&s[start..i]);
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    parts.push(&s[start..]);
+    parts
 }
 
 /// Truncate a type string to fit within `max_width`, adding "..." if needed.

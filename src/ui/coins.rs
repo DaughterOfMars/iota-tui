@@ -121,7 +121,7 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
 
             let mut cells: Vec<Cell> = vec![
                 Cell::from(coin.symbol.clone()),
-                Cell::from(common::truncate_type(&coin.coin_type, 30)),
+                Cell::from(common::short_type_name(&coin.coin_type)),
                 Cell::from(coin.balance_display.clone()),
                 Cell::from(id_display),
             ];

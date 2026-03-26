@@ -410,6 +410,7 @@ pub enum Popup {
     ActionsMenu,
     SplitCoin,
     QuickTransfer,
+    ObjectTransfer,
 }
 
 // ── Explorer types ─────────────────────────────────────────────────
@@ -489,11 +490,12 @@ pub struct LookupField {
     pub action: Option<LookupAction>,
 }
 
-/// A titled section in the lookup result.
+/// A titled section in the lookup result (collapsible tree node).
 #[derive(Debug, Clone)]
 pub struct LookupSection {
     pub title: String,
     pub fields: Vec<LookupField>,
+    pub collapsed: bool,
 }
 
 /// Result of a lookup query in the Explorer Lookup sub-view.
@@ -506,30 +508,6 @@ pub enum LookupResult {
 }
 
 impl LookupResult {
-    /// Total number of fields across all sections (for scroll bounds).
-    pub fn total_fields(&self) -> usize {
-        match self {
-            LookupResult::Object { sections }
-            | LookupResult::Address { sections }
-            | LookupResult::Transaction { sections } => {
-                sections.iter().map(|s| s.fields.len()).sum()
-            }
-            LookupResult::NotFound(_) => 0,
-        }
-    }
-
-    /// Get the field at a flat index across all sections.
-    pub fn field_at(&self, idx: usize) -> Option<&LookupField> {
-        let mut remaining = idx;
-        for section in self.sections() {
-            if remaining < section.fields.len() {
-                return Some(&section.fields[remaining]);
-            }
-            remaining -= section.fields.len();
-        }
-        None
-    }
-
     pub fn sections(&self) -> &[LookupSection] {
         match self {
             LookupResult::Object { sections }
@@ -539,49 +517,82 @@ impl LookupResult {
         }
     }
 
-    /// Convert a field index to a line index (accounting for section header lines).
-    pub fn field_to_line(&self, field_idx: usize) -> usize {
-        let mut field_count = 0;
-        let mut headers_before = 0;
-        for section in self.sections() {
-            headers_before += 1;
-            if field_count + section.fields.len() > field_idx {
-                return field_idx + headers_before;
-            }
-            field_count += section.fields.len();
+    pub fn sections_mut(&mut self) -> &mut [LookupSection] {
+        match self {
+            LookupResult::Object { sections }
+            | LookupResult::Address { sections }
+            | LookupResult::Transaction { sections } => sections,
+            LookupResult::NotFound(_) => &mut [],
         }
-        field_idx + headers_before
     }
 
-    /// Convert a line index to a field index, or `None` if the line is a section header.
-    pub fn line_to_field(&self, line_idx: usize) -> Option<usize> {
+    /// Total visible lines accounting for collapsed state.
+    pub fn total_visible_lines(&self) -> usize {
+        self.sections()
+            .iter()
+            .map(|s| {
+                if s.collapsed {
+                    1 // just the heading
+                } else {
+                    1 + s.fields.len() // heading + fields
+                }
+            })
+            .sum()
+    }
+
+    /// Convert a tree cursor (section, depth, field_idx) to a visible line index.
+    pub fn cursor_to_line(&self, section: usize, depth: usize, field_idx: usize) -> usize {
+        let mut line = 0;
+        for (i, s) in self.sections().iter().enumerate() {
+            if i == section {
+                if depth == 0 {
+                    return line; // on the heading
+                }
+                return line + 1 + field_idx; // heading + offset into fields
+            }
+            line += 1; // heading
+            if !s.collapsed {
+                line += s.fields.len();
+            }
+        }
+        line
+    }
+
+    /// Convert a visible line index to a tree cursor (section, depth, field_idx).
+    /// Returns None if the line is out of range.
+    pub fn line_to_cursor(&self, line: usize) -> Option<(usize, usize, usize)> {
         let mut current_line = 0;
-        let mut field_count = 0;
-        for section in self.sections() {
-            if line_idx == current_line {
-                return None; // section header
+        for (si, section) in self.sections().iter().enumerate() {
+            if current_line == line {
+                return Some((si, 0, 0)); // heading
             }
             current_line += 1;
-            for i in 0..section.fields.len() {
-                if line_idx == current_line {
-                    return Some(field_count + i);
+            if !section.collapsed {
+                for fi in 0..section.fields.len() {
+                    if current_line == line {
+                        return Some((si, 1, fi)); // field
+                    }
+                    current_line += 1;
                 }
-                current_line += 1;
             }
-            field_count += section.fields.len();
         }
         None
     }
 
-    /// Scroll `offset` (a **line** index) so that the line for `selected`
-    /// (a field index) is visible within `visible_lines` terminal rows.
-    pub fn scroll_into_view(&self, selected: usize, offset: &mut usize, visible_lines: usize) {
-        let selected_line = self.field_to_line(selected);
-
-        if selected_line < *offset {
-            *offset = selected_line;
-        } else if selected_line >= *offset + visible_lines {
-            *offset = selected_line + 1 - visible_lines;
+    /// Scroll offset so that the cursor line is visible.
+    pub fn scroll_cursor_into_view(
+        &self,
+        section: usize,
+        depth: usize,
+        field_idx: usize,
+        offset: &mut usize,
+        visible_lines: usize,
+    ) {
+        let target = self.cursor_to_line(section, depth, field_idx);
+        if target < *offset {
+            *offset = target;
+        } else if target >= *offset + visible_lines {
+            *offset = target + 1 - visible_lines;
         }
     }
 }
