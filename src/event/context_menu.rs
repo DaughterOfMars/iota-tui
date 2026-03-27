@@ -89,7 +89,6 @@ pub fn execute_context_action(app: &mut App, section: Section, action: ContextAc
             app.copy_selected();
         }
         ContextAction::Explore => {
-            // Explore the selected item
             let query = match section {
                 Section::Coins => app
                     .coins
@@ -102,18 +101,14 @@ pub fn execute_context_action(app: &mut App, section: Section, action: ContextAc
                 _ => None,
             };
             if let Some(q) = query {
-                app.search_buffer = q.clone();
-                app.exploring = Some(q.clone());
-                app.send_cmd(WalletCmd::LookupAddress(q));
+                app.explore_item(q);
             }
         }
         ContextAction::ExplorePackage => {
             let indices = app.package_indices();
             if let Some(&obj_idx) = indices.get(app.packages_selected) {
                 let pkg_id = app.objects[obj_idx].object_id.clone();
-                app.search_buffer = pkg_id.clone();
-                app.exploring = Some(pkg_id.clone());
-                app.send_cmd(WalletCmd::LookupAddress(pkg_id));
+                app.explore_item(pkg_id);
             }
         }
         ContextAction::ViewDetails => {

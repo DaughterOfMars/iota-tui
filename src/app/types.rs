@@ -538,7 +538,6 @@ pub enum LookupAction {
 }
 
 /// A single key-value field in a lookup result, optionally navigable.
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct LookupField {
     pub key: String,
@@ -555,7 +554,6 @@ pub struct LookupSection {
 }
 
 /// Result of a lookup query in the Explorer Lookup sub-view.
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum LookupResult {
     Object { sections: Vec<LookupSection> },
@@ -613,28 +611,6 @@ impl LookupResult {
             }
         }
         line
-    }
-
-    /// Convert a visible line index to a tree cursor (section, depth, field_idx).
-    /// Returns None if the line is out of range.
-    #[allow(dead_code)]
-    pub fn line_to_cursor(&self, line: usize) -> Option<(usize, usize, usize)> {
-        let mut current_line = 0;
-        for (si, section) in self.sections().iter().enumerate() {
-            if current_line == line {
-                return Some((si, 0, 0)); // heading
-            }
-            current_line += 1;
-            if !section.collapsed {
-                for fi in 0..section.fields.len() {
-                    if current_line == line {
-                        return Some((si, 1, fi)); // field
-                    }
-                    current_line += 1;
-                }
-            }
-        }
-        None
     }
 
     /// Scroll offset so that the cursor line is visible.

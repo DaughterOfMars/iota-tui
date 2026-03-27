@@ -315,6 +315,7 @@ fn draw_coins_compact(
     offset: usize,
 ) {
     let is_focused = app.focused_section == Section::Coins;
+    let w = area.width as usize;
     for (i, idx) in (offset..app.coins.len().min(offset + visible_rows)).enumerate() {
         let coin = &app.coins[idx];
         let y = area.y + i as u16;
@@ -324,18 +325,20 @@ fn draw_coins_compact(
         let row_area = Rect::new(area.x, y, area.width, 1);
         let is_selected = is_focused && idx == selected;
 
-        let symbol = format!("{:<6}", coin.symbol);
-        let balance = format!("{:>12}", coin.balance_display);
-
         let style = if is_selected {
             common::selected_style()
         } else {
             Style::default()
         };
 
+        let label = format!(" {}", coin.symbol);
+        let value = &coin.balance_display;
+        let pad = w.saturating_sub(label.len() + value.len() + 1);
+
         let line = Line::from(vec![
-            Span::styled(format!(" {}", symbol), style.fg(Color::White)),
-            Span::styled(balance, style.fg(Color::Green)),
+            Span::styled(label, style.fg(Color::White)),
+            Span::styled(" ".repeat(pad), style),
+            Span::styled(format!("{} ", value), style.fg(Color::Green)),
         ]);
         frame.render_widget(Paragraph::new(line), row_area);
     }
@@ -350,6 +353,7 @@ fn draw_objects_compact(
     offset: usize,
 ) {
     let is_focused = app.focused_section == Section::Objects;
+    let w = area.width as usize;
     for (i, idx) in (offset..app.objects.len().min(offset + visible_rows)).enumerate() {
         let obj = &app.objects[idx];
         let y = area.y + i as u16;
@@ -360,8 +364,6 @@ fn draw_objects_compact(
         let is_selected = is_focused && idx == selected;
 
         let type_short = common::short_type_name(&obj.type_name);
-        let type_display =
-            common::truncate_type(&type_short, (area.width as usize).saturating_sub(14));
         let id_short = if obj.object_id.len() > 10 {
             format!(
                 "{}..{}",
@@ -378,16 +380,16 @@ fn draw_objects_compact(
             Style::default()
         };
 
+        let label = format!(
+            " {}",
+            common::truncate_type(&type_short, w.saturating_sub(id_short.len() + 3))
+        );
+        let pad = w.saturating_sub(label.len() + id_short.len() + 1);
+
         let line = Line::from(vec![
-            Span::styled(
-                format!(
-                    " {:<width$}",
-                    type_display,
-                    width = (area.width as usize).saturating_sub(14)
-                ),
-                style.fg(Color::White),
-            ),
-            Span::styled(format!(" {}", id_short), style.fg(Color::DarkGray)),
+            Span::styled(label, style.fg(Color::White)),
+            Span::styled(" ".repeat(pad), style),
+            Span::styled(format!("{} ", id_short), style.fg(Color::DarkGray)),
         ]);
         frame.render_widget(Paragraph::new(line), row_area);
     }
@@ -402,6 +404,7 @@ fn draw_staking_compact(
     offset: usize,
 ) {
     let is_focused = app.focused_section == Section::Staking;
+    let w = area.width as usize;
     for (i, idx) in (offset..app.stakes.len().min(offset + visible_rows)).enumerate() {
         let stake = &app.stakes[idx];
         let y = area.y + i as u16;
@@ -423,12 +426,14 @@ fn draw_staking_compact(
             Style::default()
         };
 
+        let label = format!(" {}", stake.principal_display);
+        let value = &stake.status;
+        let pad = w.saturating_sub(label.len() + value.len() + 1);
+
         let line = Line::from(vec![
-            Span::styled(
-                format!(" {:>10}", stake.principal_display),
-                style.fg(Color::Green),
-            ),
-            Span::styled(format!(" {:<8}", stake.status), style.fg(status_color)),
+            Span::styled(label, style.fg(Color::Green)),
+            Span::styled(" ".repeat(pad), style),
+            Span::styled(format!("{} ", value), style.fg(status_color)),
         ]);
         frame.render_widget(Paragraph::new(line), row_area);
     }
@@ -443,6 +448,7 @@ fn draw_transactions_compact(
     offset: usize,
 ) {
     let is_focused = app.focused_section == Section::Transactions;
+    let w = area.width as usize;
     for (i, idx) in (offset..app.transactions.len().min(offset + visible_rows)).enumerate() {
         let tx = &app.transactions[idx];
         let y = area.y + i as u16;
@@ -470,26 +476,21 @@ fn draw_transactions_compact(
             Style::default()
         };
 
-        let kind_width = (area.width as usize).saturating_sub(22);
-        let kind_display: String = tx.tx_kind.chars().take(kind_width).collect();
+        let status_label = if tx.status.contains("Success") {
+            "OK"
+        } else {
+            "FAIL"
+        };
+
+        let label = format!(" {} {}", digest_short, tx.tx_kind);
+        let max_label = w.saturating_sub(status_label.len() + 2);
+        let label_truncated: String = label.chars().take(max_label).collect();
+        let pad = w.saturating_sub(label_truncated.len() + status_label.len() + 1);
 
         let line = Line::from(vec![
-            Span::styled(format!(" {}", digest_short), style.fg(Color::DarkGray)),
-            Span::styled(
-                format!(" {:<width$}", kind_display, width = kind_width),
-                style.fg(Color::White),
-            ),
-            Span::styled(
-                format!(
-                    " {:>7}",
-                    if tx.status.contains("Success") {
-                        "OK"
-                    } else {
-                        "FAIL"
-                    }
-                ),
-                style.fg(status_color),
-            ),
+            Span::styled(label_truncated, style.fg(Color::White)),
+            Span::styled(" ".repeat(pad), style),
+            Span::styled(format!("{} ", status_label), style.fg(status_color)),
         ]);
         frame.render_widget(Paragraph::new(line), row_area);
     }
@@ -505,6 +506,7 @@ fn draw_packages_compact(
 ) {
     let indices = app.package_indices();
     let is_focused = app.focused_section == Section::Packages;
+    let w = area.width as usize;
     for (i, pkg_pos) in (offset..indices.len().min(offset + visible_rows)).enumerate() {
         let obj_idx = indices[pkg_pos];
         let obj = &app.objects[obj_idx];
@@ -531,9 +533,14 @@ fn draw_packages_compact(
             Style::default()
         };
 
+        let label = format!(" {}", id_short);
+        let value = format!("v{}", obj.version);
+        let pad = w.saturating_sub(label.len() + value.len() + 1);
+
         let line = Line::from(vec![
-            Span::styled(format!(" {}", id_short), style.fg(Color::White)),
-            Span::styled(format!(" {}", obj.version), style.fg(Color::DarkGray)),
+            Span::styled(label, style.fg(Color::White)),
+            Span::styled(" ".repeat(pad), style),
+            Span::styled(format!("{} ", value), style.fg(Color::DarkGray)),
         ]);
         frame.render_widget(Paragraph::new(line), row_area);
     }

@@ -254,9 +254,10 @@ fn handle_explorer_overlay_key(app: &mut App, key: KeyEvent) {
                 return;
             }
             KeyCode::Esc => {
-                // Close explorer and return to grid
+                // Close explorer and return to previous overlay or grid
                 app.exploring = None;
                 app.search_buffer.clear();
+                app.section_open = app.return_to_section.take();
                 app.request_refresh();
                 return;
             }

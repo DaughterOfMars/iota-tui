@@ -34,6 +34,8 @@ pub struct App {
     pub search_buffer: String,
     /// Viewing an external entity's data (None = own address).
     pub exploring: Option<String>,
+    /// Section overlay to return to when closing the explorer.
+    pub return_to_section: Option<Section>,
     /// Settings popup tab (when settings popup is open).
     pub settings_tab: SettingsTab,
     /// Whether the tx builder overlay is open.
@@ -182,6 +184,7 @@ impl App {
             search_focused: false,
             search_buffer: String::new(),
             exploring: None,
+            return_to_section: None,
             settings_tab: SettingsTab::Keys,
             tx_builder_open: false,
             grid_box_areas: vec![],
@@ -618,6 +621,10 @@ impl App {
 
     /// Navigate to Explorer > Lookup and immediately submit a lookup query.
     pub fn explore_item(&mut self, query: String) {
+        // Remember which overlay to return to
+        if self.return_to_section.is_none() {
+            self.return_to_section = self.section_open;
+        }
         // Close any open overlay/popup and switch to grid explore mode
         self.section_open = None;
         self.popup = None;

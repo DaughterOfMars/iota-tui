@@ -7,6 +7,47 @@ use crate::wallet::WalletCmd;
 
 use super::input::handle_input_key;
 
+/// Execute the Enter action on the current explorer selection.
+/// Used by both keyboard Enter and mouse double-click.
+pub fn explorer_enter(app: &mut App) {
+    // If search results are showing, explore the selected one
+    if let Some(obj) = app
+        .explorer
+        .search_results
+        .get(app.explorer.search_selected)
+    {
+        let id = obj.object_id.clone();
+        app.explorer.search_results.clear();
+        app.explore_item(id);
+        return;
+    }
+    // If lookup result is showing, handle tree navigation
+    if let Some(ref mut result) = app.explorer.lookup_result {
+        let sections = result.sections_mut();
+        if app.explorer.lookup_depth == 0 {
+            // On a heading: toggle collapsed
+            if let Some(s) = sections.get_mut(app.explorer.lookup_section) {
+                s.collapsed = !s.collapsed;
+            }
+        } else if let Some(section) = sections.get(app.explorer.lookup_section) {
+            // On a field: follow action
+            if let Some(field) = section.fields.get(app.explorer.lookup_field_idx) {
+                match &field.action {
+                    Some(LookupAction::Explore(val)) => {
+                        let val = val.clone();
+                        app.explore_item(val);
+                    }
+                    Some(LookupAction::TypeSearch(val)) => {
+                        let val = val.clone();
+                        app.explore_type(val);
+                    }
+                    None => {}
+                }
+            }
+        }
+    }
+}
+
 /// Determine whether a query string is a lookup (address/object/tx digest)
 /// or a type search. Lookups start with `0x` (hex IDs) or look like base58
 /// transaction digests (alphanumeric, 32-44 chars, no `::` separator).
@@ -58,47 +99,12 @@ pub fn handle_explorer_key(app: &mut App, key: KeyEvent) {
 
     match key.code {
         KeyCode::Enter => {
-            // If search results are showing, explore the selected one
-            if let Some(obj) = app
-                .explorer
-                .search_results
-                .get(app.explorer.search_selected)
-            {
-                let id = obj.object_id.clone();
-                app.explorer.search_results.clear();
-                app.explore_item(id);
-                return;
+            if app.explorer.search_results.is_empty() && app.explorer.lookup_result.is_none() {
+                // No results at all — open lookup input
+                app.start_input("");
+            } else {
+                explorer_enter(app);
             }
-            // If lookup result is showing, handle tree navigation
-            if let Some(ref mut result) = app.explorer.lookup_result {
-                let sections = result.sections_mut();
-                if app.explorer.lookup_depth == 0 {
-                    // On a heading: toggle collapsed
-                    if let Some(s) = sections.get_mut(app.explorer.lookup_section) {
-                        s.collapsed = !s.collapsed;
-                    }
-                } else if let Some(section) = sections.get(app.explorer.lookup_section) {
-                    // On a field: follow action
-                    if let Some(field) = section.fields.get(app.explorer.lookup_field_idx) {
-                        match &field.action {
-                            Some(LookupAction::Explore(val)) => {
-                                let val = val.clone();
-                                app.explore_item(val);
-                                return;
-                            }
-                            Some(LookupAction::TypeSearch(val)) => {
-                                let val = val.clone();
-                                app.explore_type(val);
-                                return;
-                            }
-                            None => {}
-                        }
-                    }
-                }
-                return;
-            }
-            // No results at all — open lookup input
-            app.start_input("");
         }
         KeyCode::Esc => {
             app.explorer.lookup_result = None;

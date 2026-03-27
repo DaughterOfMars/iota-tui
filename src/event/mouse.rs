@@ -9,6 +9,8 @@ use crate::ui::common::{centered_rect_min, screen_hints};
 use crate::ui::popups::actions_menu_area;
 use crate::wallet::{Network, WalletCmd};
 
+use super::explorer::explorer_enter;
+
 pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
     match mouse.kind {
         MouseEventKind::Down(MouseButton::Left) => {
@@ -92,6 +94,29 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                     }
                 } else {
                     handle_overlay_click(app, col, row);
+                }
+                return;
+            }
+
+            // Explorer overlay
+            if app.exploring.is_some() {
+                let ca = app.content_area;
+                if row >= ca.y && row < ca.y + ca.height && col >= ca.x && col < ca.x + ca.width {
+                    // Content is inside a bordered "Result" block (+1 for top border).
+                    // Search results also have a header row + margin (+2 more).
+                    let border_offset = if !app.explorer.search_results.is_empty() {
+                        3 // border + header + margin
+                    } else {
+                        1 // border only
+                    };
+                    let inner_y = ca.y + border_offset;
+                    if row >= inner_y {
+                        let click_line = app.explorer.lookup_offset + (row - inner_y) as usize;
+                        explorer_click_select(app, click_line);
+                        if is_double_click {
+                            explorer_enter(app);
+                        }
+                    }
                 }
                 return;
             }
@@ -207,7 +232,7 @@ fn click_select_in_box(app: &mut App, section: Section, _col: u16, row: u16) {
 
 /// Handle clicks when a section overlay is open (routes to old screen-based click logic).
 fn handle_overlay_click(app: &mut App, col: u16, row: u16) {
-    let cy = app.content_area_y;
+    let cy = app.content_area.y;
     if row < cy {
         return;
     }
@@ -277,7 +302,7 @@ fn handle_overlay_click(app: &mut App, col: u16, row: u16) {
 
 /// Handle clicks when the Tx Builder overlay is open.
 fn handle_tx_builder_click(app: &mut App, col: u16, row: u16) {
-    let cy = app.content_area_y;
+    let cy = app.content_area.y;
     let step_end = cy + 3;
     if row >= cy && row < step_end {
         let mut x = 1u16;
@@ -410,6 +435,45 @@ pub fn scroll_selection(app: &mut App, delta: i32) {
                 let total_lines = result.total_visible_lines();
                 let new_offset = apply_delta(app.explorer.lookup_offset, delta, total_lines);
                 app.explorer.lookup_offset = new_offset;
+            }
+        }
+    }
+}
+
+/// Select the explorer item at a given line index (accounting for headings + fields).
+fn explorer_click_select(app: &mut App, line_idx: usize) {
+    let result = match app.explorer.lookup_result {
+        Some(ref r) => r,
+        None => {
+            // Search results: simple index selection
+            if !app.explorer.search_results.is_empty() {
+                let idx = line_idx.min(app.explorer.search_results.len().saturating_sub(1));
+                app.explorer.search_selected = idx;
+            }
+            return;
+        }
+    };
+
+    let sections = result.sections();
+    let mut current_line = 0;
+    for (si, section) in sections.iter().enumerate() {
+        if current_line == line_idx {
+            // Clicked on this heading
+            app.explorer.lookup_section = si;
+            app.explorer.lookup_depth = 0;
+            app.explorer.lookup_field_idx = 0;
+            return;
+        }
+        current_line += 1;
+        if !section.collapsed {
+            for fi in 0..section.fields.len() {
+                if current_line == line_idx {
+                    app.explorer.lookup_section = si;
+                    app.explorer.lookup_depth = 1;
+                    app.explorer.lookup_field_idx = fi;
+                    return;
+                }
+                current_line += 1;
             }
         }
     }
