@@ -228,6 +228,21 @@ fn handle_tx_builder_overlay_key(app: &mut App, key: KeyEvent) {
         return;
     }
 
+    // Global shortcuts available inside TxBuilder
+    if app.input_mode != InputMode::Editing {
+        match key.code {
+            KeyCode::Char('q') => {
+                app.open_popup(Popup::ConfirmQuit);
+                return;
+            }
+            KeyCode::Char('?') => {
+                app.open_popup(Popup::Help);
+                return;
+            }
+            _ => {}
+        }
+    }
+
     screen::handle_tx_key(app, key);
 }
 

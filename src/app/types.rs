@@ -48,7 +48,6 @@ pub enum ContextAction {
     CopyId,
     Explore,
     ExplorePackage,
-    ViewDetails,
     CopyDigest,
 }
 
@@ -63,7 +62,6 @@ impl ContextAction {
             ContextAction::CopyId => "Copy ID",
             ContextAction::Explore => "Explore",
             ContextAction::ExplorePackage => "Explore Package",
-            ContextAction::ViewDetails => "View Details",
             ContextAction::CopyDigest => "Copy Digest",
         }
     }
@@ -79,7 +77,6 @@ impl ContextAction {
             ContextAction::CopyId => 'c',
             ContextAction::Explore => 'e',
             ContextAction::ExplorePackage => 'e',
-            ContextAction::ViewDetails => 'v',
             ContextAction::CopyDigest => 'c',
         }
     }
@@ -119,7 +116,7 @@ pub fn actions_for(section: Section, is_own: bool) -> Vec<ContextAction> {
             actions
         }
         Section::Transactions => {
-            vec![ContextAction::ViewDetails, ContextAction::CopyDigest]
+            vec![ContextAction::CopyDigest]
         }
         Section::Packages => {
             vec![ContextAction::ExplorePackage, ContextAction::CopyId]
@@ -501,6 +498,7 @@ pub enum Popup {
     AddCommandForm,
     RenameKey,
     SwitchNetwork,
+    #[allow(dead_code)]
     Detail,
     ConfirmDeleteAddress,
     ConfirmDeleteKey,

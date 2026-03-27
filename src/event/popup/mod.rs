@@ -745,16 +745,35 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
             }
             match key.code {
                 KeyCode::Esc => {
-                    if app.popup_focus != PopupFocus::Fields {
+                    if app.autocomplete_idx.is_some() {
+                        app.autocomplete_idx = None;
+                    } else if app.popup_focus != PopupFocus::Fields {
                         app.popup_focus = PopupFocus::Fields;
                     } else {
                         app.popup = None;
                         app.input_mode = InputMode::Normal;
                         app.input_clear();
+                        app.autocomplete.clear();
                     }
                 }
-                KeyCode::Tab => match app.popup_focus {
-                    PopupFocus::Fields => {
+                KeyCode::Down if !app.autocomplete.is_empty() => {
+                    let len = app.autocomplete.len();
+                    app.autocomplete_idx = Some(match app.autocomplete_idx {
+                        None => 0,
+                        Some(i) => (i + 1).min(len - 1),
+                    });
+                }
+                KeyCode::Up if app.autocomplete_idx.is_some() => {
+                    app.autocomplete_idx = match app.autocomplete_idx {
+                        Some(0) => None,
+                        Some(i) => Some(i - 1),
+                        None => None,
+                    };
+                }
+                KeyCode::Tab => {
+                    if app.popup_focus == PopupFocus::Fields {
+                        // Accept autocomplete if showing
+                        app.accept_autocomplete();
                         let val = app.input_buffer.clone();
                         app.quick_transfer_buffers[app.quick_transfer_field] = val;
                         if app.quick_transfer_field < 1 {
@@ -764,15 +783,17 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                         } else {
                             app.popup_focus = PopupFocus::Submit;
                         }
-                    }
-                    PopupFocus::Submit => app.popup_focus = PopupFocus::Cancel,
-                    PopupFocus::Cancel => {
+                        app.update_autocomplete();
+                    } else if app.popup_focus == PopupFocus::Submit {
+                        app.popup_focus = PopupFocus::Cancel;
+                    } else {
                         app.quick_transfer_field = 0;
                         let val = app.quick_transfer_buffers[0].clone();
                         app.start_input(&val);
                         app.popup_focus = PopupFocus::Fields;
+                        app.update_autocomplete();
                     }
-                },
+                }
                 KeyCode::BackTab => match app.popup_focus {
                     PopupFocus::Fields => {
                         if app.quick_transfer_field > 0 {
@@ -781,6 +802,7 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                             app.quick_transfer_field -= 1;
                             let next = app.quick_transfer_buffers[app.quick_transfer_field].clone();
                             app.start_input(&next);
+                            app.update_autocomplete();
                         } else {
                             app.popup_focus = PopupFocus::Cancel;
                         }
@@ -790,11 +812,15 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                         app.quick_transfer_field = 1;
                         app.start_input(&val);
                         app.popup_focus = PopupFocus::Fields;
+                        app.update_autocomplete();
                     }
                     PopupFocus::Cancel => app.popup_focus = PopupFocus::Submit,
                 },
                 KeyCode::Enter => match app.popup_focus {
                     PopupFocus::Fields => {
+                        if app.autocomplete_idx.is_some() {
+                            app.accept_autocomplete();
+                        }
                         let val = app.input_buffer.clone();
                         app.quick_transfer_buffers[app.quick_transfer_field] = val;
                         if app.quick_transfer_field < 1 {
@@ -804,23 +830,27 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                         } else {
                             app.popup_focus = PopupFocus::Submit;
                         }
+                        app.update_autocomplete();
                     }
                     PopupFocus::Submit => {
                         app.quick_transfer_buffers[app.quick_transfer_field] =
                             app.input_buffer.clone();
                         app.stop_input();
                         app.popup = None;
+                        app.autocomplete.clear();
                         app.finalize_quick_transfer();
                     }
                     PopupFocus::Cancel => {
                         app.popup = None;
                         app.input_mode = InputMode::Normal;
                         app.input_clear();
+                        app.autocomplete.clear();
                     }
                 },
                 _ => {
                     if app.popup_focus == PopupFocus::Fields {
                         handle_input_key(app, key);
+                        app.update_autocomplete();
                     }
                 }
             }
@@ -831,50 +861,76 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
             }
             match key.code {
                 KeyCode::Esc => {
-                    if app.popup_focus != PopupFocus::Fields {
+                    if app.autocomplete_idx.is_some() {
+                        app.autocomplete_idx = None;
+                    } else if app.popup_focus != PopupFocus::Fields {
                         app.popup_focus = PopupFocus::Fields;
                     } else {
                         app.popup = None;
                         app.input_mode = InputMode::Normal;
                         app.input_clear();
+                        app.autocomplete.clear();
                     }
                 }
-                KeyCode::Tab => match app.popup_focus {
-                    PopupFocus::Fields => {
+                KeyCode::Down if !app.autocomplete.is_empty() => {
+                    let len = app.autocomplete.len();
+                    app.autocomplete_idx = Some(match app.autocomplete_idx {
+                        None => 0,
+                        Some(i) => (i + 1).min(len - 1),
+                    });
+                }
+                KeyCode::Up if app.autocomplete_idx.is_some() => {
+                    app.autocomplete_idx = match app.autocomplete_idx {
+                        Some(0) => None,
+                        Some(i) => Some(i - 1),
+                        None => None,
+                    };
+                }
+                KeyCode::Tab => {
+                    if app.popup_focus == PopupFocus::Fields {
+                        app.accept_autocomplete();
                         app.popup_focus = PopupFocus::Submit;
-                    }
-                    PopupFocus::Submit => app.popup_focus = PopupFocus::Cancel,
-                    PopupFocus::Cancel => {
+                    } else if app.popup_focus == PopupFocus::Submit {
+                        app.popup_focus = PopupFocus::Cancel;
+                    } else {
                         app.popup_focus = PopupFocus::Fields;
+                        app.update_autocomplete();
                     }
-                },
+                }
                 KeyCode::BackTab => match app.popup_focus {
                     PopupFocus::Fields => {
                         app.popup_focus = PopupFocus::Cancel;
                     }
                     PopupFocus::Submit => {
                         app.popup_focus = PopupFocus::Fields;
+                        app.update_autocomplete();
                     }
                     PopupFocus::Cancel => app.popup_focus = PopupFocus::Submit,
                 },
                 KeyCode::Enter => match app.popup_focus {
                     PopupFocus::Fields => {
+                        if app.autocomplete_idx.is_some() {
+                            app.accept_autocomplete();
+                        }
                         app.popup_focus = PopupFocus::Submit;
                     }
                     PopupFocus::Submit => {
                         app.stop_input();
                         app.popup = None;
+                        app.autocomplete.clear();
                         app.finalize_object_transfer();
                     }
                     PopupFocus::Cancel => {
                         app.popup = None;
                         app.input_mode = InputMode::Normal;
                         app.input_clear();
+                        app.autocomplete.clear();
                     }
                 },
                 _ => {
                     if app.popup_focus == PopupFocus::Fields {
                         handle_input_key(app, key);
+                        app.update_autocomplete();
                     }
                 }
             }

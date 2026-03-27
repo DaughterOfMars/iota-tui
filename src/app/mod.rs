@@ -1157,7 +1157,14 @@ impl App {
 
     /// Compute autocomplete suggestions based on current input.
     pub fn update_autocomplete(&mut self) {
-        let is_addr = self.tx.is_address_field();
+        // Quick action popups also support address autocomplete on their recipient field
+        let quick_addr = matches!(
+            self.popup,
+            Some(Popup::QuickTransfer) | Some(Popup::ObjectTransfer)
+        ) && self.popup_focus == PopupFocus::Fields
+            && (self.popup == Some(Popup::ObjectTransfer) || self.quick_transfer_field == 0);
+
+        let is_addr = self.tx.is_address_field() || quick_addr;
         let is_obj = self.tx.is_object_field();
 
         if (!is_addr && !is_obj) || self.input_buffer.is_empty() {

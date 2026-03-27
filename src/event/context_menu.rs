@@ -112,9 +112,5 @@ pub fn execute_context_action(app: &mut App, section: Section, action: ContextAc
                 app.explore_item(pkg_id);
             }
         }
-        ContextAction::ViewDetails => {
-            app.popup_scroll = 0;
-            app.open_popup(Popup::Detail);
-        }
     }
 }

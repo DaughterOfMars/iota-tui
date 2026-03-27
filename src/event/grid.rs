@@ -13,11 +13,15 @@ pub fn handle_grid_key(app: &mut App, key: KeyEvent) {
     }
 
     match key.code {
-        // Box navigation
+        // Scroll within focused box
+        KeyCode::Up => scroll_focused_box(app, -1),
+        KeyCode::Down => scroll_focused_box(app, 1),
+
+        // Navigate between boxes
+        KeyCode::Tab => cycle_focus(app, 1),
+        KeyCode::BackTab => cycle_focus(app, -1),
         KeyCode::Left => move_focus(app, -1, 0),
         KeyCode::Right => move_focus(app, 1, 0),
-        KeyCode::Up => move_focus(app, 0, -1),
-        KeyCode::Down => move_focus(app, 0, 1),
 
         // Open section overlay
         KeyCode::Enter => {
@@ -242,4 +246,94 @@ fn section_selection(app: &App, section: Section) -> (usize, usize) {
         Section::Transactions => (app.transactions_selected, app.transactions_offset),
         Section::Packages => (app.packages_selected, app.packages_offset),
     }
+}
+
+/// Scroll the selected item within the focused grid box by `delta` (+1 down, -1 up).
+fn scroll_focused_box(app: &mut App, delta: i32) {
+    let section = app.focused_section;
+    let count = section_item_count(app, section);
+    if count == 0 {
+        return;
+    }
+
+    // Compute visible rows from the grid box area (minus 2 for borders)
+    let visible = app
+        .grid_box_areas
+        .iter()
+        .find(|(s, _)| *s == section)
+        .map(|(_, r)| r.height.saturating_sub(2) as usize)
+        .unwrap_or(10);
+
+    let (sel, off) = section_selection(app, section);
+    let new_sel = if delta > 0 {
+        (sel + 1).min(count - 1)
+    } else {
+        sel.saturating_sub(1)
+    };
+    let new_off = if new_sel < off {
+        new_sel
+    } else if new_sel >= off + visible {
+        new_sel + 1 - visible
+    } else {
+        off
+    };
+
+    set_section_selection(app, section, new_sel, new_off);
+}
+
+/// Set the selected index and scroll offset for a section.
+fn set_section_selection(app: &mut App, section: Section, sel: usize, off: usize) {
+    match section {
+        Section::Coins => {
+            app.coins_selected = sel;
+            app.coins_offset = off;
+        }
+        Section::Objects => {
+            app.objects_selected = sel;
+            app.objects_offset = off;
+        }
+        Section::Staking => {
+            app.stakes_selected = sel;
+            app.stakes_offset = off;
+        }
+        Section::Transactions => {
+            app.transactions_selected = sel;
+            app.transactions_offset = off;
+        }
+        Section::Packages => {
+            app.packages_selected = sel;
+            app.packages_offset = off;
+        }
+    }
+}
+
+/// Scroll within a grid box under the mouse cursor.
+pub fn scroll_grid_box(app: &mut App, col: u16, row: u16, delta: i32) {
+    for &(section, rect) in &app.grid_box_areas {
+        if col >= rect.x && col < rect.x + rect.width && row >= rect.y && row < rect.y + rect.height
+        {
+            app.focused_section = section;
+            scroll_focused_box(app, delta);
+            return;
+        }
+    }
+}
+
+/// Cycle focus linearly through the grid boxes.
+fn cycle_focus(app: &mut App, direction: i32) {
+    if app.grid_box_areas.is_empty() {
+        return;
+    }
+    let sections: Vec<Section> = app.grid_box_areas.iter().map(|(s, _)| *s).collect();
+    let current = sections
+        .iter()
+        .position(|s| *s == app.focused_section)
+        .unwrap_or(0);
+    let len = sections.len();
+    let next = if direction > 0 {
+        (current + 1) % len
+    } else {
+        (current + len - 1) % len
+    };
+    app.focused_section = sections[next];
 }

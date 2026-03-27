@@ -131,6 +131,18 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
             if let Some(section) = hit_test_grid_box(app, col, row) {
                 app.focused_section = section;
 
+                // Click on the expand icon (▶) in the title bar opens the overlay
+                if let Some((_, rect)) = app.grid_box_areas.iter().find(|(s, _)| *s == section)
+                    && row == rect.y
+                    && col >= rect.x + rect.width.saturating_sub(4)
+                {
+                    let count = super::grid::section_item_count(app, section);
+                    if count > 0 {
+                        app.section_open = Some(section);
+                    }
+                    return;
+                }
+
                 if is_double_click {
                     // Double-click opens context menu
                     super::grid::open_context_menu_at(app, section, row, col);
@@ -154,6 +166,8 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                 app.popup_scroll = app.popup_scroll.saturating_sub(1);
             } else if app.section_open.is_some() || app.tx_builder_open {
                 scroll_selection(app, -1);
+            } else {
+                super::grid::scroll_grid_box(app, mouse.column, mouse.row, -1);
             }
         }
         MouseEventKind::ScrollDown => {
@@ -161,6 +175,8 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                 app.popup_scroll = app.popup_scroll.saturating_add(1);
             } else if app.section_open.is_some() || app.tx_builder_open {
                 scroll_selection(app, 1);
+            } else {
+                super::grid::scroll_grid_box(app, mouse.column, mouse.row, 1);
             }
         }
         MouseEventKind::Moved => {}

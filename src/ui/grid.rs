@@ -229,13 +229,22 @@ fn draw_box(frame: &mut Frame, app: &App, section: Section, area: Rect) {
         Color::DarkGray
     };
 
+    let expand_icon = Line::from(Span::styled(
+        " ▶ ",
+        Style::default().fg(if is_focused {
+            common::color_at(0)
+        } else {
+            Color::DarkGray
+        }),
+    ));
+
     let block = Block::default()
-        .title(title)
-        .title_style(if is_focused {
+        .title_top(Line::from(title).style(if is_focused {
             header_style()
         } else {
             dim_style()
-        })
+        }))
+        .title_top(expand_icon.alignment(ratatui::layout::Alignment::Right))
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(border_color));

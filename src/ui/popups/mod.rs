@@ -908,6 +908,29 @@ fn draw_quick_transfer_popup(frame: &mut Frame, app: &App, area: Rect) {
             format!("  {}", display),
             input_style,
         )]));
+
+        // Show autocomplete suggestions for the recipient field
+        if is_active && i == 0 && !app.autocomplete.is_empty() {
+            for (j, (alias, addr)) in app.autocomplete.iter().enumerate() {
+                let is_sel = app.autocomplete_idx == Some(j);
+                let trunc = if addr.len() > 24 {
+                    format!("{}…{}", &addr[..10], &addr[addr.len() - 6..])
+                } else {
+                    addr.clone()
+                };
+                let style = if is_sel {
+                    Style::default().fg(color_at(0)).bold()
+                } else {
+                    Style::default().fg(dim_at(0))
+                };
+                let prefix = if is_sel { "▸ " } else { "  " };
+                lines.push(Line::from(vec![Span::styled(
+                    format!("    {}{} → {}", prefix, alias, trunc),
+                    style,
+                )]));
+            }
+        }
+
         lines.push(Line::from(""));
     }
 
@@ -959,7 +982,7 @@ fn draw_object_transfer_popup(frame: &mut Frame, app: &App, area: Rect) {
         value.clone()
     };
 
-    let lines = vec![
+    let mut lines = vec![
         Line::from(""),
         Line::from(vec![Span::styled(
             format!("  {}", obj_label),
@@ -971,9 +994,32 @@ fn draw_object_transfer_popup(frame: &mut Frame, app: &App, area: Rect) {
             label_style,
         )]),
         Line::from(vec![Span::styled(format!("  {}", display), input_style)]),
-        Line::from(""),
-        button_line("Send", app.popup_focus, "  Tab: next  "),
     ];
+
+    // Autocomplete suggestions
+    if is_active && !app.autocomplete.is_empty() {
+        for (j, (alias, addr)) in app.autocomplete.iter().enumerate() {
+            let is_sel = app.autocomplete_idx == Some(j);
+            let trunc = if addr.len() > 24 {
+                format!("{}…{}", &addr[..10], &addr[addr.len() - 6..])
+            } else {
+                addr.clone()
+            };
+            let style = if is_sel {
+                Style::default().fg(color_at(0)).bold()
+            } else {
+                Style::default().fg(dim_at(0))
+            };
+            let prefix = if is_sel { "▸ " } else { "  " };
+            lines.push(Line::from(vec![Span::styled(
+                format!("    {}{} → {}", prefix, alias, trunc),
+                style,
+            )]));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(button_line("Send", app.popup_focus, "  Tab: next  "));
 
     let block = Block::default()
         .title(sparkle_text(" Transfer Object "))
