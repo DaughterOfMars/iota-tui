@@ -510,6 +510,7 @@ pub enum Popup {
     ErrorLog,
     ActionsMenu,
     SplitCoin,
+    MergeCoin,
     QuickTransfer,
     ObjectTransfer,
     Settings,

@@ -51,20 +51,21 @@ pub fn execute_context_action(app: &mut App, section: Section, action: ContextAc
 
     match action {
         ContextAction::Send => {
-            // Open quick transfer popup
             app.quick_transfer_field = 0;
             app.quick_transfer_buffers = [String::new(), String::new()];
             app.open_popup(Popup::QuickTransfer);
+            app.start_input("");
         }
         ContextAction::Merge => {
             app.merge_coins_for_selected();
         }
         ContextAction::Split => {
             app.open_popup(Popup::SplitCoin);
+            app.start_input("2");
         }
         ContextAction::Transfer => {
-            // Object transfer
             app.open_popup(Popup::ObjectTransfer);
+            app.start_input("");
         }
         ContextAction::Unstake => {
             // Pre-fill TxBuilder with Unstake command and open overlay

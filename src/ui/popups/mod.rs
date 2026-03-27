@@ -135,6 +135,12 @@ pub fn draw_popup(frame: &mut Frame, app: &mut App) {
             frame.render_widget(Clear, popup_area);
             draw_split_coin_popup(frame, app, popup_area);
         }
+        Some(Popup::MergeCoin) => {
+            let h = (app.merge_candidates.len() as u16 + 6).min(area.height - 2);
+            let popup_area = centered_rect_min(60, 60, 50, h, area);
+            frame.render_widget(Clear, popup_area);
+            draw_merge_coin_popup(frame, app, popup_area);
+        }
         Some(Popup::QuickTransfer) => {
             let popup_area = centered_rect_min(60, 50, 48, 13, area);
             frame.render_widget(Clear, popup_area);
@@ -800,6 +806,63 @@ fn draw_split_coin_popup(frame: &mut Frame, app: &App, area: Rect) {
         .border_style(Style::default().fg(color_at(2)));
 
     frame.render_widget(Paragraph::new(text).block(block), area);
+}
+
+fn draw_merge_coin_popup(frame: &mut Frame, app: &App, area: Rect) {
+    let selected_count = app.merge_candidates.iter().filter(|c| c.3).count();
+    let total = app.merge_candidates.len();
+
+    let mut lines = vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Space", Style::default().fg(color_at(0)).bold()),
+            Span::styled(" toggle  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("a", Style::default().fg(color_at(0)).bold()),
+            Span::styled(" all  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("({}/{})", selected_count, total),
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]),
+        Line::from(""),
+    ];
+
+    for (i, (id, symbol, balance, checked)) in app.merge_candidates.iter().enumerate() {
+        let is_cursor = i == app.merge_cursor;
+        let check = if *checked { "[x]" } else { "[ ]" };
+        let short_id = if id.len() > 10 {
+            format!("{}..{}", &id[..6], &id[id.len() - 4..])
+        } else {
+            id.clone()
+        };
+
+        let style = if is_cursor {
+            selected_style()
+        } else if *checked {
+            Style::default().fg(Color::White)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled(format!("  {} ", check), style),
+            Span::styled(format!("{:<6} ", symbol), style.bold()),
+            Span::styled(format!("{:<14} ", balance), style),
+            Span::styled(short_id, style),
+        ]));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(button_line("Merge", app.popup_focus, "  "));
+
+    let block = Block::default()
+        .title(sparkle_text(" Merge Coins "))
+        .title_style(Style::default().fg(color_at(1)).bold())
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(color_at(2)));
+
+    frame.render_widget(Paragraph::new(lines).block(block), area);
 }
 
 fn draw_quick_transfer_popup(frame: &mut Frame, app: &App, area: Rect) {

@@ -719,6 +719,10 @@ fn handle_popup_click(app: &mut App, col: u16, row: u16) {
         Some(Popup::ErrorLog) => centered_rect_min(80, 80, 60, 20, area),
         Some(Popup::ConfirmQuit) => centered_rect_min(50, 30, 40, 7, area),
         Some(Popup::SplitCoin) => centered_rect_min(50, 30, 40, 9, area),
+        Some(Popup::MergeCoin) => {
+            let h = (app.merge_candidates.len() as u16 + 6).min(area.height - 2);
+            centered_rect_min(60, 60, 50, h, area)
+        }
         Some(Popup::QuickTransfer) => centered_rect_min(60, 50, 48, 13, area),
         Some(Popup::ObjectTransfer) => centered_rect_min(60, 40, 48, 10, area),
         Some(Popup::ActionsMenu) => actions_menu_area(app, area),

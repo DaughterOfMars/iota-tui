@@ -159,6 +159,20 @@ pub fn handle_command_form_key(app: &mut App, key: KeyEvent) {
         KeyCode::Enter => {
             if app.autocomplete_idx.is_some() {
                 app.accept_autocomplete();
+                // Advance to next field after accepting autocomplete
+                if !app.tx.is_multi_value_field() {
+                    let val = app.input_buffer.clone();
+                    app.tx.edit_buffers[app.tx.edit_field] = val;
+                    let count = app.tx.edit_buffers.len();
+                    if app.tx.edit_field + 1 < count {
+                        app.tx.edit_field += 1;
+                        let next_val = app.tx.edit_buffers[app.tx.edit_field].clone();
+                        app.start_input(&next_val);
+                    } else {
+                        app.popup_focus = PopupFocus::Submit;
+                    }
+                    app.update_autocomplete();
+                }
             } else if app.tx.is_multi_value_field() && !app.input_buffer.is_empty() {
                 // Manual entry: add typed text as a value
                 let val = app.input_buffer.clone();

@@ -605,6 +605,89 @@ pub fn handle_popup_key(app: &mut App, key: KeyEvent) {
                 _ => {}
             }
         }
+        Some(Popup::MergeCoin) => {
+            // When focus is on buttons, handle navigation between them
+            if app.popup_focus != PopupFocus::Fields {
+                if handle_button_focus_key(app, key) {
+                    return;
+                }
+                match key.code {
+                    KeyCode::Esc => {
+                        app.popup_focus = PopupFocus::Fields;
+                    }
+                    KeyCode::Tab => {
+                        app.popup_focus = match app.popup_focus {
+                            PopupFocus::Submit => PopupFocus::Cancel,
+                            PopupFocus::Cancel => PopupFocus::Fields,
+                            PopupFocus::Fields => unreachable!(),
+                        };
+                    }
+                    KeyCode::BackTab => {
+                        app.popup_focus = match app.popup_focus {
+                            PopupFocus::Cancel => PopupFocus::Submit,
+                            PopupFocus::Submit => PopupFocus::Fields,
+                            PopupFocus::Fields => unreachable!(),
+                        };
+                    }
+                    KeyCode::Enter => match app.popup_focus {
+                        PopupFocus::Submit => {
+                            app.popup = None;
+                            app.finalize_merge_coins();
+                        }
+                        PopupFocus::Cancel => {
+                            app.popup = None;
+                            app.merge_candidates.clear();
+                        }
+                        PopupFocus::Fields => unreachable!(),
+                    },
+                    _ => {}
+                }
+                return;
+            }
+            // Field-focused: navigate and toggle coin selection
+            match key.code {
+                KeyCode::Esc => {
+                    app.popup = None;
+                    app.merge_candidates.clear();
+                }
+                KeyCode::Up => {
+                    if app.merge_cursor > 0 {
+                        app.merge_cursor -= 1;
+                    } else {
+                        app.merge_cursor = app.merge_candidates.len().saturating_sub(1);
+                    }
+                }
+                KeyCode::Down => {
+                    let len = app.merge_candidates.len();
+                    if len > 0 {
+                        app.merge_cursor = (app.merge_cursor + 1) % len;
+                    }
+                }
+                KeyCode::Char(' ') => {
+                    if let Some(c) = app.merge_candidates.get_mut(app.merge_cursor) {
+                        c.3 = !c.3;
+                    }
+                }
+                KeyCode::Char('a') => {
+                    // Toggle all: if all selected, deselect all; otherwise select all
+                    let all_selected = app.merge_candidates.iter().all(|c| c.3);
+                    for c in &mut app.merge_candidates {
+                        c.3 = !all_selected;
+                    }
+                }
+                KeyCode::Tab => {
+                    app.popup_focus = PopupFocus::Submit;
+                }
+                KeyCode::BackTab => {
+                    app.popup_focus = PopupFocus::Cancel;
+                }
+                KeyCode::Enter => {
+                    app.popup = None;
+                    app.finalize_merge_coins();
+                }
+                _ => {}
+            }
+        }
         Some(Popup::SplitCoin) => {
             if handle_button_focus_key(app, key) {
                 return;

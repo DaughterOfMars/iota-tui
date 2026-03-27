@@ -144,6 +144,10 @@ pub struct App {
     // Coin management popup state
     pub quick_transfer_field: usize, // 0 = recipient, 1 = amount
     pub quick_transfer_buffers: [String; 2],
+    /// Merge popup: list of (object_id, symbol, balance_display, selected).
+    pub merge_candidates: Vec<(String, String, String, bool)>,
+    /// Merge popup: cursor position in the candidate list.
+    pub merge_cursor: usize,
 
     // Portfolio summary mode (aggregated view)
     pub coins_summary_mode: bool,
@@ -270,6 +274,8 @@ impl App {
 
             quick_transfer_field: 0,
             quick_transfer_buffers: [String::new(), String::new()],
+            merge_candidates: vec![],
+            merge_cursor: 0,
 
             coins_summary_mode: false,
             portfolio_summary: vec![],
@@ -753,7 +759,11 @@ impl App {
                 args: vec!["".to_string(); func.param_types.len()],
             });
             self.tx.step = TxBuilderStep::EditCommands;
-            self.navigate(Screen::TxBuilder);
+            self.section_open = None;
+            self.tx_builder_open = true;
+            self.screen = Screen::TxBuilder;
+            self.input_mode = InputMode::Normal;
+            self.popup = None;
         }
     }
 
@@ -778,34 +788,68 @@ impl App {
         }
     }
 
-    /// Merge all coins of the same type as the selected coin into a single PTB command.
-    /// Navigates to TxBuilder at Review step, ready to execute.
+    /// Open the merge coin popup, populating candidates with all coins of the
+    /// same type as the currently selected coin.
     pub fn merge_coins_for_selected(&mut self) {
         let Some(coin) = self.coins.get(self.coins_selected) else {
             return;
         };
         let coin_type = coin.coin_type.clone();
-        let coin_ids: Vec<String> = self
+        let selected_id = coin.object_id.clone();
+        let candidates: Vec<(String, String, String, bool)> = self
             .coins
             .iter()
             .filter(|c| c.coin_type == coin_type)
-            .map(|c| c.object_id.clone())
+            .map(|c| {
+                (
+                    c.object_id.clone(),
+                    c.symbol.clone(),
+                    c.balance_display.clone(),
+                    // Pre-select all except the primary (first selected) coin
+                    c.object_id != selected_id,
+                )
+            })
             .collect();
-        if coin_ids.len() < 2 {
+        if candidates.len() < 2 {
             self.clipboard_toast = Some((
                 "Only one coin of this type — nothing to merge".into(),
                 std::time::Instant::now(),
             ));
             return;
         }
-        let primary = coin_ids[0].clone();
-        let sources = coin_ids[1..].to_vec();
+        self.merge_candidates = candidates;
+        self.merge_cursor = 0;
+        self.open_popup(Popup::MergeCoin);
+    }
+
+    /// Execute merge for the coins selected in the merge popup.
+    /// The first selected coin becomes the primary; the rest are sources.
+    pub fn finalize_merge_coins(&mut self) {
+        let selected: Vec<String> = self
+            .merge_candidates
+            .iter()
+            .filter(|(_, _, _, sel)| *sel)
+            .map(|(id, _, _, _)| id.clone())
+            .collect();
+        if selected.len() < 2 {
+            self.clipboard_toast = Some((
+                "Select at least 2 coins to merge".into(),
+                std::time::Instant::now(),
+            ));
+            return;
+        }
+        let primary = selected[0].clone();
+        let sources = selected[1..].to_vec();
         self.tx.reset();
         self.tx
             .commands
             .push(PtbCommand::MergeCoins { primary, sources });
         self.tx.step = TxBuilderStep::Review;
-        self.navigate(Screen::TxBuilder);
+        self.section_open = None;
+        self.tx_builder_open = true;
+        self.screen = Screen::TxBuilder;
+        self.input_mode = InputMode::Normal;
+        self.popup = None;
         self.send_cmd(WalletCmd::DryRun {
             sender_idx: self.tx.sender,
             commands: self.tx.commands.clone(),
@@ -841,7 +885,11 @@ impl App {
             amounts,
         });
         self.tx.step = TxBuilderStep::Review;
-        self.navigate(Screen::TxBuilder);
+        self.section_open = None;
+        self.tx_builder_open = true;
+        self.screen = Screen::TxBuilder;
+        self.input_mode = InputMode::Normal;
+        self.popup = None;
         self.send_cmd(WalletCmd::DryRun {
             sender_idx: self.tx.sender,
             commands: self.tx.commands.clone(),
@@ -867,7 +915,11 @@ impl App {
             amount: amount.clone(),
         });
         self.tx.step = TxBuilderStep::Review;
-        self.navigate(Screen::TxBuilder);
+        self.section_open = None;
+        self.tx_builder_open = true;
+        self.screen = Screen::TxBuilder;
+        self.input_mode = InputMode::Normal;
+        self.popup = None;
         self.send_cmd(WalletCmd::DryRun {
             sender_idx: self.tx.sender,
             commands: self.tx.commands.clone(),
@@ -894,7 +946,11 @@ impl App {
             object_ids: vec![object_id],
         });
         self.tx.step = TxBuilderStep::Review;
-        self.navigate(Screen::TxBuilder);
+        self.section_open = None;
+        self.tx_builder_open = true;
+        self.screen = Screen::TxBuilder;
+        self.input_mode = InputMode::Normal;
+        self.popup = None;
         self.send_cmd(WalletCmd::DryRun {
             sender_idx: self.tx.sender,
             commands: self.tx.commands.clone(),
