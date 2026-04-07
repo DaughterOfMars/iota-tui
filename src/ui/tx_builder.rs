@@ -5,7 +5,7 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Row, Table},
+    widgets::{List, ListItem, Paragraph, Row, Table},
 };
 
 use super::common;
@@ -61,23 +61,13 @@ fn draw_step_indicator(frame: &mut Frame, app: &App, area: Rect) {
         })
         .collect();
 
-    let block = Block::default()
-        .title(common::sparkle_text(" Transaction Builder "))
-        .title_style(common::header_style())
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(common::dim_style());
+    let block = common::section_block(" Transaction Builder ");
 
     frame.render_widget(Paragraph::new(Line::from(steps)).block(block), area);
 }
 
 fn draw_select_sender(frame: &mut Frame, app: &App, area: Rect) {
-    let block = Block::default()
-        .title(common::sparkle_text(" Select Sender "))
-        .title_style(common::header_style())
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(common::dim_style());
+    let block = common::section_block(" Select Sender ");
 
     if app.keys.is_empty() {
         let text = vec![
@@ -123,15 +113,7 @@ fn draw_select_sender(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_commands(frame: &mut Frame, app: &App, area: Rect) {
-    let block = Block::default()
-        .title(common::sparkle_text(&format!(
-            " Commands ({}) ",
-            app.tx.commands.len()
-        )))
-        .title_style(common::header_style())
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(common::dim_style());
+    let block = common::section_block(&format!(" Commands ({}) ", app.tx.commands.len()));
 
     if app.tx.commands.is_empty() {
         let text = vec![
@@ -192,12 +174,7 @@ fn draw_commands(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_gas(frame: &mut Frame, app: &App, area: Rect) {
-    let block = Block::default()
-        .title(common::sparkle_text(" Gas Budget "))
-        .title_style(common::header_style())
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(common::dim_style());
+    let block = common::section_block(" Gas Budget ");
 
     let display = if app.input_mode == InputMode::Editing {
         format!("{}|", app.input_buffer)
@@ -247,12 +224,7 @@ fn draw_gas(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_review(frame: &mut Frame, app: &App, area: Rect) {
-    let block = Block::default()
-        .title(common::sparkle_text(" Review Transaction "))
-        .title_style(common::header_style())
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(common::dim_style());
+    let block = common::section_block(" Review Transaction ");
 
     let sender = app
         .keys

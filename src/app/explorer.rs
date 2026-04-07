@@ -37,6 +37,49 @@ pub struct ExplorerState {
     pub pagination_row_y: u16,
 }
 
+impl ExplorerState {
+    /// Reset state for a new lookup query (address/object/transaction).
+    pub fn reset_for_lookup(&mut self, query: &str) {
+        self.search_mode = false;
+        self.lookup_result = None;
+        self.lookup_selected = 0;
+        self.lookup_offset = 0;
+        self.lookup_section = 0;
+        self.lookup_depth = 0;
+        self.lookup_field_idx = 0;
+        self.lookup_query = Some(query.to_string());
+        self.lookup_address = Some(query.to_string());
+        self.lookup_obj_cursor = None;
+        self.lookup_obj_cursors.clear();
+        self.lookup_obj_has_next = false;
+        self.lookup_obj_page = 0;
+        self.lookup_tx_cursor = None;
+        self.lookup_tx_cursors.clear();
+        self.lookup_tx_has_next = false;
+        self.lookup_tx_page = 0;
+        self.search_results.clear();
+        self.search_has_next = false;
+        self.search_cursor = None;
+        self.search_cursors.clear();
+    }
+
+    /// Reset state for a new type search.
+    pub fn reset_for_search(&mut self, type_filter: &str) {
+        self.search_mode = true;
+        self.lookup_result = None;
+        self.lookup_section = 0;
+        self.lookup_depth = 0;
+        self.lookup_field_idx = 0;
+        self.search_results.clear();
+        self.search_selected = 0;
+        self.search_offset = 0;
+        self.search_has_next = false;
+        self.search_cursor = None;
+        self.search_cursors.clear();
+        self.search_type = type_filter.to_string();
+    }
+}
+
 impl Default for ExplorerState {
     fn default() -> Self {
         Self {

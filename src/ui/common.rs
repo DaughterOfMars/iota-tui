@@ -230,6 +230,37 @@ pub fn truncate_address(addr: &str, max_width: usize) -> String {
     format!("{}..{}", &addr[..prefix], &addr[addr.len() - suffix..])
 }
 
+/// Create a standard section block with sparkle title and rounded borders.
+pub fn section_block(title: &str) -> ratatui::widgets::Block<'static> {
+    use ratatui::widgets::{Block, BorderType, Borders};
+    Block::default()
+        .title(sparkle_text(title))
+        .title_style(header_style())
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(dim_style())
+}
+
+/// Render a filter/search bar and return the remaining area below it.
+/// If `filter_query` is None, returns the full area unchanged.
+pub fn render_filter_bar(frame: &mut Frame, area: Rect, filter_query: Option<&str>) -> Rect {
+    use ratatui::{
+        layout::{Constraint, Layout},
+        widgets::Paragraph,
+    };
+    let Some(query) = filter_query else {
+        return area;
+    };
+    let split = Layout::vertical([Constraint::Length(1), Constraint::Min(3)]).split(area);
+    let bar = Line::from(vec![
+        Span::styled(" Search: ", Style::default().fg(Color::Yellow).bold()),
+        Span::styled(query.to_string(), accent_style()),
+        Span::styled("_", dim_style()),
+    ]);
+    frame.render_widget(Paragraph::new(bar), split[0]);
+    split[1]
+}
+
 pub fn selected_style() -> Style {
     Style::default()
         .bg(Color::Indexed(236))

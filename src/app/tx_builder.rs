@@ -1,6 +1,8 @@
 //! Transaction builder sub-state extracted from the main App struct.
 
-use crate::app::{AddCommandType, DryRunInfo, PtbCommand, TxBuilderStep, parse_iota_amount};
+use crate::app::{AddCommandType, DryRunInfo, PtbCommand, TxBuilderStep};
+
+use super::formatting::parse_iota_amount;
 
 /// All transaction-builder-related state, grouped into a single sub-struct.
 pub struct TxBuilderState {

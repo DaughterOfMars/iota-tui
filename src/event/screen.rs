@@ -9,64 +9,109 @@ use crate::wallet::WalletCmd;
 use super::input::handle_input_key;
 use super::nav::ListNav;
 
+/// Result of handling a key in filter mode.
+enum FilterResult {
+    /// Filter was not active.
+    Inactive,
+    /// Key was consumed by the filter.
+    Consumed,
+    /// Enter was pressed; the selected index (into the filtered list) is returned.
+    Enter(usize),
+}
+
+/// Generic filter mode handler.
+fn handle_filter_key(
+    key: KeyEvent,
+    filter: &mut Option<String>,
+    selected: &mut usize,
+    offset: &mut usize,
+    visible_rows: usize,
+    filtered_len: usize,
+) -> FilterResult {
+    if filter.is_none() {
+        return FilterResult::Inactive;
+    }
+    let mut enter_idx = None;
+    match key.code {
+        KeyCode::Esc => {
+            *filter = None;
+            *selected = 0;
+            *offset = 0;
+        }
+        KeyCode::Backspace => {
+            if let Some(q) = filter {
+                q.pop();
+                if q.is_empty() {
+                    *filter = None;
+                }
+            }
+            *selected = 0;
+            *offset = 0;
+        }
+        KeyCode::Char(c) => {
+            if let Some(q) = filter {
+                q.push(c);
+            }
+            *selected = 0;
+            *offset = 0;
+        }
+        KeyCode::Up => {
+            if *selected > 0 {
+                *selected -= 1;
+            }
+        }
+        KeyCode::Down => {
+            if *selected + 1 < filtered_len {
+                *selected += 1;
+            }
+        }
+        KeyCode::Enter => {
+            enter_idx = Some(*selected);
+        }
+        _ => {}
+    }
+    if *selected >= filtered_len {
+        *selected = filtered_len.saturating_sub(1);
+    }
+    App::scroll_into_view(*selected, offset, visible_rows);
+    match enter_idx {
+        Some(idx) => FilterResult::Enter(idx),
+        None => FilterResult::Consumed,
+    }
+}
+
 pub fn handle_coins_key(app: &mut App, key: KeyEvent) {
     // Filter mode
-    if app.coins_filter.is_some() {
-        let filtered = app.filtered_coins();
-        match key.code {
-            KeyCode::Esc => {
-                app.coins_filter = None;
-                app.coins_selected = 0;
-                app.coins_offset = 0;
-            }
-            KeyCode::Backspace => {
-                if let Some(ref mut q) = app.coins_filter {
-                    q.pop();
-                    if q.is_empty() {
-                        app.coins_filter = None;
-                    }
+    {
+        let flen = app.filtered_coins().len();
+        match handle_filter_key(
+            key,
+            &mut app.coins_filter,
+            &mut app.coins_selected,
+            &mut app.coins_offset,
+            app.content_visible_rows,
+            flen,
+        ) {
+            FilterResult::Inactive => {}
+            FilterResult::Consumed => {
+                // Re-clamp after filter text changed
+                let flen = app.filtered_coins().len();
+                if app.coins_selected >= flen {
+                    app.coins_selected = flen.saturating_sub(1);
                 }
-                app.coins_selected = 0;
-                app.coins_offset = 0;
+                return;
             }
-            KeyCode::Char(c) => {
-                if let Some(ref mut q) = app.coins_filter {
-                    q.push(c);
-                }
-                app.coins_selected = 0;
-                app.coins_offset = 0;
-            }
-            KeyCode::Up => {
-                if app.coins_selected > 0 {
-                    app.coins_selected -= 1;
-                }
-            }
-            KeyCode::Down => {
-                if app.coins_selected + 1 < filtered.len() {
-                    app.coins_selected += 1;
-                }
-            }
-            KeyCode::Enter => {
-                // Activate using the filtered index
-                if let Some(&real_idx) = filtered.get(app.coins_selected) {
+            FilterResult::Enter(sel) => {
+                let filtered = app.filtered_coins();
+                if let Some(&real_idx) = filtered.get(sel) {
                     let old = app.coins_selected;
                     app.coins_selected = real_idx;
                     app.activate_selected_coin();
                     app.coins_selected = old;
                 }
+                return;
             }
-            _ => {}
         }
-        let filtered = app.filtered_coins();
-        if app.coins_selected >= filtered.len() {
-            app.coins_selected = filtered.len().saturating_sub(1);
-        }
-        App::scroll_into_view(
-            app.coins_selected,
-            &mut app.coins_offset,
-            app.content_visible_rows,
-        );
-        return;
     }
 
     // Portfolio summary mode with multiple owners
@@ -157,61 +202,35 @@ pub fn handle_coins_key(app: &mut App, key: KeyEvent) {
 
 pub fn handle_objects_key(app: &mut App, key: KeyEvent) {
     // Filter mode
-    if app.objects_filter.is_some() {
-        let filtered = app.filtered_objects();
-        match key.code {
-            KeyCode::Esc => {
-                app.objects_filter = None;
-                app.objects_selected = 0;
-                app.objects_offset = 0;
-            }
-            KeyCode::Backspace => {
-                if let Some(ref mut q) = app.objects_filter {
-                    q.pop();
-                    if q.is_empty() {
-                        app.objects_filter = None;
-                    }
+    {
+        let flen = app.filtered_objects().len();
+        match handle_filter_key(
+            key,
+            &mut app.objects_filter,
+            &mut app.objects_selected,
+            &mut app.objects_offset,
+            app.content_visible_rows,
+            flen,
+        ) {
+            FilterResult::Inactive => {}
+            FilterResult::Consumed => {
+                let flen = app.filtered_objects().len();
+                if app.objects_selected >= flen {
+                    app.objects_selected = flen.saturating_sub(1);
                 }
-                app.objects_selected = 0;
-                app.objects_offset = 0;
+                return;
             }
-            KeyCode::Char(c) => {
-                if let Some(ref mut q) = app.objects_filter {
-                    q.push(c);
-                }
-                app.objects_selected = 0;
-                app.objects_offset = 0;
-            }
-            KeyCode::Up => {
-                if app.objects_selected > 0 {
-                    app.objects_selected -= 1;
-                }
-            }
-            KeyCode::Down => {
-                if app.objects_selected + 1 < filtered.len() {
-                    app.objects_selected += 1;
-                }
-            }
-            KeyCode::Enter => {
-                if let Some(&real_idx) = filtered.get(app.objects_selected) {
+            FilterResult::Enter(sel) => {
+                let filtered = app.filtered_objects();
+                if let Some(&real_idx) = filtered.get(sel) {
                     let old = app.objects_selected;
                     app.objects_selected = real_idx;
                     app.activate_selected_object();
                     app.objects_selected = old;
                 }
+                return;
             }
-            _ => {}
         }
-        let filtered = app.filtered_objects();
-        if app.objects_selected >= filtered.len() {
-            app.objects_selected = filtered.len().saturating_sub(1);
-        }
-        App::scroll_into_view(
-            app.objects_selected,
-            &mut app.objects_offset,
-            app.content_visible_rows,
-        );
-        return;
     }
 
     let mut nav = ListNav {
@@ -250,61 +269,35 @@ pub fn handle_objects_key(app: &mut App, key: KeyEvent) {
 
 pub fn handle_transactions_key(app: &mut App, key: KeyEvent) {
     // Filter mode
-    if app.transactions_filter.is_some() {
-        let filtered = app.filtered_transactions();
-        match key.code {
-            KeyCode::Esc => {
-                app.transactions_filter = None;
-                app.transactions_selected = 0;
-                app.transactions_offset = 0;
-            }
-            KeyCode::Backspace => {
-                if let Some(ref mut q) = app.transactions_filter {
-                    q.pop();
-                    if q.is_empty() {
-                        app.transactions_filter = None;
-                    }
+    {
+        let flen = app.filtered_transactions().len();
+        match handle_filter_key(
+            key,
+            &mut app.transactions_filter,
+            &mut app.transactions_selected,
+            &mut app.transactions_offset,
+            app.content_visible_rows,
+            flen,
+        ) {
+            FilterResult::Inactive => {}
+            FilterResult::Consumed => {
+                let flen = app.filtered_transactions().len();
+                if app.transactions_selected >= flen {
+                    app.transactions_selected = flen.saturating_sub(1);
                 }
-                app.transactions_selected = 0;
-                app.transactions_offset = 0;
+                return;
             }
-            KeyCode::Char(c) => {
-                if let Some(ref mut q) = app.transactions_filter {
-                    q.push(c);
-                }
-                app.transactions_selected = 0;
-                app.transactions_offset = 0;
-            }
-            KeyCode::Up => {
-                if app.transactions_selected > 0 {
-                    app.transactions_selected -= 1;
-                }
-            }
-            KeyCode::Down => {
-                if app.transactions_selected + 1 < filtered.len() {
-                    app.transactions_selected += 1;
-                }
-            }
-            KeyCode::Enter => {
-                if let Some(&real_idx) = filtered.get(app.transactions_selected) {
+            FilterResult::Enter(sel) => {
+                let filtered = app.filtered_transactions();
+                if let Some(&real_idx) = filtered.get(sel) {
                     let old = app.transactions_selected;
                     app.transactions_selected = real_idx;
                     app.activate_selected_transaction();
                     app.transactions_selected = old;
                 }
+                return;
             }
-            _ => {}
         }
-        let filtered = app.filtered_transactions();
-        if app.transactions_selected >= filtered.len() {
-            app.transactions_selected = filtered.len().saturating_sub(1);
-        }
-        App::scroll_into_view(
-            app.transactions_selected,
-            &mut app.transactions_offset,
-            app.content_visible_rows,
-        );
-        return;
     }
 
     let mut nav = ListNav {

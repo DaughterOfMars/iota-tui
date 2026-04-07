@@ -29,12 +29,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_summary(frame: &mut Frame, app: &App, area: Rect) {
-    let block = Block::default()
-        .title(common::sparkle_text(" Portfolio "))
-        .title_style(common::header_style())
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(common::dim_style());
+    let block = common::section_block(" Portfolio ");
 
     let balance_display = format_nanos(app.total_balance_iota);
 
@@ -54,29 +49,10 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
     let filtering = app.coins_filter.is_some();
     let filtered = app.filtered_coins();
 
-    // Show filter bar if active
-    let (filter_area, table_area) = if filtering {
-        let split = Layout::vertical([Constraint::Length(1), Constraint::Min(3)]).split(area);
-        let query = app.coins_filter.as_deref().unwrap_or("");
-        let bar = Line::from(vec![
-            Span::styled(" Search: ", Style::default().fg(Color::Yellow).bold()),
-            Span::styled(query, common::accent_style()),
-            Span::styled("_", common::dim_style()),
-        ]);
-        frame.render_widget(Paragraph::new(bar), split[0]);
-        (Some(split[0]), split[1])
-    } else {
-        (None, area)
-    };
-    let _ = filter_area;
+    let table_area = common::render_filter_bar(frame, area, app.coins_filter.as_deref());
 
     if app.coins.is_empty() {
-        let block = Block::default()
-            .title(common::sparkle_text(" Coins "))
-            .title_style(common::header_style())
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .border_style(common::dim_style());
+        let block = common::section_block(" Coins ");
 
         let msg = if app.keys.is_empty() {
             "  No keys configured. Press 5 to go to Keys, then 'g' to generate one."
@@ -181,12 +157,7 @@ fn draw_coin_table(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
-    let block = Block::default()
-        .title(common::sparkle_text(" Details "))
-        .title_style(common::header_style())
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(common::dim_style());
+    let block = common::section_block(" Details ");
 
     let content = if let Some(coin) = app.coins.get(app.coins_selected) {
         let id_width = area.width.saturating_sub(16) as usize;

@@ -3,8 +3,8 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::{Color, Style, Stylize},
-    text::{Line, Span},
+    style::{Color, Style},
+    text::Line,
     widgets::{Block, BorderType, Borders, Cell, Paragraph, Row, Table},
 };
 
@@ -22,28 +22,10 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
     let filtering = app.objects_filter.is_some();
     let filtered = app.filtered_objects();
 
-    let (filter_area, table_area) = if filtering {
-        let split = Layout::vertical([Constraint::Length(1), Constraint::Min(3)]).split(area);
-        let query = app.objects_filter.as_deref().unwrap_or("");
-        let bar = Line::from(vec![
-            Span::styled(" Search: ", Style::default().fg(Color::Yellow).bold()),
-            Span::styled(query, common::accent_style()),
-            Span::styled("_", common::dim_style()),
-        ]);
-        frame.render_widget(Paragraph::new(bar), split[0]);
-        (Some(split[0]), split[1])
-    } else {
-        (None, area)
-    };
-    let _ = filter_area;
+    let table_area = common::render_filter_bar(frame, area, app.objects_filter.as_deref());
 
     if app.objects.is_empty() {
-        let block = Block::default()
-            .title(common::sparkle_text(" Objects "))
-            .title_style(common::header_style())
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .border_style(common::dim_style());
+        let block = common::section_block(" Objects ");
 
         let msg = if app.keys.is_empty() {
             "  No keys configured."
@@ -142,12 +124,7 @@ fn draw_object_table(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
-    let block = Block::default()
-        .title(common::sparkle_text(" Object Details "))
-        .title_style(common::header_style())
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(common::dim_style());
+    let block = common::section_block(" Object Details ");
 
     let content = if let Some(obj) = app.objects.get(app.objects_selected) {
         let id_width = area.width.saturating_sub(16) as usize;

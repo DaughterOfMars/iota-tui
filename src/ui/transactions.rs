@@ -3,11 +3,12 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::{Color, Style, Stylize},
-    text::{Line, Span},
+    style::{Color, Style},
+    text::Line,
     widgets::{Block, BorderType, Borders, Cell, Paragraph, Row, Table},
 };
 
+use super::common;
 use super::common::{
     accent_style, detail_line, dim_style, header_style, selected_style, sparkle_text,
     truncate_address,
@@ -18,19 +19,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let filtering = app.transactions_filter.is_some();
     let filtered = app.filtered_transactions();
 
-    let filter_split = if filtering {
-        let split = Layout::vertical([Constraint::Length(1), Constraint::Min(3)]).split(area);
-        let query = app.transactions_filter.as_deref().unwrap_or("");
-        let bar = Line::from(vec![
-            Span::styled(" Search: ", Style::default().fg(Color::Yellow).bold()),
-            Span::styled(query, accent_style()),
-            Span::styled("_", dim_style()),
-        ]);
-        frame.render_widget(Paragraph::new(bar), split[0]);
-        split[1]
-    } else {
-        area
-    };
+    let filter_split = common::render_filter_bar(frame, area, app.transactions_filter.as_deref());
 
     // Split into table + detail pane
     let layout = Layout::vertical([Constraint::Min(8), Constraint::Length(7)]).split(filter_split);
